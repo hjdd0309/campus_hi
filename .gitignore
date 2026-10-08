@@ -1,0 +1,12 @@
+node_modules/
+.vite/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+backend/.venv/
+__pycache__/
+*.pyc

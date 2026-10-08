@@ -1,0 +1,16 @@
+{
+  "name": "mirae-campus",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "start": "node scripts/dev.mjs",
+    "dev": "node scripts/dev.mjs",
+    "setup": "node scripts/dev.mjs --setup",
+    "build": "npm --prefix frontend run build",
+    "test": "npm --prefix frontend test",
+    "preview": "node scripts/dev.mjs preview",
+    "dev:frontend": "npm --prefix frontend run dev"
+  }
+}
