@@ -4,7 +4,7 @@ export const lessonYear = (index) => [1, 2, 4][Math.min(2, Math.max(0, index))];
 export const departments = [
   {
     id: "design",
-    name: "시각디자인학과",
+    name: "산업디자인학과",
     category: "디자인",
     group: "예술 · 디자인",
     icon: "palette",
@@ -23,7 +23,7 @@ export const departments = [
   {
     id: "psychology",
     name: "심리학과",
-    category: "사람·사회",
+    category: "심리",
     group: "사람 · 사회",
     icon: "brain",
     keywords: ["심리", "교육", "사회"],
@@ -34,34 +34,7 @@ export const departments = [
     lessons: ["마음과 행동 관찰", "일상 속 심리 탐구", "4학년 졸업작품"],
     jobs: ["심리 연구원", "상담 분야 전문가", "사용자 경험 연구원"],
   },
-  {
-    id: "media",
-    name: "미디어콘텐츠학과",
-    category: "디자인",
-    group: "예술 · 디자인",
-    icon: "film",
-    keywords: ["영상·콘텐츠", "디자인", "공연"],
-    description:
-      "나만의 이야기를 찾고, 글과 이미지, 영상으로 사람들에게 전해요.",
-    tags: ["스토리 구성", "영상 기획"],
-    years: ["기초 탐색", "적용 실습", "졸업작품"],
-    lessons: ["이야기의 발견", "콘텐츠 기획과 표현", "4학년 졸업작품"],
-    jobs: ["콘텐츠 기획자", "영상 제작자", "미디어 에디터"],
-  },
-  {
-    id: "computer",
-    name: "컴퓨터공학과",
-    category: "기술·자연",
-    group: "기술 · 자연",
-    icon: "code",
-    keywords: ["컴퓨터", "데이터", "공학"],
-    description:
-      "일상의 문제를 작은 단계로 나누고, 기술로 해결하는 방법을 배워요.",
-    tags: ["문제 해결", "논리적 사고"],
-    years: ["기초 탐색", "적용 실습", "졸업작품"],
-    lessons: ["컴퓨팅 기초 탐색", "문제 해결과 서비스 설계", "4학년 졸업작품"],
-    jobs: ["소프트웨어 개발자", "데이터 분석가", "서비스 엔지니어"],
-  },
+
 ];
 export const initialState = {
   version: 2,
@@ -76,15 +49,8 @@ export const initialState = {
   onboarded: false,
 };
 export function createDepartment(course, school, curriculum) {
-  const template =
-    departments.find((d) => d.name === course) ||
-    (/디자인|미술|조형/.test(course)
-      ? departments[0]
-      : /미디어|영상|콘텐츠|방송/.test(course)
-        ? departments[2]
-        : /컴퓨터|소프트웨어|인공지능|공학|데이터/.test(course)
-          ? departments[3]
-          : departments[1]);
+  const template = departments.find((d) => d.name === course);
+  if (!template) throw new Error("지원하지 않는 학과입니다.");
   return {
     ...template,
     id: `api:${school}:${course}`,
@@ -111,7 +77,7 @@ export function loadState(storage) {
       ? value.catalog
           .filter(
             (d) =>
-              typeof d?.name === "string" &&
+              departments.some((item) => item.name === d?.name) &&
               typeof d?.school === "string" &&
               Array.isArray(d?.curriculum),
           )
@@ -188,16 +154,16 @@ export function loadState(storage) {
   }
 }
 export function recommend(interests, activities) {
-  const scores = { design: 0, psychology: 0, media: 0, computer: 0 };
+  const scores = { design: 0, psychology: 0 };
   departments.forEach((d) => {
     scores[d.id] += d.keywords.filter((k) => interests.includes(k)).length * 3;
   });
   const activityMap = {
-    puzzle: ["computer"],
-    draw: ["design", "media"],
+    puzzle: ["design"],
+    draw: ["design"],
     listen: ["psychology"],
-    science: ["computer"],
-    experiment: ["computer", "design"],
+    science: ["psychology"],
+    experiment: ["design"],
   };
   activities.forEach((a) =>
     activityMap[a]?.forEach((id) => {

@@ -45,7 +45,7 @@ test("손상된 저장 데이터는 초기 상태로 복구하고 진행률 범�
 });
 test("관심 분야와 활동에 따라 추천 학과가 바뀐다", () => {
   assert.equal(recommend(["심리", "교육"], ["listen"])[0].id, "psychology");
-  assert.equal(recommend(["컴퓨터"], ["puzzle"])[0].id, "computer");
+  assert.equal(recommend(["디자인"], ["draw"])[0].id, "design");
 });
 test("실습 완료는 한 단계씩 진행되며 빈 기록, 중복, 휴학 중 진행을 막는다", () => {
   const state = {
@@ -115,4 +115,20 @@ test("API로 선택한 대학과 교육과정은 새로고침 후 복구된다",
   assert.equal(restored.current, d.id);
   assert.equal(restored.catalog[0].school, "경희대학교");
   assert.equal(restored.journeys[d.id].completed, 2);
+});
+
+
+test("Figma에 없는 학과는 추천과 저장된 목록에서 제외한다", () => {
+  assert.deepEqual(departments.map((d) => d.name), ["산업디자인학과", "심리학과"]);
+  assert.throws(() => createDepartment("컴퓨터공학과", "대학교", []));
+  const restored = loadState({ getItem: () => JSON.stringify({
+    catalog: [{ name: "컴퓨터공학과", school: "대학교", curriculum: [] }],
+    current: "computer",
+    journeys: { computer: { completed: 3 } },
+    reports: [{ id: "computer", date: "2026-10-09" }],
+  }) });
+  assert.deepEqual(restored.catalog, []);
+  assert.deepEqual(restored.journeys, {});
+  assert.deepEqual(restored.reports, []);
+  assert.equal(restored.current, "design");
 });

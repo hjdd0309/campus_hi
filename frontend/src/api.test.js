@@ -20,7 +20,6 @@ test("Litton의 요청 필드와 응답 형식을 따른다", async (t) => {
   });
   assert.deepEqual(await getCourseList("디자인"), [
     "산업디자인학과",
-    "컴퓨터공학과",
   ]);
   assert.deepEqual(await getSchoolList("산업디자인학과"), ["경희대학교"]);
   assert.deepEqual(await getCurriculumList("경희대학교", "산업디자인학과"), [

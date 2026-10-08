@@ -1,3 +1,5 @@
+import { departments } from "./model.js";
+
 export class ApiError extends Error {
   constructor(status, detail) {
     super(detail);
@@ -55,7 +57,9 @@ const splitList = (value) => {
 };
 export async function getCourseList(interests, signal) {
   const data = await post("/course_list", { interests }, signal);
-  return splitList(data.course_list);
+  return splitList(data.course_list).filter((course) =>
+    departments.some((department) => department.name === course),
+  );
 }
 export async function getSchoolList(course, signal) {
   const data = await post("/school_list", { course }, signal);

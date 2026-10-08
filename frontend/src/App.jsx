@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Icon from "./Icon.jsx";
 import Mascot from "./Mascot.jsx";
 import Catalog from "./Catalog.jsx";
+import CampusDocument, { documentTitles } from "./CampusDocument.jsx";
 import GraduationStudio, { ArtworkPreview } from "./GraduationStudio.jsx";
 import {
   STORAGE_KEY,
@@ -144,16 +145,11 @@ export default function App() {
   const [state, setState] = useState(() => loadState(window.localStorage));
   const departments = [...baseDepartments, ...state.catalog];
   const [pendingTransfer, setPendingTransfer] = useState(null);
-  const defaultRoute = state.onboarded
-    ? Object.keys(state.journeys).length
-      ? "home"
-      : "explore"
-    : "welcome";
   const readRoute = () =>
     routes.includes(location.hash.slice(1))
       ? location.hash.slice(1)
-      : defaultRoute;
-  const [route, setRoute] = useState(readRoute);
+      : "welcome";
+  const [route, setRoute] = useState("welcome");
   const [interestAnswer, setInterestAnswer] = useState("yes");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("전체");
@@ -185,8 +181,25 @@ export default function App() {
     setModal(null);
   };
   const notify = (message) => setToast(message);
+  const hasSavedProgress =
+    state.onboarded ||
+    Object.keys(state.journeys).length > 0 ||
+    state.interests.length > 0 ||
+    state.activities.length > 0;
+
+  function startFresh(next = "interest") {
+    setState(structuredClone(initialState));
+    setDraft("");
+    setQuery("");
+    setFilter("전체");
+    setDetailTab("배우는 내용");
+    setInterestAnswer("yes");
+    setPendingTransfer(null);
+    go(next);
+  }
 
   useEffect(() => {
+    history.replaceState(null, "", `${location.pathname}${location.search}#welcome`);
     const handler = () => {
       setRoute(readRoute());
       setModal(null);
@@ -433,22 +446,26 @@ export default function App() {
                 <i />
               </div>
               <div className="bottom-action">
-                <Button onClick={() => go("interest")}>
-                  내 전공 찾으러 가기
+                <Button onClick={() => startFresh()}>
+                  {hasSavedProgress ? "처음부터 시작하기" : "내 전공 찾으러 가기"}
                 </Button>
                 <p className="footnote">
-                  정답은 없어요. 나만의 속도로 시작해요.
+                  {hasSavedProgress
+                    ? "처음부터 시작하면 이 브라우저의 이전 기록이 초기화돼요."
+                    : "정답은 없어요. 나만의 속도로 시작해요."}
                 </p>
-                {state.onboarded && (
+                {hasSavedProgress && (
                   <button
                     className="text-button"
                     onClick={() =>
                       go(
-                        Object.keys(state.journeys).length ? "home" : "explore",
+                        Object.keys(state.journeys).length
+                          ? "home"
+                          : state.onboarded ? "explore" : "interest",
                       )
                     }
                   >
-                    이어서 둘러보기 <Icon name="next" size={14} />
+                    이전 기록 이어서 하기 <Icon name="next" size={14} />
                   </button>
                 )}
               </div>
@@ -709,7 +726,7 @@ export default function App() {
                 )}
               </label>
               <div className="chips filters">
-                {["전체", "디자인", "사람·사회", "기술·자연"].map((item) => (
+                {["전체", "디자인", "심리", "사회"].map((item) => (
                   <button
                     className={`chip ${filter === item ? "active" : ""}`}
                     aria-pressed={filter === item}
@@ -744,6 +761,9 @@ export default function App() {
                 </div>
               )}
               <div className="callout mint department-hero">
+                {department.id === "design" || department.name === "산업디자인학과" ? (
+                  <img className="major-palette" src="/assets/major-palette.svg" alt="" />
+                ) : null}
                 <div className="hero-title">
                   <Icon name={department.icon} size={32} />
                   <div>
@@ -878,6 +898,9 @@ export default function App() {
               </div>
               <div className="bottom-action">
                 <Button onClick={() => go("lesson")}>첫 체험 시작하기</Button>
+                <button className="text-button" onClick={() => setModal({ type: "document", document: "admission" })}>
+                  체험 입학증 보기
+                </button>
                 <p className="footnote">
                   학년은 체험 단계예요. 내 속도에 맞춰 탐색해요.
                 </p>
@@ -1364,6 +1387,12 @@ export default function App() {
                     ? "저장된 리포트 확인하기"
                     : "체험 리포트 저장하기"}
                 </Button>
+                <Button secondary onClick={() => setModal({ type: "document", document: "transcript" })}>
+                  성적표 확인하기
+                </Button>
+                <button className="text-button" onClick={() => setModal({ type: "document", document: "diploma" })}>
+                  졸업증명서 보기
+                </button>
                 <p className="footnote">
                   저장한 리포트는 나의 진로·전공 계획에서 볼 수 있어요.
                 </p>
@@ -1491,7 +1520,9 @@ export default function App() {
           <Modal
             onClose={() => setModal(null)}
             title={
-              modal === "menu"
+              modal?.type === "document"
+                ? documentTitles[modal.document]
+                : modal === "menu"
                 ? "미래캠퍼스"
                 : modal === "notifications"
                   ? "나의 소식"
@@ -1508,6 +1539,14 @@ export default function App() {
                             : "저장한 체험 리포트"
             }
           >
+            {modal?.type === "document" && (
+              <CampusDocument
+                type={modal.document}
+                department={department}
+                completed={completed}
+                onNext={() => setModal({ type: "document", document: "diploma" })}
+              />
+            )}
             {modal === "artwork" && (
               <GraduationStudio
                 key={department.id}
@@ -1553,11 +1592,7 @@ export default function App() {
                 <Button
                   className="danger"
                   onClick={() => {
-                    setState(structuredClone(initialState));
-                    setDraft("");
-                    setQuery("");
-                    setFilter("전체");
-                    go("welcome");
+                    startFresh("welcome");
                     notify("새로운 탐색을 시작할 준비가 됐어요.");
                   }}
                 >

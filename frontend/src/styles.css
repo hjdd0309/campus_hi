@@ -19,6 +19,7 @@
     rgba(39, 216, 205, 0) 0%,
     rgba(39, 216, 205, 0.2) 100%
   );
+  --document-fold-gradient: linear-gradient(135deg, #27d8cd 49%, #eafffd 51%);
   --dark-teal: #287c77;
   --cream: #fff9e7;
   --gray: #f5f5f3;
@@ -561,8 +562,7 @@ button strong {
   color: #4a584c;
 }
 .result-card,
-.department-hero,
-.department-card.mint {
+.department-hero {
   background: var(--card-gradient);
   border: 1px solid var(--figma-mint);
 }
@@ -745,6 +745,21 @@ button strong {
 }
 .department-hero {
   padding: 20px;
+  flex-shrink: 0;
+  min-height: 168px;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.department-hero > .major-palette {
+  position: absolute;
+  z-index: -1;
+  top: -12px;
+  right: -8px;
+  width: 163.377px;
+  height: 163.377px;
+  transform: rotate(-22.71deg);
+  pointer-events: none;
 }
 .hero-title {
   display: flex;
@@ -1089,6 +1104,78 @@ button strong {
   border: 1px solid var(--border);
   border-radius: 19px;
   padding: 20px;
+}
+.document-scene {
+  background: var(--figma-mint);
+  border-radius: 12px;
+  padding: 26px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+.document-paper {
+  position: relative;
+  width: min(100%, 273px);
+  min-height: 365px;
+  padding: 58px 24px 24px;
+  border-radius: 8px;
+  background: white;
+  text-align: center;
+  color: #949494;
+}
+.document-fold {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 53px;
+  height: 52px;
+  background: var(--document-fold-gradient);
+}
+.document-paper h3 {
+  font-size: 22px;
+  color: var(--figma-mint);
+  margin: 0 0 30px;
+}
+.document-school,
+.document-paper > strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.document-copy {
+  margin: 36px 0;
+  font-size: 12px;
+  line-height: 2;
+}
+.document-lessons {
+  margin: 20px 0;
+  font-size: 10px;
+}
+.document-lessons > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid #cacaca;
+}
+.document-lessons dd {
+  margin: 0;
+}
+.document-paper > svg {
+  opacity: 0.29;
+  margin: 10px auto;
+}
+.document-paper > small {
+  display: block;
+  font-size: 10px;
+}
+.document-next {
+  background: white;
+  color: #087f77;
+}
+.document-next:hover:not(:disabled) {
+  background: #eafffd;
 }
 .report-card h2 {
   font-size: 13px;
