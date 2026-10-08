@@ -1,0 +1,341 @@
+.learning-steps {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 20px;
+  justify-content: space-between;
+}
+.learning-steps > span {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  background: #f2f5f0;
+  border-radius: 20px;
+  font-size: 10px;
+  color: #a1ab9b;
+  padding: 8px 9px;
+  flex: 1;
+  white-space: nowrap;
+}
+.learning-steps > .active {
+  background: #dcf7ef;
+  color: #248675;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #86d8ca;
+}
+.learning-steps > .done {
+  color: #5ba18e;
+}
+.graduation-studio {
+  margin: 0 -10px 23px;
+  flex-shrink: 0;
+}
+.studio-heading {
+  text-align: center;
+  padding: 6px 0 18px;
+}
+.studio-heading h2 {
+  font-size: 21px;
+  margin: 12px 0 7px;
+  letter-spacing: -0.7px;
+}
+.studio-heading p {
+  font-size: 11px;
+  color: #8a9788;
+}
+.studio-scene {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 640/660;
+  border-radius: 22px;
+  isolation: isolate;
+  overflow: hidden;
+  background: #aaac98;
+  box-shadow: inset 0 0 0 1px #d2d5c8;
+}
+.workshop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.studio-scene canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  z-index: 2;
+}
+.studio-scene canvas:focus-visible {
+  outline: 3px solid #27c6b3;
+  outline-offset: -4px;
+  border-radius: 22px;
+}
+.spray-cursor {
+  position: absolute;
+  pointer-events: none;
+  width: 64px;
+  height: 105px;
+  z-index: 3;
+  transform: translate(-5%, 5%);
+  filter: drop-shadow(3px 6px 3px #23362b55);
+}
+.spray-cursor svg {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 20%;
+  transition: transform 0.1s;
+}
+.spray-cursor.spraying svg {
+  transform: rotate(-8deg);
+}
+.spray-cloud {
+  position: absolute;
+  left: -33px;
+  top: -24px;
+  width: 72px;
+  height: 54px;
+  border-radius: 50%;
+  background: radial-gradient(
+    at 0% center,
+    color-mix(in srgb, var(--spray-color) 70%, transparent) 0%,
+    color-mix(in srgb, var(--spray-color) 25%, transparent) 55%,
+    transparent 72%
+  );
+  opacity: 0;
+  filter: blur(4px);
+  transform: rotate(-20deg);
+  transition: opacity 0.15s;
+}
+.spraying .spray-cloud {
+  opacity: 1;
+  animation: spray-mist 0.18s infinite alternate;
+}
+.studio-caption {
+  position: absolute;
+  bottom: 15px;
+  left: 14px;
+  right: 14px;
+  padding: 11px 5px;
+  text-align: center;
+  border-radius: 12px;
+  background: #fffef4e8;
+  color: #667860;
+  font-size: 10px;
+  pointer-events: none;
+  z-index: 3;
+}
+.studio-controls {
+  background: #fafcf7;
+  border: 1px solid #edf0e7;
+  border-radius: 18px;
+  margin-top: 12px;
+  padding: 15px;
+}
+.paint-colors {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.paint-colors button {
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 3px white;
+}
+.paint-colors button[aria-pressed="true"] {
+  outline: 2px solid #465e50;
+  outline-offset: 3px;
+}
+.spray-size {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  color: #7b8d75;
+  font-size: 10px;
+  margin: 20px 0 10px;
+}
+.spray-size input {
+  accent-color: #22b9a5;
+  flex: 1;
+}
+.studio-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  border-top: 1px solid #e9eee3;
+  padding-top: 10px;
+}
+.studio-actions button {
+  font-size: 10px;
+  color: #608471;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+}
+.studio-actions button:hover {
+  color: #17846e;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.saved-artwork {
+  width: 100%;
+  border-radius: 15px;
+  background: #e9e5d9;
+  border: 1px solid #dcdccd;
+  margin: 12px 0;
+}
+.graduation-school {
+  text-align: center;
+  color: #64a48f;
+  font-size: 12px;
+  margin: -10px 0 22px;
+}
+.catalog-count,
+.catalog-status {
+  font-size: 11px;
+  color: #7f9788;
+  line-height: 1.8;
+  margin: 0 0 16px;
+}
+.catalog .department-card {
+  padding: 15px;
+}
+.school-select {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 24px 0 17px;
+}
+.school-select select {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #b9d9cc;
+  border-radius: 12px;
+  padding: 12px;
+  font: inherit;
+  font-weight: 400;
+  color: #536e5d;
+}
+.school-curriculum h3 {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.school-curriculum p {
+  font-size: 11px;
+  color: #92a28c;
+}
+.school-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #f1ead3;
+  border-radius: 15px;
+  background: #fff9e7;
+  padding: 16px;
+  margin-bottom: 14px;
+  color: #9b6b5e;
+}
+.school-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.school-banner strong {
+  font-size: 14px;
+  color: #6c7963;
+}
+.school-banner small {
+  font-size: 9px;
+  color: #9aa08c;
+}
+.actual-curriculum {
+  border: 1px solid #e4ece0;
+  border-radius: 13px;
+  padding: 12px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: #70917d;
+}
+.actual-curriculum summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.actual-curriculum ul {
+  max-height: 180px;
+  overflow: auto;
+  padding-left: 17px;
+  color: #89987d;
+  line-height: 1.9;
+}
+.current-card > .eyebrow {
+  margin-bottom: 12px;
+}
+.page-lesson > .note-card {
+  flex-shrink: 0;
+}
+@keyframes spray-mist {
+  from {
+    transform: rotate(-20deg) scale(0.9);
+  }
+  to {
+    transform: rotate(-15deg) scale(1.2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spray-cloud {
+    animation: none !important;
+  }
+}
+@media (max-width: 350px) {
+  .learning-steps > span {
+    font-size: 9px;
+    padding: 7px;
+  }
+  .paint-colors {
+    gap: 11px;
+  }
+  .spray-cursor {
+    width: 55px;
+    height: 90px;
+  }
+}
+
+.artwork-preview {
+  position: relative;
+  aspect-ratio: 640/660;
+  width: 100%;
+  background: #f0eee4;
+  border-radius: 15px;
+  margin: 15px 0;
+  overflow: hidden;
+}
+.artwork-preview > svg,
+.artwork-preview > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
