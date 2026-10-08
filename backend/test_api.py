@@ -21,6 +21,12 @@ class ApiTests(unittest.TestCase):
         self.assertTrue(all(isinstance(subject, str) for subject in subjects))
         self.assertEqual(len(subjects), len(set(subjects)))
 
+    def test_only_figma_courses_are_available(self):
+        courses = self.client.post("/api/course_list", json={"interests": "전체"}).json()["course_list"].split(",")
+        self.assertEqual(set(courses), {"산업디자인학과", "심리학과"})
+        self.assertEqual(self.client.post("/api/school_list", json={"course": "컴퓨터공학과"}).json(), {"school_list": ""})
+        self.assertEqual(self.client.post("/api/curriculum_list", json={"school": "대학교", "course": "컴퓨터공학과"}).status_code, 404)
+
     def test_validation_and_not_found(self):
         for body in ({}, {"interests": " "}, {"interests": 3}):
             response = self.client.post("/api/course_list", json=body)

@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 app = FastAPI(title="Litton Campus API", version="1.0.0")
+ALLOWED_COURSES = {"산업디자인학과", "심리학과"}
 DATA_PATH = Path(__file__).parent / "data" / "courses.csv.gz"
 
 
@@ -38,7 +39,7 @@ async def validation_error(request, exc):
 @lru_cache(maxsize=1)
 def rows():
     with gzip.open(DATA_PATH, "rt", encoding="utf-8-sig", newline="") as file:
-        return tuple(row for row in csv.DictReader(file) if row["학과상태명"] != "폐과")
+        return tuple(row for row in csv.DictReader(file) if row["학과상태명"] != "폐과" and row["학과명"].strip() in ALLOWED_COURSES)
 
 
 @app.get("/api/health")
