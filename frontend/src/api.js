@@ -85,5 +85,6 @@ export async function getCurriculum(school, course, signal) {
     ),
     category: typeof data.category === "string" ? data.category : "",
     years: data.years ?? null,
+    duration: typeof data.duration === "string" ? data.duration : "",
   };
 }

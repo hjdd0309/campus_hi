@@ -1,6 +1,6 @@
-# 미래캠퍼스
+# 하이캠퍼스
 
-관심 분야에서 출발해 대학 학과와 교육과정을 살펴보고, 세 단계 체험으로 전공을 미리 경험하는 웹 서비스입니다.
+관심 분야에서 출발해 대학 학과와 교육과정을 살펴보고, 학년별 체험으로 전공을 미리 경험하는 웹 서비스입니다. 체험은 학과의 수업연한에 맞춰 학년마다 하나씩 있고(4년제는 1~4학년, 2년제는 1~2학년), 마지막 학년은 학과에 맞는 졸업 과제입니다(조형·디자인 학과는 도색 졸업작품, 공학은 캡스톤 디자인 계획서, 그 밖의 예체능은 졸업 발표 계획서, 나머지는 졸업 연구 계획서).
 
 ## 폴더 구조
 - `frontend/` : React + Vite 화면
@@ -36,8 +36,8 @@ backend/.venv/Scripts/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8
 Docker로 배포할 때는 저장소 루트의 `Dockerfile`을 사용합니다. 포트는 `PORT` 환경변수(기본 8000)를 따릅니다.
 
 ```
-docker build -t mirae-campus .
-docker run -p 8000:8000 mirae-campus
+docker build -t hi-campus .
+docker run -p 8000:8000 hi-campus
 ```
 
 Vercel로 배포할 때는 `vercel.json`을 사용합니다. 화면은 정적 파일로, API는 `api/index.py`를 거쳐 서버리스 함수로 제공됩니다. 파이썬 의존성은 루트 `requirements.txt`에서 읽으므로 `backend/requirements.txt`와 버전을 맞추고, 보안 헤더는 `backend/main.py`와 `vercel.json` 양쪽에 있으므로 함께 고칩니다.

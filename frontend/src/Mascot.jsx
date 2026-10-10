@@ -9,8 +9,8 @@ export default function Mascot({ variant = "hello", small = false }) {
       role="img"
       aria-label={
         variant === "graduate"
-          ? "졸업 모자를 쓴 미래캠퍼스 캐릭터"
-          : "반갑게 인사하는 미래캠퍼스 캐릭터"
+          ? "졸업 모자를 쓴 하이캠퍼스 캐릭터"
+          : "반갑게 인사하는 하이캠퍼스 캐릭터"
       }
     >
       <g

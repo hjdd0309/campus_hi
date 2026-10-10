@@ -168,7 +168,7 @@ def decode(raw, content_type):
 def fetch(url):
     if urlparse(url).scheme not in ("http", "https"):
         raise ValueError("http(s) 주소만 받을 수 있습니다.")
-    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; MiraeCampusCurriculumBot/1.0)"})
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; HiCampusCurriculumBot/1.0)"})
     with urllib.request.urlopen(request, timeout=30) as response:
         raw = response.read(MAX_BYTES + 1)
         content_type = response.headers.get("Content-Type", "")

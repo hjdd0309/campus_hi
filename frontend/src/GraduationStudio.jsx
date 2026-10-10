@@ -210,7 +210,7 @@ export default function GraduationStudio({ value, onChange }) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "미래캠퍼스-졸업작품.png";
+      link.download = "하이캠퍼스-졸업작품.png";
       document.body.append(link);
       link.click();
       link.remove();
@@ -220,11 +220,11 @@ export default function GraduationStudio({ value, onChange }) {
   return (
     <section
       className="graduation-studio"
-      aria-label="4학년 졸업작품 도색 작업실"
+      aria-label="졸업작품 도색 작업실"
     >
       <div className="studio-heading">
-        <span className="tag">3 / 3 · 마지막 학습</span>
-        <h2>4학년 졸업작품</h2>
+        <span className="tag">마지막 학년</span>
+        <h2>졸업작품</h2>
         <p>스프레이를 드래그해서 나만의 색을 입혀요.</p>
       </div>
       <div className="studio-scene" style={{ "--spray-color": color }}>

@@ -21,6 +21,7 @@ import {
   loadState,
   cleanYears,
   initialState,
+  STORAGE_KEY,
 } from "./model.js";
 
 // 테스트가 매번 같은 결과를 내도록 고정된 난수를 쓴다.
@@ -53,6 +54,12 @@ test("체험 과목은 게임이 있는 과목을 먼저, 서로 다른 게임�
   ]);
   assert.deepEqual(pickLessons(["운영체제"]), [{ subject: "운영체제", game: null }]);
   assert.deepEqual(pickLessons([]), []);
+  assert.deepEqual(
+    pickLessons(["C언어", "자료구조", "운영체제", "회계원리"], 3).map((item) => item.subject),
+    ["자료구조", "회계원리", "C언어"],
+  );
+  assert.deepEqual(pickLessons(["자료구조", "알고리즘"], 1), [{ subject: "자료구조", game: "sorting" }]);
+  assert.deepEqual(pickLessons(["자료구조"], 0), []);
 });
 test("스트룹 실험은 일치 8문제와 불일치 8문제로 구성된다", () => {
   for (const seed of [1, 2, 3, 4, 5]) {
@@ -129,8 +136,8 @@ test("분개 문제는 차변과 대변이 회계 원칙에 맞는다", () => {
   );
 });
 test("게임이 있는 수업은 게임을 마쳐야 완료된다", () => {
-  const d = createDepartment("컴퓨터공학과", "가천대학교", ["C언어", "자료구조"], "공학");
-  assert.deepEqual(d.lessons, ["자료구조", "C언어", "4학년 졸업작품"]);
+  const d = createDepartment("컴퓨터공학과", "가천대학교", ["C언어", "자료구조"], "공학", null, "3년");
+  assert.deepEqual(d.lessons, ["자료구조", "C언어", "캡스톤 디자인"]);
   assert.deepEqual(d.games, ["sorting", null, null]);
   const state = {
     ...structuredClone(initialState),
@@ -169,7 +176,8 @@ test("게임 결과와 학년별 편성은 형식이 맞는 것만 복구한다"
     "https://a.ac.kr/c",
   );
   const restored = loadState({
-    getItem: () =>
+    getItem: (key) =>
+      key !== STORAGE_KEY ? null :
       JSON.stringify({
         catalog: [d],
         plays: {
@@ -184,6 +192,6 @@ test("게임 결과와 학년별 편성은 형식이 맞는 것만 복구한다"
     [`${d.id}-0`]: { game: "stroop", summary: "16문제 중 15개 정답" },
   });
   assert.deepEqual(restored.catalog[0].yearly, d.yearly);
-  assert.deepEqual(restored.catalog[0].games, ["stroop", null, null]);
+  assert.deepEqual(restored.catalog[0].games, ["stroop", null, null, null]);
   assert.ok(games.every((game) => game.title && game.pattern instanceof RegExp));
 });

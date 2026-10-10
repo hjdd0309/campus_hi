@@ -13,8 +13,9 @@
   border-radius: 20px;
   font-size: 10px;
   color: #a1ab9b;
-  padding: 8px 9px;
+  padding: 8px 4px;
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
 }
 .learning-steps > .active {

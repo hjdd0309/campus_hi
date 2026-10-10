@@ -9,6 +9,7 @@ export default function Catalog({ filter, query, onChoose }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [category, setCategory] = useState("");
   const [years, setYears] = useState(null);
+  const [duration, setDuration] = useState("");
   // 화면의 교육과정이 어느 대학·학과의 것인지 기억해, 불러오기 전의 빈 값으로 넘어가지 않게 한다.
   const [loadedFor, setLoadedFor] = useState("");
   const [selected, setSelected] = useState("");
@@ -91,6 +92,7 @@ export default function Catalog({ filter, query, onChoose }) {
         setCurriculum(result.curriculum);
         setCategory(result.category);
         setYears(result.years);
+        setDuration(result.duration);
         setLoadedFor(`${school}
 ${selected}`);
         setStatus("");
@@ -223,7 +225,7 @@ ${selected}` && (
               </p>
               <button
                 className="button"
-                onClick={() => onChoose(selected, school, curriculum, category, years)}
+                onClick={() => onChoose(selected, school, curriculum, category, years, duration)}
               >
                 이 대학·학과 알아보기
               </button>

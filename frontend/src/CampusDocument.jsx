@@ -13,13 +13,13 @@ export default function CampusDocument({ type, department, completed, onNext }) 
       <article className="document-paper" aria-label={documentTitles[type]}>
         <span className="document-fold" aria-hidden="true" />
         <h3>{documentTitles[type]}</h3>
-        <p className="document-school">{department.school || "미래캠퍼스"}</p>
+        <p className="document-school">{department.school || "하이캠퍼스"}</p>
         <strong>{department.name}</strong>
         {type === "transcript" ? (
           <dl className="document-lessons">
-            {department.years.map((year, index) => (
-              <div key={year}>
-                <dt>{index + 1}단계 · {year}</dt>
+            {department.lessons.map((lesson, index) => (
+              <div key={index}>
+                <dt>{department.yearNumbers[index]}학년 · {lesson}</dt>
                 <dd>{index < completed ? "완료" : "미완료"}</dd>
               </div>
             ))}
@@ -28,7 +28,7 @@ export default function CampusDocument({ type, department, completed, onNext }) 
           <p className="document-copy">
             {type === "admission"
               ? "이 학과의 전공 체험을 시작합니다."
-              : "세 단계의 학습과 실습을 모두 마쳤습니다."}
+              : "모든 학년의 학습과 실습을 마쳤습니다."}
           </p>
         )}
         <Icon name="cap" size={42} />

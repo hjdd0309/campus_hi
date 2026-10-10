@@ -21,17 +21,18 @@ export const games = [
 export const gameFor = (subject) =>
   games.find((game) => game.pattern.test(subject))?.id || null;
 
-// 체험 1·2단계에 쓸 과목을 고른다. 게임이 있는 과목을 먼저, 서로 다른 게임이 되도록 고른다.
-export function pickLessons(curriculum) {
+// 체험에 쓸 과목을 count개 고른다. 게임이 있는 과목을 먼저, 서로 다른 게임이 되도록 고른다.
+export function pickLessons(curriculum, count = 2) {
   const picked = [];
   for (const subject of curriculum) {
+    if (picked.length >= count) break;
     const game = gameFor(subject);
     if (game && !picked.some((item) => item.game === game))
       picked.push({ subject, game });
-    if (picked.length === 2) break;
+    if (picked.length >= count) break;
   }
   for (const subject of curriculum) {
-    if (picked.length === 2) break;
+    if (picked.length >= count) break;
     if (!picked.some((item) => item.subject === subject))
       picked.push({ subject, game: gameFor(subject) });
   }

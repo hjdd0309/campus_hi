@@ -1,8 +1,73 @@
 import { games, pickLessons } from "./games.js";
 
-export const STORAGE_KEY = "mirae-campus-v2";
-export const LESSON_COUNT = 3;
-export const lessonYear = (index) => [1, 2, 4][Math.min(2, Math.max(0, index))];
+export const STORAGE_KEY = "hi-campus-v3";
+// 예전 저장 데이터: [저장 키, 그때의 체험 단계 수]
+const LEGACY_KEYS = [
+  ["mirae-campus-v2", 3],
+  ["mirae-campus-v1", 8],
+];
+// 마지막 학년의 졸업 과제. 도색 작업실은 조형·디자인 학과에만 맞으므로, 나머지 학과는 계열에 맞는 과제의 계획서를 쓴다.
+export const PLAN_FIELDS = ["topic", "reason", "method"];
+export const finals = {
+  artwork: { kind: "artwork", name: "졸업작품" },
+  capstone: {
+    kind: "plan",
+    name: "캡스톤 디자인",
+    intro:
+      "공학 계열은 마지막 학년에 팀을 이뤄 실제 문제를 해결하는 결과물을 만드는 캡스톤 디자인을 하는 경우가 많아요. 나만의 계획서를 써봐요.",
+    prompts: [
+      { label: "해결하고 싶은 문제", placeholder: "주변에서 불편하다고 느낀 문제를 하나 골라 적어주세요." },
+      { label: "누구에게, 왜 필요한가요?", placeholder: "이 문제가 해결되면 누가 어떤 점에서 좋아질까요?" },
+      { label: "어떻게 만들어 볼 건가요?", placeholder: "무엇을 만들지, 앞 학년에서 체험한 내용을 어떻게 쓸지 적어주세요." },
+    ],
+  },
+  thesis: {
+    kind: "plan",
+    name: "졸업 연구",
+    intro:
+      "많은 학과가 마지막 학년에 스스로 정한 질문을 탐구하는 졸업 논문이나 졸업 연구로 배움을 마무리해요. 나만의 연구 계획서를 써봐요.",
+    prompts: [
+      { label: "탐구하고 싶은 질문", placeholder: "이 전공을 체험하며 가장 궁금해진 점을 질문으로 적어주세요." },
+      { label: "왜 궁금한가요?", placeholder: "이 질문이 나에게, 또는 다른 사람에게 왜 중요한가요?" },
+      { label: "어떻게 알아볼 건가요?", placeholder: "자료 조사, 관찰, 실험, 인터뷰 중 어떤 방법으로 답을 찾을지 적어주세요." },
+    ],
+  },
+  showcase: {
+    kind: "plan",
+    name: "졸업 발표",
+    intro:
+      "예술·체육 계열은 졸업 공연, 연주회, 발표회처럼 사람들 앞에서 배움을 보여주며 마무리하는 경우가 많아요. 나만의 발표 계획서를 써봐요.",
+    prompts: [
+      { label: "무대에 올리고 싶은 것", placeholder: "어떤 공연, 연주, 경기, 작품을 보여주고 싶은지 적어주세요." },
+      { label: "무엇을 전하고 싶나요?", placeholder: "보는 사람이 무엇을 느끼거나 알게 되면 좋을까요?" },
+      { label: "어떻게 준비할 건가요?", placeholder: "무엇을 연습하고 누구와 함께 준비할지 적어주세요." },
+    ],
+  },
+};
+const ARTWORK_COURSE = /디자인|미술|조형|공예|회화|조소|도예/;
+export function finalFor(course, category) {
+  if (ARTWORK_COURSE.test(course)) return "artwork";
+  if (category === "공학") return "capstone";
+  if (category === "예체능") return "showcase";
+  return "thesis";
+}
+export const planReady = (plan) =>
+  !!plan && PLAN_FIELDS.every((field) => typeof plan[field] === "string" && plan[field].trim());
+// 마지막 학년을 완료할 준비가 됐는지: 졸업작품은 칠한 작품이, 계획서는 세 칸이 모두 있어야 한다.
+export function finalReady(state, department) {
+  return (finals[department.final] || finals.artwork).kind === "artwork"
+    ? !!state.artworks?.[department.id]
+    : planReady(state.capstones?.[department.id]);
+}
+// 수업연한("4년", "2.5년", "1년(전공심화)")을 체험할 학년 목록으로 바꾼다. 학년마다 체험이 하나씩 있다.
+export function stageYears(duration) {
+  const length = Math.ceil(parseFloat(duration));
+  if (!Number.isFinite(length)) return [1, 2, 3, 4];
+  const count = Math.min(6, Math.max(1, length));
+  // 전공심화 과정은 전문학사 뒤에 이어지는 과정이라 4학년에서 끝난다.
+  const first = String(duration).includes("전공심화") ? Math.max(1, 5 - count) : 1;
+  return Array.from({ length: count }, (_, i) => first + i);
+}
 export const departments = [
   {
     id: "design",
@@ -14,11 +79,13 @@ export const departments = [
     description:
       "사람의 일상을 관찰하고, 생각을 시각적인 해결책으로 바꾸는 과정을 체험해요.",
     tags: ["사용자 관찰", "화면 설계"],
-    years: ["기초 탐색", "적용 실습", "졸업작품"],
+    yearNumbers: [1, 2, 3, 4],
+    final: "artwork",
     lessons: [
       "일상 속 디자인 찾기",
       "사용자를 위한 제품 설계",
-      "4학년 졸업작품",
+      "서비스와 브랜드 디자인",
+      finals.artwork.name,
     ],
     jobs: ["UX/UI 디자이너", "브랜드 디자이너", "콘텐츠 디자이너"],
   },
@@ -32,8 +99,14 @@ export const departments = [
     description:
       "사람의 마음과 행동이 궁금하다면, 일상 속 질문을 통해 심리학을 만나보세요.",
     tags: ["감정 기록", "행동 관찰"],
-    years: ["기초 탐색", "적용 실습", "졸업작품"],
-    lessons: ["마음과 행동 관찰", "일상 속 심리 탐구", "4학년 졸업작품"],
+    yearNumbers: [1, 2, 3, 4],
+    final: "thesis",
+    lessons: [
+      "마음과 행동 관찰",
+      "일상 속 심리 탐구",
+      "심리 연구 설계",
+      finals.thesis.name,
+    ],
     jobs: ["심리 연구원", "상담 분야 전문가", "사용자 경험 연구원"],
   },
 ];
@@ -101,7 +174,7 @@ const fallbackField = {
   tags: ["교과목 살펴보기", "직접 해보기"],
 };
 export const initialState = {
-  version: 2,
+  version: 3,
   interests: [],
   activities: [],
   journeys: {},
@@ -112,6 +185,7 @@ export const initialState = {
   reports: [],
   catalog: [],
   artworks: {},
+  capstones: {},
   onboarded: false,
 };
 // 수집 파이프라인이 검증한 학년별 편성. 형식이 맞지 않으면 없는 것으로 본다.
@@ -146,15 +220,29 @@ export function createDepartment(
   curriculum,
   category = "",
   years = null,
+  duration = "",
 ) {
-  const picked = pickLessons(curriculum);
+  const yearly = cleanYears(years);
+  const yearNumbers = stageYears(duration);
+  // 마지막 학년은 졸업 과제, 그 앞 학년은 과목 하나씩을 체험한다.
+  const subjectYears = yearNumbers.slice(0, -1);
+  const subjectsOf = (year) =>
+    yearly.terms.filter((t) => t.year === year).flatMap((t) => t.subjects);
+  // 검증된 학년별 편성이 모든 학년에 있으면 그 학년의 과목으로, 없으면 교과목 목록에서 고른다.
+  const lessonsFromYears =
+    !!yearly &&
+    subjectYears.length > 0 &&
+    subjectYears.every((year) => subjectsOf(year).length > 0);
+  const picked = lessonsFromYears
+    ? subjectYears.map((year) => pickLessons(subjectsOf(year), 1)[0])
+    : pickLessons(curriculum, subjectYears.length);
   const field = fields.find((item) => item.id === category) || fallbackField;
+  const final = finalFor(course, field.id);
   const template = departments.find((d) => d.name === course) || {
     category: field.id,
     group: field.group,
     icon: field.icon,
     tags: field.tags,
-    years: ["기초 탐색", "적용 실습", "졸업작품"],
   };
   return {
     ...template,
@@ -162,25 +250,35 @@ export function createDepartment(
     name: course,
     school,
     curriculum,
+    duration,
     category: field.id || template.category,
     source: "litton",
-    description: `${school} ${course}의 교과목을 살펴보고, 세 단계의 탐색 활동으로 전공을 미리 경험해요.`,
-    yearly: cleanYears(years),
+    description: `${school} ${course}의 교과목을 살펴보고, 학년별 체험으로 전공을 미리 경험해요.`,
+    yearly,
+    yearNumbers,
+    final,
+    lessonsFromYears,
     lessons: [
-      picked[0]?.subject || "전공 기초 탐색",
-      picked[1]?.subject || "전공 적용 실습",
-      "4학년 졸업작품",
+      ...subjectYears.map(
+        (year, i) => picked[i]?.subject || `${year}학년 전공 탐색`,
+      ),
+      finals[final].name,
     ],
-    games: [picked[0]?.game || null, picked[1]?.game || null, null],
+    games: [...subjectYears.map((_, i) => picked[i]?.game || null), null],
   };
 }
 export function loadState(storage) {
   try {
-    const saved = storage.getItem(STORAGE_KEY);
-    const value = JSON.parse(saved || storage.getItem("mirae-campus-v1"));
+    // stages: 저장 당시의 체험 단계 수. 0이면 지금 구조(학년별)로 저장된 데이터다.
+    let value = JSON.parse(storage.getItem(STORAGE_KEY));
+    let stages = 0;
+    for (const [key, count] of LEGACY_KEYS) {
+      if (value) break;
+      value = JSON.parse(storage.getItem(key));
+      stages = count;
+    }
     if (!value || typeof value !== "object")
       return structuredClone(initialState);
-    const legacy = !saved;
     const catalog = Array.isArray(value.catalog)
       ? value.catalog
           .filter(
@@ -198,26 +296,41 @@ export function loadState(storage) {
               d.curriculum.filter((s) => typeof s === "string"),
               fields.some((item) => item.id === d.category) ? d.category : "",
               d.yearly,
+              typeof d.duration === "string" ? d.duration : "",
             ),
           )
       : [];
-    const validIds = new Set([...departments, ...catalog].map((d) => d.id));
+    const counts = new Map(
+      [...departments, ...catalog].map((d) => [d.id, d.lessons.length]),
+    );
+    const validIds = new Set(counts.keys());
+    // 예전 단계 번호를 지금의 학년 단계 번호로 옮긴다. 마지막 단계(졸업작품)는 마지막 학년으로 간다.
+    const moveIndex = (id, index) => {
+      const last = counts.get(id) - 1;
+      if (stages === 3 && index >= 2) return last;
+      if (stages === 8) return Math.min(last, Math.floor((index * (last + 1)) / 8));
+      return Math.min(last, index);
+    };
+    const moveKey = (key) => {
+      const match = key.match(/^(.*)-(\d+)$/);
+      return match && validIds.has(match[1])
+        ? `${match[1]}-${moveIndex(match[1], Number(match[2]))}`
+        : null;
+    };
+    const moveCompleted = (id, completed) => {
+      const total = counts.get(id);
+      const done = Math.max(0, Math.floor(Number(completed) || 0));
+      if (stages === 3) return done >= 3 ? total : Math.min(done, total - 1);
+      if (stages === 8) return Math.min(total, Math.floor((done * total) / 8));
+      return Math.min(total, done);
+    };
     const journeys = Object.fromEntries(
       Object.entries(value.journeys || {})
         .filter(([id]) => validIds.has(id))
         .map(([id, item]) => [
           id,
           {
-            completed: Math.min(
-              LESSON_COUNT,
-              Math.max(
-                0,
-                Math.floor(
-                  (Number(item?.completed) || 0) *
-                    (legacy ? LESSON_COUNT / 8 : 1),
-                ),
-              ),
-            ),
+            completed: moveCompleted(id, item?.completed),
             paused: !!item?.paused,
           },
         ]),
@@ -226,31 +339,27 @@ export function loadState(storage) {
     if (value.notes && typeof value.notes === "object")
       for (const [key, note] of Object.entries(value.notes)) {
         if (typeof note !== "string") continue;
-        const match = key.match(/^(.*)-(\d+)$/);
-        if (!match || !validIds.has(match[1])) continue;
-        const target = legacy
-          ? `${match[1]}-${Math.min(2, Math.floor((Number(match[2]) * 3) / 8))}`
-          : key;
+        const target = moveKey(key);
+        if (!target) continue;
         notes[target] = notes[target] ? `${notes[target]}\n\n${note}` : note;
       }
     const drafts = {};
     if (value.drafts && typeof value.drafts === "object")
       for (const [key, text] of Object.entries(value.drafts)) {
-        const match = key.match(/^(.*)-(\d+)$/);
-        if (typeof text === "string" && match && validIds.has(match[1]))
-          drafts[key] = text.slice(0, 3000);
+        const target = moveKey(key);
+        if (typeof text === "string" && target)
+          drafts[target] = text.slice(0, 3000);
       }
     const plays = {};
     if (value.plays && typeof value.plays === "object")
       for (const [key, play] of Object.entries(value.plays)) {
-        const match = key.match(/^(.*)-(\d+)$/);
+        const target = moveKey(key);
         if (
-          match &&
-          validIds.has(match[1]) &&
+          target &&
           games.some((game) => game.id === play?.game) &&
           typeof play.summary === "string"
         )
-          plays[key] = { game: play.game, summary: play.summary.slice(0, 200) };
+          plays[target] = { game: play.game, summary: play.summary.slice(0, 200) };
       }
     return {
       ...structuredClone(initialState),
@@ -280,6 +389,19 @@ export function loadState(storage) {
             image.length < 1500000,
         ),
       ),
+      capstones: Object.fromEntries(
+        Object.entries(value.capstones || {})
+          .filter(([id, plan]) => validIds.has(id) && plan && typeof plan === "object")
+          .map(([id, plan]) => [
+            id,
+            Object.fromEntries(
+              PLAN_FIELDS.map((field) => [
+                field,
+                typeof plan[field] === "string" ? plan[field].slice(0, 500) : "",
+              ]),
+            ),
+          ]),
+      ),
       onboarded: !!value.onboarded,
     };
   } catch {
@@ -302,7 +424,13 @@ export function recommend(interests, activities) {
 }
 export function completeLesson(state, id, index, note) {
   const journey = state.journeys[id];
-  if (index === LESSON_COUNT - 1 && !state.artworks[id]) return state;
+  const department = [...departments, ...(state.catalog || [])].find(
+    (d) => d.id === id,
+  );
+  const total = department?.lessons.length || 0;
+  // 마지막 학년은 졸업 과제(작품 또는 계획서)를 마쳐야 완료된다.
+  if (department && index === total - 1 && !finalReady(state, department))
+    return state;
   // 미니게임이 있는 수업은 게임을 해본 뒤에만 완료할 수 있다.
   const game = state.catalog?.find((d) => d.id === id)?.games?.[index];
   if (game && state.plays?.[`${id}-${index}`]?.game !== game) return state;
@@ -310,7 +438,7 @@ export function completeLesson(state, id, index, note) {
     !journey ||
     journey.paused ||
     journey.completed !== index ||
-    index >= LESSON_COUNT ||
+    index >= total ||
     !note.trim()
   )
     return state;

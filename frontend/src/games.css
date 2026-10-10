@@ -154,3 +154,28 @@
 .year-terms a {
   color: #26837a;
 }
+.graduation-plan {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.plan-field textarea {
+  min-height: 72px;
+}
+.plan-summary {
+  margin: 8px 0 14px;
+  display: grid;
+  gap: 10px;
+}
+.plan-summary dt {
+  font-size: 11px;
+  font-weight: 700;
+  color: #26837a;
+}
+.plan-summary dd {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
