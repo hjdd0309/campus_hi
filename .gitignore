@@ -1,6 +1,7 @@
 node_modules/
 .vite/
 dist/
+.vercel
 .env
 .env.*
 !.env.example
@@ -10,3 +11,5 @@ dist/
 backend/.venv/
 __pycache__/
 *.pyc
+backend/.cache/
+.env*

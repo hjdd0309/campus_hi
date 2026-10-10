@@ -1,0 +1,2 @@
+# Vercel 배포용. Vercel은 루트의 이 파일만 읽으므로 backend/requirements.txt와 버전을 맞춘다.
+fastapi==0.115.12

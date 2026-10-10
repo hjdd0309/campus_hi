@@ -4,6 +4,7 @@ import Mascot from "./Mascot.jsx";
 import Catalog from "./Catalog.jsx";
 import CampusDocument, { documentTitles } from "./CampusDocument.jsx";
 import GraduationStudio, { ArtworkPreview } from "./GraduationStudio.jsx";
+import LessonGame from "./Games.jsx";
 import {
   STORAGE_KEY,
   departments as baseDepartments,
@@ -149,7 +150,7 @@ export default function App() {
     routes.includes(location.hash.slice(1))
       ? location.hash.slice(1)
       : "welcome";
-  const [route, setRoute] = useState("welcome");
+  const [route, setRoute] = useState(readRoute);
   const [interestAnswer, setInterestAnswer] = useState("yes");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("전체");
@@ -159,11 +160,18 @@ export default function App() {
   const [draft, setDraft] = useState("");
   const mainRef = useRef(null);
   const storageFailed = useRef(false);
+  const draftTimer = useRef(0);
   const department =
     departments.find((d) => d.id === state.current) || departments[0];
   const journey = state.journeys[department.id];
   const completed = journey?.completed || 0;
   const lessonIndex = Math.min(completed, LESSON_COUNT - 1);
+  const lessonKey = `${department.id}-${lessonIndex}`;
+  const lessonGame = department.games?.[lessonIndex] || null;
+  const played =
+    lessonGame && state.plays[lessonKey]?.game === lessonGame
+      ? state.plays[lessonKey].summary
+      : "";
   const year = lessonYear(completed);
   const recommendations = recommend(state.interests, state.activities);
   const best = recommendations[0];
@@ -187,7 +195,18 @@ export default function App() {
     state.interests.length > 0 ||
     state.activities.length > 0;
 
+  // 입력할 때마다 전체 상태를 저장하지 않도록 잠시 모았다가 저장한다.
+  function editDraft(value) {
+    const key = `${department.id}-${lessonIndex}`;
+    setDraft(value);
+    clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(
+      () => setState((s) => ({ ...s, drafts: { ...s.drafts, [key]: value } })),
+      400,
+    );
+  }
   function startFresh(next = "interest") {
+    clearTimeout(draftTimer.current);
     setState(structuredClone(initialState));
     setDraft("");
     setQuery("");
@@ -199,7 +218,6 @@ export default function App() {
   }
 
   useEffect(() => {
-    history.replaceState(null, "", `${location.pathname}${location.search}#welcome`);
     const handler = () => {
       setRoute(readRoute());
       setModal(null);
@@ -231,12 +249,20 @@ export default function App() {
     }
   }, [toast]);
   useEffect(() => {
-    setDraft(state.notes[`${department.id}-${lessonIndex}`] || "");
+    const key = `${department.id}-${lessonIndex}`;
+    clearTimeout(draftTimer.current);
+    setDraft(state.drafts[key] ?? state.notes[key] ?? "");
   }, [department.id, lessonIndex]);
   useEffect(() => {
     if (["enrolled", "lesson", "manage", "report"].includes(route) && !journey)
       go("detail");
     else if (route === "report" && completed < LESSON_COUNT) go("home");
+    else if (
+      route === "result" &&
+      !state.interests.length &&
+      !state.activities.length
+    )
+      go("interest");
     else if (
       route === "lesson" &&
       (journey?.paused || completed >= LESSON_COUNT)
@@ -244,20 +270,8 @@ export default function App() {
       go(completed >= LESSON_COUNT ? "report" : "journeys");
   }, [route, journey, completed]);
 
-  function openDepartment(id) {
-    const target = departments.find((d) => d.id === id);
-    if (!target.school) {
-      setFilter("전체");
-      setQuery(target.name);
-      go("explore");
-      return;
-    }
-    setState((s) => ({ ...s, current: id }));
-    setDetailTab("배우는 내용");
-    go("detail");
-  }
-  function chooseCourse(course, school, curriculum) {
-    const next = createDepartment(course, school, curriculum);
+  function chooseCourse(course, school, curriculum, category, years) {
+    const next = createDepartment(course, school, curriculum, category, years);
     setState((s) => ({
       ...s,
       current: next.id,
@@ -303,10 +317,15 @@ export default function App() {
       notify("졸업작품에 스프레이로 색을 입혀주세요.");
       return;
     }
+    if (lessonGame && !played) {
+      notify("먼저 위의 체험을 끝까지 해보세요.");
+      return;
+    }
     if (!draft.trim()) {
       notify("오늘 발견한 점을 한 줄 이상 적어주세요.");
       return;
     }
+    clearTimeout(draftTimer.current);
     setState((s) => completeLesson(s, department.id, lessonIndex, draft));
     go(completed === LESSON_COUNT - 1 ? "report" : "home");
     notify(
@@ -355,27 +374,7 @@ export default function App() {
 
   return (
     <div className="app-surround">
-      <div className="phone">
-        <div className="status-bar" aria-hidden="true">
-          <span>9:41</span>
-          <div>
-            <svg width="16" height="12" viewBox="0 0 16 12">
-              <path
-                d="M1 11V8h2v3zm4 0V6h2v5zm4 0V3h2v8zm4 0V0h2v11Z"
-                fill="currentColor"
-              />
-            </svg>
-            <svg width="15" height="12" viewBox="0 0 15 12">
-              <path
-                d="M1 3q6.5-5 13 0M3 6q4.5-3.5 9 0M6 9q1.5-1 3 0"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-            </svg>
-            <span className="battery" />
-          </div>
-        </div>
+      <div className="app-shell">
         <header className="app-header">
           {bottomNav ? (
             <button
@@ -634,25 +633,9 @@ export default function App() {
               <div className="centered result-intro">
                 <Mascot small />
                 <Heading>
-                  {best.id === "design" || best.id === "media" ? (
-                    <>
-                      관찰하고 표현하는
-                      <br />
-                      일에 마음이 가네요!
-                    </>
-                  ) : best.id === "psychology" ? (
-                    <>
-                      사람의 마음을 이해하는
-                      <br />
-                      일에 마음이 가네요!
-                    </>
-                  ) : (
-                    <>
-                      원리를 찾고 해결하는
-                      <br />
-                      일에 마음이 가네요!
-                    </>
-                  )}
+                  {best.headline}
+                  <br />
+                  일에 마음이 가네요!
                 </Heading>
               </div>
               <div className="callout mint result-card">
@@ -670,19 +653,20 @@ export default function App() {
                 </div>
               </div>
               <div className="compact-cards">
-                {recommendations.slice(0, 2).map((d) => (
+                {state.interests.slice(0, 3).map((keyword) => (
                   <button
                     className="choice"
-                    key={d.id}
-                    onClick={() => openDepartment(d.id)}
+                    key={keyword}
+                    onClick={() => {
+                      setFilter(keyword);
+                      setQuery("");
+                      go("explore");
+                    }}
                   >
-                    <Icon name={d.icon} />
+                    <Icon name="search" />
                     <span>
-                      <strong>
-                        {d.name}
-                        {d.id !== best.id ? "도 궁금하다면" : ""}
-                      </strong>
-                      <small>{d.tags.join(" · ")}부터 시작해봐요</small>
+                      <strong>‘{keyword}’ 관련 학과</strong>
+                      <small>이름에 이 키워드가 들어간 학과를 찾아봐요</small>
                     </span>
                     <Icon name="next" size={16} />
                   </button>
@@ -691,11 +675,12 @@ export default function App() {
               <div className="bottom-action">
                 <Button
                   onClick={() => {
-                    setFilter(best.category);
+                    setFilter(best.id);
+                    setQuery("");
                     go("explore");
                   }}
                 >
-                  추천 학과 둘러보기
+                  {best.group} 학과 둘러보기
                 </Button>
                 <p className="footnote">
                   추천은 하나의 출발점이에요. 다른 학과도 자유롭게 살펴봐요.
@@ -726,7 +711,17 @@ export default function App() {
                 )}
               </label>
               <div className="chips filters">
-                {["전체", "디자인", "심리", "사회"].map((item) => (
+                {[
+                  ...new Set([
+                    "전체",
+                    "인문사회",
+                    "공학",
+                    "자연과학",
+                    "예체능",
+                    "의학",
+                    filter,
+                  ]),
+                ].map((item) => (
                   <button
                     className={`chip ${filter === item ? "active" : ""}`}
                     aria-pressed={filter === item}
@@ -791,8 +786,7 @@ export default function App() {
                   <>
                     <h2 className="section-title">이런 내용을 배워요</h2>
                     <p className="body-copy">
-                      {department.tags.join(", ")}부터 아이디어를 공유하는
-                      경험을 만나요.
+                      {department.tags.join(", ")}부터 차근차근 경험해요.
                     </p>
                     <div className="curriculum">
                       {department.years.map((item, i) => (
@@ -807,7 +801,36 @@ export default function App() {
                 )}
                 {detailTab === "교육과정" && (
                   <>
-                    {department.curriculum && (
+                    {department.yearly && (
+                      <div className="year-terms">
+                        <h2 className="section-title">학년별 수업</h2>
+                        {department.yearly.terms.map((term) => (
+                          <div key={`${term.year}-${term.semester}`}>
+                            <h3>
+                              {term.year}학년
+                              {term.semester ? ` ${term.semester}학기` : ""}
+                            </h3>
+                            <p>{term.subjects.join(" · ")}</p>
+                          </div>
+                        ))}
+                        <p className="footnote">
+                          {department.yearly.source_url ? (
+                            <a
+                              href={department.yearly.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              학교 홈페이지
+                            </a>
+                          ) : (
+                            "학교 자료"
+                          )}{" "}
+                          기준 · {department.yearly.checked_at} 확인. 실제
+                          편성은 학교 사정에 따라 달라질 수 있어요.
+                        </p>
+                      </div>
+                    )}
+                    {department.curriculum?.length > 0 && (
                       <details className="actual-curriculum">
                         <summary>
                           학교 교과목 {department.curriculum.length}개 보기
@@ -848,10 +871,12 @@ export default function App() {
                       기록해요. 세 번의 체험이 끝나면 나의 전공 체험 리포트가
                       완성돼요.
                     </p>
-                    <div className="callout cream">
-                      <strong>이 전공과 연결되는 일</strong>
-                      <p>{department.jobs.join(" · ")}</p>
-                    </div>
+                    {department.jobs && (
+                      <div className="callout cream">
+                        <strong>이 전공과 연결되는 일</strong>
+                        <p>{department.jobs.join(" · ")}</p>
+                      </div>
+                    )}
                   </>
                 )}
               </section>
@@ -1044,6 +1069,23 @@ export default function App() {
                     <br />
                     직접 경험해 볼까요?
                   </Heading>
+                  {lessonGame ? (
+                    <LessonGame
+                      key={lessonKey}
+                      game={lessonGame}
+                      played={played}
+                      onComplete={(summary) =>
+                        setState((s) => ({
+                          ...s,
+                          plays: {
+                            ...s.plays,
+                            [lessonKey]: { game: lessonGame, summary },
+                          },
+                        }))
+                      }
+                    />
+                  ) : (
+                  <>
                   <div className="callout mint">
                     <strong>
                       {lessonIndex === 0
@@ -1062,6 +1104,8 @@ export default function App() {
                     <li>나의 아이디어를 간단한 스케치나 실험으로 표현해요.</li>
                     <li>새롭게 발견한 점과 다음에 바꿔볼 점을 기록해요.</li>
                   </ol>
+                  </>
+                  )}
                 </>
               )}
               <label className="note-card">
@@ -1078,11 +1122,13 @@ export default function App() {
                   placeholder={
                     lessonIndex === 2
                       ? "어떤 생각을 색으로 표현했나요? 작품의 의미를 적어주세요."
-                      : "어떤 장면을 발견했나요? 나의 생각을 자유롭게 적어주세요."
+                      : lessonGame
+                        ? "직접 해보니 어땠나요? 느낀 점과 궁금해진 점을 적어주세요."
+                        : "어떤 장면을 발견했나요? 나의 생각을 자유롭게 적어주세요."
                   }
                   value={draft}
                   maxLength={3000}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={(e) => editDraft(e.target.value)}
                 />
                 <small>
                   {draft.length} / 3,000자 · 완료 버튼을 누르면 기록이 저장돼요.
@@ -1092,6 +1138,7 @@ export default function App() {
                 <Button
                   disabled={
                     !draft.trim() ||
+                    (lessonGame && !played) ||
                     (lessonIndex === 2 && !state.artworks[department.id])
                   }
                   onClick={finishLesson}
@@ -1375,11 +1422,15 @@ export default function App() {
                   {state.notes[`${department.id}-2`] ||
                     "세 번의 경험이 나만의 전공 이야기가 되었어요."}
                 </blockquote>
-                <span className="eyebrow">다음 가능성</span>
-                <p>
-                  {department.jobs.join(" · ")}처럼 배운 내용을 이어갈 수 있는
-                  일들도 탐색해봐요.
-                </p>
+                {department.jobs && (
+                  <>
+                    <span className="eyebrow">다음 가능성</span>
+                    <p>
+                      {department.jobs.join(" · ")}처럼 배운 내용을 이어갈 수
+                      있는 일들도 탐색해봐요.
+                    </p>
+                  </>
+                )}
               </div>
               <div className="bottom-action">
                 <Button onClick={saveReport}>
@@ -1507,9 +1558,6 @@ export default function App() {
             ))}
           </nav>
         )}
-        <div className="home-indicator" aria-hidden="true">
-          <span />
-        </div>
         {toast && (
           <div className="toast" role="status">
             <Icon name="check" size={18} />
@@ -1682,9 +1730,6 @@ export default function App() {
           </Modal>
         )}
       </div>
-      <p className="desktop-caption">
-        미래캠퍼스 <span>·</span> 나의 전공, 미리 만나기
-      </p>
     </div>
   );
 }

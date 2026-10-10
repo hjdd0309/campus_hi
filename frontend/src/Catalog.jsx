@@ -1,9 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { getCourseList, getSchoolList, getCurriculumList } from "./api.js";
+import { getCourseList, getSchoolList, getCurriculum } from "./api.js";
 import Icon from "./Icon.jsx";
 
 export default function Catalog({ filter, query, onChoose }) {
   const [courses, setCourses] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState(query);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [category, setCategory] = useState("");
+  const [years, setYears] = useState(null);
+  // 화면의 교육과정이 어느 대학·학과의 것인지 기억해, 불러오기 전의 빈 값으로 넘어가지 않게 한다.
+  const [loadedFor, setLoadedFor] = useState("");
   const [selected, setSelected] = useState("");
   const [schools, setSchools] = useState([]);
   const [school, setSchool] = useState("");
@@ -11,7 +18,11 @@ export default function Catalog({ filter, query, onChoose }) {
   const [status, setStatus] = useState("courses");
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
-  const [limit, setLimit] = useState(30);
+  // 입력이 멈춘 뒤에 검색한다.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(query), 250);
+    return () => clearTimeout(timer);
+  }, [query]);
   useEffect(() => {
     const controller = new AbortController();
     setSelected("");
@@ -19,12 +30,14 @@ export default function Catalog({ filter, query, onChoose }) {
     setSchools([]);
     setCurriculum([]);
     setCourses([]);
+    setTotal(0);
+    setLoadingMore(false);
     setStatus("courses");
     setError("");
-    setLimit(30);
-    getCourseList(filter, controller.signal)
-      .then((items) => {
-        setCourses(items);
+    getCourseList(filter, search, 0, controller.signal)
+      .then((result) => {
+        setCourses(result.courses);
+        setTotal(result.total);
         setStatus("");
       })
       .catch((e) => {
@@ -34,7 +47,18 @@ export default function Catalog({ filter, query, onChoose }) {
         }
       });
     return () => controller.abort();
-  }, [filter, retry]);
+  }, [filter, search, retry]);
+  function loadMore() {
+    setLoadingMore(true);
+    setError("");
+    getCourseList(filter, search, courses.length)
+      .then((result) => {
+        setCourses((items) => [...new Set([...items, ...result.courses])]);
+        setTotal(result.total);
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoadingMore(false));
+  }
   useEffect(() => {
     if (!selected) return;
     const controller = new AbortController();
@@ -62,9 +86,13 @@ export default function Catalog({ filter, query, onChoose }) {
     setCurriculum([]);
     setStatus("curriculum");
     setError("");
-    getCurriculumList(school, selected, controller.signal)
-      .then((items) => {
-        setCurriculum(items);
+    getCurriculum(school, selected, controller.signal)
+      .then((result) => {
+        setCurriculum(result.curriculum);
+        setCategory(result.category);
+        setYears(result.years);
+        setLoadedFor(`${school}
+${selected}`);
         setStatus("");
       })
       .catch((e) => {
@@ -75,9 +103,6 @@ export default function Catalog({ filter, query, onChoose }) {
       });
     return () => controller.abort();
   }, [school, selected]);
-  const visible = courses.filter((course) =>
-    course.toLowerCase().includes(query.trim().toLowerCase()),
-  );
   return (
     <section className="catalog" aria-label="대학 학과 찾기">
       {status && (
@@ -100,14 +125,13 @@ export default function Catalog({ filter, query, onChoose }) {
           </button>
         </div>
       )}
-      {!selected && !status && !error && (
+      {!selected && !status && (!error || courses.length > 0) && (
         <>
           <p className="catalog-count">
-            {visible.length.toLocaleString()}개 학과 · 관심 있는 학과를
-            선택해주세요
+            {total.toLocaleString()}개 학과 · 관심 있는 학과를 선택해주세요
           </p>
           <div className="department-list">
-            {visible.slice(0, limit).map((course) => (
+            {courses.map((course) => (
               <button
                 key={course}
                 className="department-card"
@@ -124,20 +148,22 @@ export default function Catalog({ filter, query, onChoose }) {
               </button>
             ))}
           </div>
-          {!visible.length && (
+          {!courses.length && (
             <div className="empty-state">
               <Icon name="search" size={28} />
               <h3>검색 결과가 없어요</h3>
               <p>다른 분야나 학과 이름으로 찾아보세요.</p>
             </div>
           )}
-          {visible.length > limit && (
+          {courses.length < total && (
             <button
               className="text-button"
-              onClick={() => setLimit((n) => n + 30)}
+              disabled={loadingMore}
+              onClick={loadMore}
             >
-              학과 더 보기 ({Math.min(limit, visible.length)} / {visible.length}
-              )
+              {loadingMore
+                ? "불러오는 중…"
+                : `학과 더 보기 (${courses.length.toLocaleString()} / ${total.toLocaleString()})`}
             </button>
           )}
         </>
@@ -187,18 +213,17 @@ export default function Catalog({ filter, query, onChoose }) {
               등록된 대학 정보가 없어요. 다른 학과를 선택해주세요.
             </p>
           )}
-          {school && !status && !error && (
+          {school && !status && !error && loadedFor === `${school}
+${selected}` && (
             <div className="school-curriculum">
               <h3>{school} 교육과정</h3>
               <p className="body-copy">
-                {curriculum.length
-                  ? curriculum.slice(0, 12).join(" · ")
-                  : "등록된 교과목 정보가 없어요. 전공 탐색 활동으로 시작할 수 있어요."}
+                {curriculum.slice(0, 12).join(" · ")}
                 {curriculum.length > 12 && ` 외 ${curriculum.length - 12}개`}
               </p>
               <button
                 className="button"
-                onClick={() => onChoose(selected, school, curriculum)}
+                onClick={() => onChoose(selected, school, curriculum, category, years)}
               >
                 이 대학·학과 알아보기
               </button>

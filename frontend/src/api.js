@@ -1,5 +1,3 @@
-import { departments } from "./model.js";
-
 export class ApiError extends Error {
   constructor(status, detail) {
     super(detail);
@@ -8,15 +6,19 @@ export class ApiError extends Error {
   }
 }
 async function post(path, body, signal) {
+  // AbortSignal.any는 iOS 17.4 미만 Safari에 없어서 직접 묶는다.
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  const timer = setTimeout(cancel, 15000);
+  if (signal?.aborted) cancel();
+  signal?.addEventListener("abort", cancel);
   let response;
   try {
     response = await fetch(`/api${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
-        : AbortSignal.timeout(15000),
+      signal: controller.signal,
     });
   } catch (error) {
     if (signal?.aborted) throw error;
@@ -24,6 +26,9 @@ async function post(path, body, signal) {
       0,
       "학과 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
     );
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", cancel);
   }
   let data;
   try {
@@ -43,37 +48,42 @@ async function post(path, body, signal) {
     );
   return data;
 }
-const splitList = (value) => {
-  if (typeof value !== "string")
-    throw new ApiError(502, "목록 형식이 올바르지 않아요. 다시 시도해주세요.");
-  return [
-    ...new Set(
-      value
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-    ),
-  ];
+const stringList = (value, message) => {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string"))
+    throw new ApiError(502, message);
+  return value;
 };
-export async function getCourseList(interests, signal) {
-  const data = await post("/course_list", { interests }, signal);
-  return splitList(data.course_list).filter((course) =>
-    departments.some((department) => department.name === course),
+export async function getCourseList(interests, query, offset, signal) {
+  const data = await post(
+    "/course_list",
+    { interests, query, offset, limit: 30 },
+    signal,
   );
+  if (!Number.isInteger(data.total))
+    throw new ApiError(502, "목록 형식이 올바르지 않아요. 다시 시도해주세요.");
+  return {
+    courses: stringList(
+      data.course_list,
+      "목록 형식이 올바르지 않아요. 다시 시도해주세요.",
+    ),
+    total: data.total,
+  };
 }
 export async function getSchoolList(course, signal) {
   const data = await post("/school_list", { course }, signal);
-  return splitList(data.school_list);
+  return stringList(
+    data.school_list,
+    "목록 형식이 올바르지 않아요. 다시 시도해주세요.",
+  );
 }
-export async function getCurriculumList(school, course, signal) {
+export async function getCurriculum(school, course, signal) {
   const data = await post("/curriculum_list", { school, course }, signal);
-  if (
-    !Array.isArray(data.curriculum_list) ||
-    !data.curriculum_list.every((item) => typeof item === "string")
-  )
-    throw new ApiError(
-      502,
+  return {
+    curriculum: stringList(
+      data.curriculum_list,
       "교육과정 형식이 올바르지 않아요. 다시 시도해주세요.",
-    );
-  return data.curriculum_list;
+    ),
+    category: typeof data.category === "string" ? data.category : "",
+    years: data.years ?? null,
+  };
 }

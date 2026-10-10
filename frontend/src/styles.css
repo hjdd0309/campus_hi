@@ -95,67 +95,27 @@ button strong {
 .app-surround {
   min-height: 100svh;
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  padding: 28px 16px 16px;
-  background: radial-gradient(ellipse at 35% 25%, #f9fcf7 0%, #edf3f1 65%);
+  background: #edf3f1;
 }
-.phone {
-  width: 390px;
-  max-width: 100%;
-  height: min(844px, calc(100svh - 82px));
-  min-height: 560px;
+/* 앱 화면. 휴대폰에서는 화면 전체를 쓰고, 넓은 화면에서는 읽기 좋은 폭의 가운데 열로 보인다. */
+.app-shell {
+  width: 100%;
+  max-width: 560px;
+  height: 100vh;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
   background: white;
-  border-radius: 30px;
   position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow:
-    0 18px 65px #344b3820,
-    0 0 0 1px #fff9;
 }
-.status-bar {
-  height: 38px;
-  padding: 14px 25px 6px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1px;
-}
-.status-bar > div {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.battery {
-  height: 9px;
-  width: 18px;
-  border: 1px solid #aaa;
-  border-radius: 3px;
-  position: relative;
-  margin-left: 1px;
-}
-.battery:before {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  background: #373b34;
-  border-radius: 1px;
-}
-.battery:after {
-  content: "";
-  position: absolute;
-  right: -3px;
-  top: 2px;
-  width: 2px;
-  height: 3px;
-  background: #aaa;
-  border-radius: 1px;
+@media (min-width: 600px) {
+  .app-shell {
+    box-shadow: 0 0 0 1px #e3ebe7;
+  }
 }
 .app-header {
   height: 49px;
@@ -1268,30 +1228,6 @@ button strong {
 .bottom-nav button:hover {
   background: #f1f9f5;
 }
-.home-indicator {
-  height: 19px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-}
-.home-indicator > span {
-  height: 4px;
-  width: 108px;
-  border-radius: 6px;
-  background: #342b21;
-}
-.desktop-caption {
-  margin: 15px 0 0;
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  color: #87978c;
-}
-.desktop-caption span {
-  margin: 0 6px;
-  color: #b4c4b8;
-}
 .toast {
   position: absolute;
   z-index: 5;
@@ -1425,18 +1361,7 @@ button strong {
     transform: translateY(0);
   }
 }
-@media (min-width: 600px) and (max-height: 760px) {
-  .phone {
-    height: calc(100svh - 55px);
-    min-height: 480px;
-  }
-  .app-surround {
-    padding-top: 12px;
-    padding-bottom: 8px;
-  }
-  .desktop-caption {
-    margin-top: 10px;
-  }
+@media (max-height: 680px) {
   .page-welcome .mascot {
     height: 155px;
     width: 165px;
@@ -1471,29 +1396,6 @@ button strong {
 @media (max-width: 599px) {
   :root {
     background: #fff;
-  }
-  .app-surround {
-    padding: 0;
-    background: #fff;
-    min-height: 100svh;
-  }
-  .phone {
-    width: 100%;
-    max-width: 430px;
-    height: 100svh;
-    min-height: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-  .status-bar {
-    padding-top: max(12px, env(safe-area-inset-top));
-    height: calc(36px + env(safe-area-inset-top));
-  }
-  .home-indicator {
-    height: max(19px, env(safe-area-inset-bottom));
-  }
-  .desktop-caption {
-    display: none;
   }
   .page {
     padding-left: 24px;

@@ -1,0 +1,156 @@
+.lesson-game {
+  margin: 18px 0;
+  padding: 18px;
+  border: 1px solid #dfeee8;
+  border-radius: 18px;
+  background: #fbfdfc;
+}
+.lesson-game .section-title {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.lesson-game .button {
+  width: 100%;
+}
+.game-progress {
+  margin: 10px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #26837a;
+  text-align: center;
+}
+.game-feedback {
+  min-height: 42px;
+  margin: 10px 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.stroop-word {
+  margin: 8px 0 14px;
+  padding: 34px 8px;
+  border-radius: 16px;
+  background: #1f2430;
+  font-size: 44px;
+  font-weight: 800;
+  text-align: center;
+}
+.game-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.game-choices button {
+  min-height: 52px;
+  border: 1px solid #cfd8d4;
+  border-radius: 14px;
+  background: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: #342b21;
+  cursor: pointer;
+}
+.game-choices button:hover {
+  background: #f1f9f5;
+}
+.game-result {
+  margin: 0 0 12px;
+  display: grid;
+  gap: 6px;
+}
+.game-result div {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f1f9f5;
+  font-size: 14px;
+}
+.game-result dd {
+  margin: 0;
+  font-weight: 700;
+}
+.sort-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 14px 0 4px;
+}
+.sort-card {
+  flex: 1;
+  max-width: 44px;
+  padding: 14px 0;
+  border-radius: 10px;
+  background: #1c7f76;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+}
+.sort-swap {
+  width: 24px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 15px;
+  color: #342b21;
+  cursor: pointer;
+}
+.sort-swap:hover:not(:disabled) {
+  background: #e4f4ee;
+}
+.sort-swap:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.journal-text {
+  padding: 14px;
+  border-radius: 12px;
+  background: #fbf6e6;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.journal-entry {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.journal-side {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.journal-side select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid #cfd8d4;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+.year-terms {
+  margin: 0 0 18px;
+  display: grid;
+  gap: 10px;
+}
+.year-terms h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.year-terms p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.year-terms a {
+  color: #26837a;
+}
