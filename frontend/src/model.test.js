@@ -9,6 +9,8 @@ import {
   stageYears,
   departments,
   fields,
+  QUESTIONS,
+  KEYWORD_GROUPS,
   createDepartment,
   loadState,
   recommend,
@@ -104,19 +106,34 @@ test("작성 중인 노트는 새로고침 후 복구하고 잘못된 값은 버
   assert.deepEqual(restored.drafts, { "design-0": "쓰던 글" });
 });
 test("온보딩의 모든 관심 키워드는 추천 계열과 연결된다", () => {
-  const keywords = ["디자인", "영상·콘텐츠", "미술", "공연", "심리", "교육", "사회", "경영", "컴퓨터", "데이터", "공학", "생명과학"];
+  const keywords = KEYWORD_GROUPS.flatMap((group) => group.items);
+  assert.equal(keywords.length, 13);
   for (const keyword of keywords)
     assert.ok(
-      Math.max(...Object.values(recommendationScores([keyword], []))) > 0,
+      Math.max(...Object.values(recommendationScores([keyword], {}))) > 0,
       keyword,
     );
+  // 질문의 모든 보기는 실제로 있는 계열과 연결된다.
+  assert.equal(QUESTIONS.length, 7);
+  for (const q of QUESTIONS) {
+    assert.equal(q.options.length, 5);
+    for (const option of q.options)
+      assert.ok(fields.some((field) => field.id === option.field), option.label);
+  }
 });
 test("관심 분야와 활동에 따라 추천 계열이 바뀐다", () => {
-  assert.equal(recommend(["심리", "교육"], ["listen"])[0].id, "인문사회");
-  assert.equal(recommend(["디자인"], ["draw"])[0].id, "예체능");
-  assert.equal(recommend(["컴퓨터"], [])[0].id, "공학");
-  assert.equal(recommend([], ["science"])[0].id, "자연과학");
-  assert.equal(recommend([], []).length, fields.length);
+  assert.equal(recommend(["심리", "교육"], { 1: ["친구와 이야기 나누기"] })[0].id, "인문사회");
+  assert.equal(recommend(["디자인"], { 2: ["그림이나 이미지로 표현하기"] })[0].id, "예체능");
+  assert.equal(recommend(["컴퓨터"], {})[0].id, "공학");
+  assert.equal(recommend([], { 2: ["규칙과 원리를 알아내기"], 3: ["수학 · 과학"] })[0].id, "자연과학");
+  // 키워드 하나(3점)보다 같은 계열의 답 두 개(4점)가 더 세다.
+  assert.equal(recommend(["심리"], { 1: ["무언가 만들거나 고치기"], 2: ["직접 만들고 실험하기"] })[0].id, "공학");
+  assert.equal(recommend([], {}).length, fields.length);
+  assert.equal(recommend([], undefined).length, fields.length);
+  const restored = loadState(
+    only(STORAGE_KEY, { answers: { 1: ["친구와 이야기 나누기", "없는 보기"], 2: "문자열", 9: ["범위 밖"] } }),
+  );
+  assert.deepEqual(restored.answers, { 1: ["친구와 이야기 나누기"] });
 });
 test("실습 완료는 한 학년씩 진행되며 빈 기록, 중복, 휴학 중 진행을 막는다", () => {
   const state = {
@@ -151,10 +168,16 @@ test("마지막 학년은 졸업작품이 있어야 완료되고, 다른 학과�
   for (let i = 0; i < TOTAL; i++)
     state = completeLesson(state, "design", i, `기록 ${i}`);
   assert.equal(state.journeys.design.completed, TOTAL - 1);
-  state = { ...state, artworks: { design: "data:image/png;base64,AA==" } };
-  state = completeLesson(state, "design", TOTAL - 1, "졸업작품 기록");
+  state = { ...state, artworks: { design: true } };
+  // 졸업작품은 느낀 점을 적지 않아도 완료된다.
+  state = completeLesson(state, "design", TOTAL - 1, "");
   assert.equal(state.journeys.design.completed, TOTAL);
-  assert.equal(Object.keys(state.notes).length, TOTAL);
+  assert.equal(Object.keys(state.notes).length, TOTAL - 1);
+  const loaded = loadState(
+    only(STORAGE_KEY, { artworks: { design: true, psychology: "data:image/png;base64,AA==", missing: true } }),
+  );
+  assert.deepEqual(loaded.artworks, { design: true, psychology: true });
+  assert.deepEqual(loadState(only(STORAGE_KEY, { artworks: { design: "javascript:1", psychology: 1 } })).artworks, {});
   assert.deepEqual(state.journeys.psychology, { completed: 1, paused: true });
   assert.equal(completeLesson(state, "design", TOTAL, "추가"), state);
   // 2년제 학과는 두 번째 학년이 마지막이고, 조형·디자인 학과가 아니면 계획서를 써야 완료된다.

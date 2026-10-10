@@ -4,6 +4,7 @@ import {
   getCourseList,
   getSchoolList,
   getCurriculum,
+  getProgramList,
   ApiError,
 } from "./api.js";
 
@@ -28,6 +29,7 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     category: "예체능",
     years: null,
     duration: "4년",
+    region: "",
   });
   assert.deepEqual(requests, [
     ["/api/course_list", { interests: "디자인", query: "산업", offset: 30, limit: 30 }],
@@ -72,6 +74,26 @@ test("서버 오류와 잘못된 응답은 가짜 목록으로 대체하지 않�
     );
     await assert.rejects(
       getCourseList("전체", "", 0),
+      (error) => error instanceof ApiError && error.status === 502,
+    );
+  }
+});
+test("학교·학과 목록은 형식이 맞을 때만 받아들인다", async (t) => {
+  const requests = [];
+  const program = { school: "경희대학교", course: "산업디자인학과", category: "예체능", duration: "4년", region: "경기도" };
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    requests.push([url, JSON.parse(options.body)]);
+    return new Response(JSON.stringify({ programs: [program, { school: "가천대학교", course: "심리학과" }], total: 2 }), { status: 200 });
+  });
+  assert.deepEqual(await getProgramList("전체", "디자인", 30), {
+    programs: [program, { school: "가천대학교", course: "심리학과", category: "", duration: "", region: "" }],
+    total: 2,
+  });
+  assert.deepEqual(requests, [["/api/program_list", { interests: "전체", query: "디자인", offset: 30, limit: 30 }]]);
+  for (const body of [{ programs: [{ school: "", course: "학과" }], total: 1 }, { programs: "x", total: 1 }, { programs: [] }]) {
+    t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(body), { status: 200 }));
+    await assert.rejects(
+      getProgramList("전체", "", 0),
       (error) => error instanceof ApiError && error.status === 502,
     );
   }

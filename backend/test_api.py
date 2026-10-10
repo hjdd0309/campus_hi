@@ -23,6 +23,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(len(subjects), len(set(subjects)))
         self.assertEqual(curriculum.json()["category"], "예체능")
         self.assertEqual(curriculum.json()["duration"], "4년")
+        self.assertEqual(curriculum.json()["region"], "경기도")
 
     def test_every_listed_program_is_undergraduate_with_subjects(self):
         from backend.main import catalog
@@ -59,8 +60,28 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(self.client.post("/api/course_list", json=body).status_code, 400)
 
     def test_onboarding_keywords_all_find_courses(self):
-        for keyword in ("디자인", "영상·콘텐츠", "미술", "공연", "심리", "교육", "사회", "경영", "컴퓨터", "데이터", "공학", "생명과학", "인문사회", "자연과학", "예체능", "의학"):
+        for keyword in ("디자인", "영상 / 콘텐츠", "음악", "연기", "체육", "심리", "교육", "사회", "경영", "컴퓨터", "데이터", "공학", "생명과학", "인문사회", "자연과학", "예체능", "의학"):
             self.assertGreater(self.client.post("/api/course_list", json={"interests": keyword}).json()["total"], 0, keyword)
+            self.assertGreater(self.client.post("/api/program_list", json={"interests": keyword}).json()["total"], 0, keyword)
+
+    def test_program_list_searches_school_and_course(self):
+        everything = self.client.post("/api/program_list", json={"interests": "전체"}).json()
+        self.assertEqual(everything["total"], 13347)
+        self.assertEqual(len(everything["programs"]), 30)
+        self.assertEqual(set(everything["programs"][0]), {"school", "course", "category", "duration", "region"})
+        both = self.client.post("/api/program_list", json={"interests": "전체", "query": "경희대 산업디자인"}).json()["programs"]
+        self.assertEqual(both[0], {"school": "경희대학교", "course": "산업디자인학과", "category": "예체능", "duration": "4년", "region": "경기도"})
+        exact = self.client.post("/api/program_list", json={"interests": "전체", "query": "심리학과", "limit": 100}).json()["programs"]
+        self.assertTrue(all(item["course"] == "심리학과" for item in exact[:27]))
+        school = self.client.post("/api/program_list", json={"interests": "공학", "query": "가천대학교", "limit": 100}).json()
+        self.assertGreater(school["total"], 5)
+        self.assertTrue(all(item["school"] == "가천대학교" and (item["category"] == "공학" or "공학" in item["course"]) for item in school["programs"]))
+        self.assertFalse(any("대학원" in item["school"] for item in everything["programs"] + school["programs"]))
+        first = self.client.post("/api/program_list", json={"interests": "예체능", "limit": 5}).json()["programs"]
+        second = self.client.post("/api/program_list", json={"interests": "예체능", "limit": 5, "offset": 5}).json()["programs"]
+        self.assertFalse({(item["school"], item["course"]) for item in first} & {(item["school"], item["course"]) for item in second})
+        self.assertEqual(self.client.post("/api/program_list", json={"interests": "전체", "query": "없는학교 없는학과"}).json(), {"programs": [], "total": 0})
+        self.assertEqual(self.client.post("/api/program_list", json={"interests": ""}).status_code, 400)
 
     def test_course_names_with_commas_stay_intact(self):
         result = self.client.post("/api/course_list", json={"interests": "전체", "query": "PEP"}).json()["course_list"]

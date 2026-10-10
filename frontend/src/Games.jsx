@@ -1,5 +1,4 @@
 import React, { useRef, useState } from "react";
-import Icon from "./Icon.jsx";
 import {
   games,
   stroopColors,
@@ -302,7 +301,10 @@ export default function LessonGame({ game, played, onComplete }) {
         {info.title}
         {played && (
           <span className="tag">
-            완료 <Icon name="check" size={12} />
+            완료
+            <svg width="11" height="9" viewBox="0 0 11 9" fill="none" aria-hidden="true">
+              <path d="M1.2 4.6 4 7.3 9.8 1.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </span>
         )}
       </h2>

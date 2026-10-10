@@ -69,6 +69,31 @@ export async function getCourseList(interests, query, offset, signal) {
     total: data.total,
   };
 }
+// 학교·학과 조합을 검색한다. 한 번에 30개씩 받는다.
+export async function getProgramList(interests, query, offset, signal) {
+  const data = await post(
+    "/program_list",
+    { interests, query, offset, limit: 30 },
+    signal,
+  );
+  const text = (value) => (typeof value === "string" ? value : "");
+  if (
+    !Number.isInteger(data.total) ||
+    !Array.isArray(data.programs) ||
+    !data.programs.every((item) => text(item?.school) && text(item?.course))
+  )
+    throw new ApiError(502, "목록 형식이 올바르지 않아요. 다시 시도해주세요.");
+  return {
+    programs: data.programs.map((item) => ({
+      school: item.school,
+      course: item.course,
+      category: text(item.category),
+      duration: text(item.duration),
+      region: text(item.region),
+    })),
+    total: data.total,
+  };
+}
 export async function getSchoolList(course, signal) {
   const data = await post("/school_list", { course }, signal);
   return stringList(
@@ -86,5 +111,6 @@ export async function getCurriculum(school, course, signal) {
     category: typeof data.category === "string" ? data.category : "",
     years: data.years ?? null,
     duration: typeof data.duration === "string" ? data.duration : "",
+    region: typeof data.region === "string" ? data.region : "",
   };
 }

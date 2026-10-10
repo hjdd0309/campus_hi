@@ -20,11 +20,13 @@ DATA_PATH = Path(__file__).parent / "data" / "courses.csv.gz"
 YEARS_PATH = Path(__file__).parent / "data" / "year_curricula.json"
 DIST_PATH = Path(__file__).parent.parent / "frontend" / "dist"
 MAX_BODY_BYTES = 16 * 1024
-HASHED_ASSET = re.compile(r"^/assets/.+-[A-Za-z0-9_-]{8}\.(js|css)$")
+HASHED_ASSET = re.compile(r"^/assets/.+-[A-Za-z0-9_-]{8}\.(js|css|png|webp|svg)$")
 CONTENT_SECURITY_POLICY = "; ".join([
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
+    # 글꼴(Pretendard)을 jsDelivr에서 불러온다.
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "font-src 'self' https://cdn.jsdelivr.net",
     "img-src 'self' data: blob:",
     "connect-src 'self'",
     "object-src 'none'",
@@ -115,7 +117,7 @@ class Catalog:
             subjects = [subject.strip() for subject in row["주요교과목명"].split("+") if subject.strip()]
             if row["학과상태명"] == "폐과" or "대학원" in school or not school or not course or not subjects:
                 continue
-            program = self.programs.setdefault((school, course), {"curriculum": {}, "duration": row["수업연한"].strip()})
+            program = self.programs.setdefault((school, course), {"curriculum": {}, "duration": row["수업연한"].strip(), "region": row["시도명"].strip()})
             program["curriculum"].update(dict.fromkeys(subjects))
             schools[course].add(school)
             categories[course][row["대학자체계열명"].strip()] += 1
@@ -124,6 +126,8 @@ class Catalog:
         self.categories = {course: counts.most_common(1)[0][0] for course, counts in categories.items()}
         # 개설 대학이 많은 학과부터 보여준다.
         self.courses = [(course, compact(course), self.categories[course]) for course in sorted(schools, key=lambda name: (-len(schools[name]), name))]
+        # 학교·학과 조합 목록. 개설 대학이 많은 학과부터, 같은 학과 안에서는 학교 이름순.
+        self.pairs = [(school, course, compact(school + course), key, category) for course, key, category in self.courses for school in self.schools[course]]
 
 
 @lru_cache(maxsize=1)
@@ -146,11 +150,42 @@ def health():
     return {"status": "ok", "source": "litton", "records": len(catalog().programs)}
 
 
+ALIASES = {
+    "영상·콘텐츠": ["미디어", "영상", "콘텐츠"],
+    "영상 / 콘텐츠": ["미디어", "영상", "콘텐츠"],
+    "미술": ["미술", "회화", "조형"],
+    "공연": ["공연", "연극", "뮤지컬", "무용"],
+    "연기": ["연기", "연극", "뮤지컬"],
+    "데이터": ["데이터", "통계"],
+    "생명과학": ["생명", "바이오"],
+}
+
+
+def matcher(keyword):
+    """분야 필터: 전체, 계열명, 또는 학과명에 들어갈 키워드."""
+    terms = [compact(term) for term in ALIASES.get(keyword, [keyword])]
+    return lambda key, category: keyword == "전체" or keyword == category or any(term in key for term in terms)
+
+
+@app.post("/api/program_list")
+def program_list(body: CourseRequest):
+    """학교·학과 조합을 검색한다. 검색어의 낱말이 학교명이나 학과명에 모두 들어 있어야 한다."""
+    data = catalog()
+    matches = matcher(body.interests)
+    words = [compact(word) for word in body.query.split()]
+    found = [(school, course, key) for school, course, text, key, category in data.pairs if matches(key, category) and all(word in text for word in words)]
+    query = compact(body.query)
+    if query:
+        found.sort(key=lambda item: (item[2] != query, not item[2].startswith(query)))
+    page = found[body.offset:body.offset + body.limit]
+    programs = [{"school": school, "course": course, "category": data.categories[course], "duration": data.programs[(school, course)]["duration"], "region": data.programs[(school, course)]["region"]} for school, course, key in page]
+    return {"programs": programs, "total": len(found)}
+
+
 @app.post("/api/course_list")
 def course_list(body: CourseRequest):
     keyword = body.interests
-    aliases = {"영상·콘텐츠": ["미디어", "영상", "콘텐츠"], "미술": ["미술", "회화", "조형"], "공연": ["공연", "연극", "뮤지컬", "무용"], "데이터": ["데이터", "통계"], "생명과학": ["생명", "바이오"]}
-    terms = [compact(term) for term in aliases.get(keyword, [keyword])]
+    terms = [compact(term) for term in ALIASES.get(keyword, [keyword])]
     query = compact(body.query)
     matches = [(course, key) for course, key, category in catalog().courses if (keyword == "전체" or keyword == category or any(term in key for term in terms)) and query in key]
     if query:
@@ -172,7 +207,7 @@ def curriculum_list(body: CurriculumRequest):
         raise HTTPException(status_code=404, detail="해당 학교의 학과 정보를 찾을 수 없습니다.")
     verified = year_curricula().get((body.school, body.course))
     years = verified and {"terms": verified["years"], "source_url": verified["url"], "checked_at": verified["checked_at"]}
-    return {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "years": years}
+    return {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "years": years}
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
