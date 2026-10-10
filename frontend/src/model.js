@@ -1,4 +1,5 @@
-import { games, pickLessons } from "./games.js";
+import { isGame, pickLessons } from "./games.js";
+import { cleanLessonGames } from "./lessonGames.js";
 
 export const STORAGE_KEY = "hi-campus-v3";
 // 예전 저장 데이터: [저장 키, 그때의 체험 단계 수]
@@ -292,8 +293,11 @@ export function createDepartment(
   years = null,
   duration = "",
   region = "",
+  games = null,
 ) {
   const yearly = cleanYears(years);
+  // 미리 만들어 둔 연습 문제가 있는 과목과 그 유형.
+  const lessonGames = cleanLessonGames(games);
   const yearNumbers = stageYears(duration);
   // 마지막 학년은 졸업 과제, 그 앞 학년은 과목 하나씩을 체험한다.
   const subjectYears = yearNumbers.slice(0, -1);
@@ -305,8 +309,8 @@ export function createDepartment(
     subjectYears.length > 0 &&
     subjectYears.every((year) => subjectsOf(year).length > 0);
   const picked = lessonsFromYears
-    ? subjectYears.map((year) => pickLessons(subjectsOf(year), 1)[0])
-    : pickLessons(curriculum, subjectYears.length);
+    ? subjectYears.map((year) => pickLessons(subjectsOf(year), 1, lessonGames)[0])
+    : pickLessons(curriculum, subjectYears.length, lessonGames);
   const field = fields.find((item) => item.id === category) || fallbackField;
   const final = finalFor(course, field.id);
   const template = departments.find((d) => d.name === course) || {
@@ -330,6 +334,7 @@ export function createDepartment(
     yearNumbers,
     final,
     lessonsFromYears,
+    lessonGames,
     lessons: [
       ...subjectYears.map(
         (year, i) => picked[i]?.subject || `${year}학년 전공 탐색`,
@@ -370,6 +375,7 @@ export function loadState(storage) {
               d.yearly,
               typeof d.duration === "string" ? d.duration : "",
               typeof d.region === "string" ? d.region : "",
+              d.lessonGames,
             ),
           )
       : [];
@@ -429,7 +435,7 @@ export function loadState(storage) {
         const target = moveKey(key);
         if (
           target &&
-          games.some((game) => game.id === play?.game) &&
+          isGame(play?.game) &&
           typeof play.summary === "string"
         )
           plays[target] = { game: play.game, summary: play.summary.slice(0, 200) };

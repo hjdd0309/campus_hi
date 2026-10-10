@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 logger = logging.getLogger("uvicorn.error")
 DATA_PATH = Path(__file__).parent / "data" / "courses.csv.gz"
 YEARS_PATH = Path(__file__).parent / "data" / "year_curricula.json"
+GAMES_PATH = Path(__file__).parent / "data" / "lesson_games.jsonl"
 DIST_PATH = Path(__file__).parent.parent / "frontend" / "dist"
 MAX_BODY_BYTES = 16 * 1024
 HASHED_ASSET = re.compile(r"^/assets/.+-[A-Za-z0-9_-]{8}\.(js|css|png|webp|svg)$")
@@ -38,7 +39,7 @@ CONTENT_SECURITY_POLICY = "; ".join([
 
 @asynccontextmanager
 async def lifespan(app):
-    logger.info("학교·학과 %d건을 불러왔습니다.", len(catalog().programs))
+    logger.info("학교·학과 %d건, 연습 문제 %d건을 불러왔습니다.", len(catalog().programs), len(lesson_games()))
     yield
 
 
@@ -63,6 +64,10 @@ class SchoolRequest(RequestBody):
 
 class CurriculumRequest(SchoolRequest):
     school: str = Field(min_length=1, max_length=200)
+
+
+class GameRequest(RequestBody):
+    subject: str = Field(min_length=1, max_length=200)
 
 
 @app.middleware("http")
@@ -91,7 +96,7 @@ async def guard(request, call_next):
 @app.exception_handler(RequestValidationError)
 async def validation_error(request, exc):
     field = exc.errors()[0]["loc"][-1] if exc.errors() else ""
-    message = {"interests": "분야를 작성해주세요.", "course": "학과를 작성해주세요.", "school": "학교를 작성해주세요."}.get(field, "필수 항목을 올바르게 작성해주세요.")
+    message = {"interests": "분야를 작성해주세요.", "course": "학과를 작성해주세요.", "school": "학교를 작성해주세요.", "subject": "과목을 작성해주세요."}.get(field, "필수 항목을 올바르게 작성해주세요.")
     return JSONResponse(status_code=400, content={"detail": message})
 
 
@@ -137,6 +142,20 @@ def year_curricula():
         return {}
     entries = json.loads(YEARS_PATH.read_text(encoding="utf-8")).values()
     return {(entry["school"], entry["course"]): entry for entry in entries if entry.get("status") == "verified" and entry.get("years")}
+
+
+@lru_cache(maxsize=1)
+def lesson_games():
+    """`backend/lesson_games.py`로 넣은 연습 문제 중 검증된 것만 과목 키 → 문제로 돌려준다."""
+    if not GAMES_PATH.exists():
+        return {}
+    games = {}
+    with GAMES_PATH.open(encoding="utf-8") as file:
+        for line in file:
+            game = json.loads(line) if line.strip() else {}
+            if game.get("status") == "verified":
+                games[compact(game["course_name"])] = {name: value for name, value in game.items() if name != "check"}
+    return games
 
 
 @lru_cache(maxsize=1)
@@ -207,7 +226,18 @@ def curriculum_list(body: CurriculumRequest):
         raise HTTPException(status_code=404, detail="해당 학교의 학과 정보를 찾을 수 없습니다.")
     verified = year_curricula().get((body.school, body.course))
     years = verified and {"terms": verified["years"], "source_url": verified["url"], "checked_at": verified["checked_at"]}
-    return {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "years": years}
+    games = lesson_games()
+    # 연습 문제가 있는 과목과 그 유형. 화면이 체험할 과목을 고를 때 쓴다.
+    types = {subject: games[compact(subject)]["type"] for subject in program["curriculum"] if compact(subject) in games}
+    return {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "years": years, "games": types}
+
+
+@app.post("/api/lesson_game")
+def lesson_game(body: GameRequest):
+    game = lesson_games().get(compact(body.subject))
+    if not game:
+        raise HTTPException(status_code=404, detail="이 과목의 연습 문제가 아직 없어요.")
+    return {"game": game}
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)

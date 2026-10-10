@@ -428,6 +428,147 @@ body {
 .game-choices button:active {
   background: #e8faf7;
 }
+.game-choices.stack {
+  grid-template-columns: 1fr;
+}
+.game-choices.stack button {
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.game-choices button.is-right,
+.match-board button.is-right {
+  border-color: #27d8cd;
+  background: #d6f8f6;
+  color: #087f77;
+}
+.game-choices button.is-wrong {
+  border-color: #e5484d;
+  background: #fff1f1;
+}
+.game-choices button.is-rest {
+  opacity: 0.5;
+}
+.game-choices button[aria-disabled="true"],
+.match-board button[aria-disabled="true"] {
+  cursor: default;
+}
+.game-note {
+  margin: -2px 0 10px;
+  font-size: 11px;
+  line-height: 17px;
+  color: #827d76;
+}
+.lesson-game .text-button {
+  display: block;
+  margin: 12px auto 0;
+}
+.quiz-text {
+  margin: 0 0 10px;
+  border-radius: 12px;
+  background: #fffaea;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+  color: #302b27;
+}
+.quiz-blank {
+  display: inline-block;
+  min-width: 52px;
+  margin: 0 3px;
+  border-bottom: 2px solid #087f77;
+  text-align: center;
+  color: #087f77;
+}
+.order-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+.order-list li {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d1d5da;
+  border-radius: 10px;
+  background: #fff;
+  padding: 4px 6px 4px 10px;
+}
+.order-number {
+  width: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #087f77;
+}
+.order-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 19px;
+  color: #302b27;
+}
+.order-list button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #e8faf7;
+  font-size: 15px;
+  color: #087f77;
+  cursor: pointer;
+}
+.order-list button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.match-board {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: 8px;
+  align-items: start;
+}
+.match-board > div {
+  display: grid;
+  gap: 6px;
+}
+.match-board button {
+  min-height: 48px;
+  border: 1px solid #d1d5da;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: #302b27;
+  cursor: pointer;
+}
+.match-board button[aria-pressed="true"] {
+  border-color: #087f77;
+  box-shadow: inset 0 0 0 1px #087f77;
+}
+.match-pairs {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.match-pairs div {
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 19px;
+}
+.match-pairs dt {
+  font-weight: 700;
+  color: #087f77;
+}
+.match-pairs dd {
+  margin: 0;
+  color: #302b27;
+}
 .game-result {
   display: grid;
   gap: 6px;

@@ -21,7 +21,7 @@ npm run build    # 프런트 프로덕션 빌드
 
 ```
 backend/.venv/Scripts/python -m pip install -r backend/requirements-test.txt -r backend/requirements-pipeline.txt
-backend/.venv/Scripts/python -m unittest backend.test_api backend.test_pipeline
+backend/.venv/Scripts/python -m unittest backend.test_api backend.test_pipeline backend.test_lesson_games
 ```
 
 ## 운영 배포
@@ -75,6 +75,31 @@ backend/.venv/Scripts/python -m backend.pipeline import 편성표.csv
 ```
 
 수집 결과는 서버를 다시 띄우거나 다시 배포해야 반영됩니다.
+
+## 수업 연습 문제
+
+전용 미니게임이 없는 과목에는 미리 만들어 둔 연습 문제가 붙습니다. 유형은 빈칸 채우기, OX 퀴즈, 순서 맞추기, 짝 맞추기, 분류하기 다섯 가지이고, 과목 하나에 유형 하나입니다. 체험은 전용 미니게임, 연습 문제, 기본 체험(관찰 과제) 순서로 정해집니다. 문제는 `backend/data/lesson_games.jsonl`에 쌓이고 서버는 검증된 것만 내보냅니다. 형식과 상한은 `backend/SOURCE.md`에 있습니다.
+
+문제는 서비스가 돌아가는 중에 만들지 않고, AI 에이전트(Claude Code)가 미리 써서 넣습니다. API 키는 필요 없습니다. 한 번에 50개씩 아래 순서로 진행합니다. 작업 파일은 `backend/.cache/lesson_games/`에 둡니다(저장소에 올라가지 않음).
+
+```
+backend/.venv/Scripts/python -m backend.lesson_games next --limit 50 --out backend/.cache/lesson_games/next.jsonl
+# next.jsonl의 과목마다 문제를 써서 batch.jsonl에 한 줄씩 적는다
+backend/.venv/Scripts/python -m backend.lesson_games ingest backend/.cache/lesson_games/batch.jsonl --model 모델명
+backend/.venv/Scripts/python -m backend.lesson_games quiz --out backend/.cache/lesson_games/quiz.jsonl
+# quiz.jsonl(정답을 가린 문제)을 문제를 쓰지 않은 별도 에이전트가 풀어 solved.jsonl에 적는다
+backend/.venv/Scripts/python -m backend.lesson_games verify-ingest backend/.cache/lesson_games/solved.jsonl
+backend/.venv/Scripts/python -m backend.lesson_games status
+```
+
+- `next`는 모든 학과의 체험 자리를 채우는 데 필요한 과목을 많이 쓰이는 순서로 줍니다(학과마다 가장 흔한 과목부터).
+- 문제로 만들 내용이 없는 과목(현장실습, 캡스톤디자인 등)은 `{"course_name":"과목명","unsuitable":"이유"}`로 적습니다. 그 과목은 다시 나오지 않고, 그 학과의 다음 과목이 대상에 들어옵니다.
+- `ingest`는 형식과 상한을 검사해 맞는 것만 검토 대기(`review`)로 넣고, 틀린 줄은 이유와 함께 알려줍니다. 고쳐서 다시 넣으면 됩니다.
+- 풀이가 정답과 모두 같고 지적 사항이 없으면 공개(`verified`)되고, 아니면 검토 대기로 남습니다. 남은 것은 `status`로 확인해 문제를 고쳐 `ingest --force`로 다시 넣거나, 직접 확인한 뒤 `approve 과목명`, 버리려면 `reject 과목명 --reason 이유`를 씁니다.
+- 문제를 쓸 때는 그 과목의 표준 교재에 공통으로 나오는 내용만 다루고, 교재나 학자에 따라 답이 갈리는 내용, 해마다 바뀌는 수치는 피합니다.
+- 공개된 문제는 서버를 다시 띄우거나 다시 배포해야 반영됩니다.
+
+유형을 추가하려면 `backend/lesson_games.py`의 `TYPES`와 `frontend/src/lessonGames.js`의 `lessonTypes`에 형식 검사를 넣고, `frontend/src/TypedGames.jsx`의 `typedComponents`에 화면을 등록합니다.
 
 ## 수업 맞춤 미니게임
 

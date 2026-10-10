@@ -14,5 +14,7 @@ Dockerfile
 backend/test_api.py
 backend/requirements-test.txt
 backend/pipeline.py
+backend/lesson_games.py
+backend/test_lesson_games.py
 backend/requirements-pipeline.txt
 backend/.cache

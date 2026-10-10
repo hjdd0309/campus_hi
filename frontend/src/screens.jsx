@@ -30,6 +30,7 @@ import {
   initialState,
 } from "./model.js";
 import { games } from "./games.js";
+import { lessonTypes } from "./lessonGames.js";
 import LessonGame from "./Games.jsx";
 import GraduationPlan from "./GraduationPlan.jsx";
 
@@ -492,7 +493,7 @@ export function Schools({ nav, route, setState }) {
     setFailed(null);
     getCurriculum(p.school, p.course)
       .then((result) => {
-        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region);
+        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games);
         setState((s) => ({
           ...s,
           current: dept.id,
@@ -1000,8 +1001,9 @@ function TabBar({ active, nav }) {
 /** 과제 하나가 어떤 활동인지 한 줄로. */
 function taskKind(d, index) {
   if (index === d.lessons.length - 1) return "졸업 과제";
-  const game = games.find((item) => item.id === d.games?.[index]);
-  return game ? game.title : "직접 해보고 느낀 점 기록하기";
+  const id = d.games?.[index];
+  const title = games.find((item) => item.id === id)?.title || lessonTypes[id]?.title;
+  return title || "직접 해보고 느낀 점 기록하기";
 }
 
 function TaskCard({ top, title, sub, d }) {
@@ -1276,7 +1278,21 @@ export function Lesson({ active, nav, state, setState }) {
   const { d, index, total, year, final } = v;
   const isFinal = index === total - 1;
   const game = d.games?.[index] || null;
-  const played = game && state.plays[key]?.game === game ? state.plays[key].summary : "";
+  // 체험을 마친 기록. 연습 문제를 받지 못해 기본 체험으로 진행한 경우에는 결과(summary)가 비어 있다.
+  const play = game && state.plays[key]?.game === game ? state.plays[key] : null;
+  const played = play?.summary || "";
+  const basic = (
+    <div className="rounded-[16px] border border-cream-line bg-cream p-[16px]">
+      <strong className="text-[14px] font-semibold text-slate">
+        {index === 0 ? "관찰하고 이해하기" : "아이디어 적용하기"}
+      </strong>
+      <p className="mt-[6px] text-[13px] leading-[21px] text-ink-3">
+        {index === 0
+          ? `‘${d.lessons[index]}’에서 다루는 주제와 관련된 일상 속 장면을 하나 찾아보세요. 무엇을 관찰했고 어떤 점이 궁금했나요?`
+          : "앞 학년에서 발견한 질문을 작은 해결 방법으로 바꿔보세요. 대상과 목적을 정하고, 직접 해본 과정과 결과를 기록해요."}
+      </p>
+    </div>
+  );
   const plan = state.capstones[d.id];
 
   // 입력할 때마다 전체 상태를 저장하지 않도록 잠시 모았다가 저장한다.
@@ -1306,7 +1322,7 @@ export function Lesson({ active, nav, state, setState }) {
     );
 
   const finish = () => {
-    if (game && !played) return warn("먼저 위의 체험을 끝까지 해보세요.");
+    if (game && !play) return warn("먼저 위의 체험을 끝까지 해보세요.");
     if (isFinal && !finalReady(state, d)) return warn("계획서의 세 칸을 모두 채워주세요.");
     if (!draft.trim()) return warn("느낀 점을 한 줄 이상 적어주세요.");
     window.clearTimeout(timer.current);
@@ -1334,20 +1350,14 @@ export function Lesson({ active, nav, state, setState }) {
           ) : game ? (
             <LessonGame
               game={game}
+              subject={d.lessons[index]}
               played={played}
               onComplete={(summary) => setState((s) => ({ ...s, plays: { ...s.plays, [key]: { game, summary } } }))}
+              basic={basic}
+              onBasic={() => setState((s) => (s.plays[key]?.game === game ? s : { ...s, plays: { ...s.plays, [key]: { game, summary: "" } } }))}
             />
           ) : (
-            <div className="rounded-[16px] border border-cream-line bg-cream p-[16px]">
-              <strong className="text-[14px] font-semibold text-slate">
-                {index === 0 ? "관찰하고 이해하기" : "아이디어 적용하기"}
-              </strong>
-              <p className="mt-[6px] text-[13px] leading-[21px] text-ink-3">
-                {index === 0
-                  ? `‘${d.lessons[index]}’에서 다루는 주제와 관련된 일상 속 장면을 하나 찾아보세요. 무엇을 관찰했고 어떤 점이 궁금했나요?`
-                  : "앞 학년에서 발견한 질문을 작은 해결 방법으로 바꿔보세요. 대상과 목적을 정하고, 직접 해본 과정과 결과를 기록해요."}
-              </p>
-            </div>
+            basic
           )}
         </div>
         <label className="note-card a-up mt-[14px]" style={delay(0.22)}>

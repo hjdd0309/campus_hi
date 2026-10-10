@@ -30,6 +30,7 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     years: null,
     duration: "4년",
     region: "",
+    games: {},
   });
   assert.deepEqual(requests, [
     ["/api/course_list", { interests: "디자인", query: "산업", offset: 30, limit: 30 }],

@@ -7,7 +7,7 @@
   "functions": {
     "api/index.py": {
       "includeFiles": "backend/**",
-      "excludeFiles": "{frontend/**,scripts/**,node_modules/**,.env*,*.md,*.pdf,Dockerfile,.dockerignore,.vercelignore,package*.json,backend/*.md,backend/test_*.py,backend/pipeline.py,backend/requirements*.txt}",
+      "excludeFiles": "{frontend/**,scripts/**,node_modules/**,.env*,*.md,*.pdf,Dockerfile,.dockerignore,.vercelignore,package*.json,backend/*.md,backend/test_*.py,backend/pipeline.py,backend/lesson_games.py,backend/requirements*.txt}",
       "maxDuration": 30
     }
   },

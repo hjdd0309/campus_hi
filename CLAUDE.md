@@ -66,6 +66,7 @@
 - `backend/`: FastAPI. `main.py` 하나에 API가 있고, 데이터는 `data/courses.csv.gz`를 읽는다. 데이터 출처는 `backend/SOURCE.md`에 있다.
 - `backend/pipeline.py`: 학교 홈페이지에서 학년별 편성을 모아 `data/year_curricula.json`에 저장하는 수집 도구. 서버는 이 파일의 검증된 항목만 내보낸다.
 - `frontend/src/games.js`, `Games.jsx`: 과목명에 맞춰 붙는 수업 맞춤 미니게임. 게임 내용(실험 설명, 회계 처리 등)은 사실과 맞아야 하므로 추가·수정할 때 근거를 확인한다.
+- `frontend/src/lessonGames.js`, `TypedGames.jsx`, `backend/lesson_games.py`: 전용 미니게임이 없는 과목에 붙는 유형별 연습 문제(빈칸 채우기, OX, 순서 맞추기, 짝 맞추기, 분류하기). 문제는 미리 만들어 `backend/data/lesson_games.jsonl`에 넣고 서버는 검증된 것만 내보낸다. 체험은 전용 미니게임, 연습 문제, 기본 체험 순서로 정한다.
 - `scripts/dev.mjs`: 백엔드 가상환경 준비와 백엔드·프론트 동시 실행을 맡는다.
 
 명령어(저장소 루트에서 실행):
@@ -75,12 +76,34 @@
 | 개발 서버 실행(백엔드 + 프론트) | `npm start` |
 | 환경 준비만 | `npm run setup` |
 | 프론트 테스트 | `npm test` |
-| 백엔드 테스트 | `backend/.venv/Scripts/python -m unittest backend.test_api backend.test_pipeline` (`backend/requirements-test.txt`, `backend/requirements-pipeline.txt` 설치 필요) |
+| 백엔드 테스트 | `backend/.venv/Scripts/python -m unittest backend.test_api backend.test_pipeline backend.test_lesson_games` (`backend/requirements-test.txt`, `backend/requirements-pipeline.txt` 설치 필요) |
 | 학년별 교육과정 수집 | `backend/.venv/Scripts/python -m backend.pipeline collect` (`ANTHROPIC_API_KEY` 필요, 사용법은 `README.md`) |
+| 연습 문제 현황 | `backend/.venv/Scripts/python -m backend.lesson_games status` |
 | 프로덕션 빌드 | `npm run build` |
 | 빌드 결과 미리보기 | `npm run preview` |
 
 개발 서버는 `/api` 요청을 `127.0.0.1:8000`의 백엔드로 프록시한다. 포트는 `API_PORT`, 외부 백엔드는 `API_TARGET` 환경변수로 바꾼다.
+
+## 연습 문제 생성 이어서 하기
+
+"lesson_games 생성 이어서 해줘"라는 요청을 받으면 아래 순서를 한 배치(50개)씩 되풀이한다. API 키는 쓰지 않고 네가 직접 문제를 쓴다. 명령과 주의점은 `README.md`의 "수업 연습 문제", 형식과 상한은 `backend/SOURCE.md`에 있다. 작업 파일은 `backend/.cache/lesson_games/`에 둔다.
+
+1. `status`로 남은 수를 확인하고, 검토 대기(`review`)로 남은 문제가 있으면 먼저 처리한다(고쳐서 `ingest --force`, 또는 `reject`).
+2. `next --limit 50 --out ...`으로 다음 과목을 받는다.
+3. 과목마다 가장 맞는 유형 하나로 문제를 써서 JSONL로 저장한다. 표준 교재에 공통으로 나오는 내용만 쓰고, 문제로 만들 수 없는 과목은 `unsuitable`로 적는다.
+4. `ingest 파일 --model 실제_모델명`으로 넣고, 실패한 줄은 고쳐서 다시 넣는다.
+5. `quiz --out ...`으로 정답을 가린 문제를 내보내고, 문제를 쓰지 않은 별도 서브에이전트에게 풀게 한다. 서브에이전트에게는 그 파일만 읽게 하고 정답이 든 파일은 열지 못하게 한다. 네가 쓴 문제를 네가 승인하지 않는다.
+6. `verify-ingest 풀이파일`로 반영하고 `status`로 확인한다.
+7. `TODO.md`의 생성 진행 상황(완료·남은 과목 수)을 고친다. 커밋은 요청받았을 때만 한다.
+
+작업 폴더 `backend/.cache/lesson_games/`에는 지난 작업에서 만든 도우미가 있다(저장소에는 올라가지 않으니, 없으면 같은 역할로 다시 만든다).
+
+- `lib.py`: 배치 파일에서 `blank()`, `ox()`, `order()`, `match()`, `sort()`, `unsuitable()`로 문제를 짧게 적고 `dump()`로 JSONL을 내보낸다. 배치는 `batch-번호.py`로 쓴다.
+- `run.sh 번호`: 배치를 JSONL로 만들어 `ingest`하고 `quiz-번호.jsonl`을 내보낸다.
+- `solver.md`: 풀이 서브에이전트에게 주는 지침. 서브에이전트에게는 이 파일과 `quiz-번호.jsonl`만 읽고 `solved-번호.jsonl`을 쓰게 한다.
+- `show.py`: `next`가 저장한 과목 목록을 보기 좋게 출력한다.
+
+풀이 서브에이전트가 결함(`issues`)으로 올린 문제는 검토 대기로 남는다. 문구를 고쳐 `ingest --force`로 다시 넣으면 다음 배치의 `quiz`에 함께 실려 다시 검증된다. 결함은 아니지만 덜 엄밀하다고 알려 온 표현도 사실과 관련된 것은 같은 방법으로 고친다. 순서 맞추기는 교재마다 순서가 갈리는 단계가 끼면 자주 걸리므로, 순서가 하나로 정해지는 내용에만 쓴다.
 
 ## 작업 보고
 
