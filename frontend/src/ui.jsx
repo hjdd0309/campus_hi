@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { confetti, icon } from "./assets.js";
 
 /** 뽑아낸 아이콘을 CSS 마스크로 그려 색을 입힐 수 있게 한다. */
@@ -21,6 +21,7 @@ export function Mask({ src, w, h, color = "currentColor", className = "", style 
   );
 }
 
+const ARTBOARD_H = 874;
 const GLYPH_OFFSET = 0.06;
 
 /**
@@ -43,10 +44,55 @@ export function T({ y, size, lh, left, right, center, clip, className = "", styl
   );
 }
 
-export function Screen({ children, bg = "#fff", className = "" }) {
+/**
+ * 화면 하나. 아트보드 높이는 기기마다 달라서(App.jsx) 내용을 세 군데에 나눠 붙인다.
+ * - children: 위쪽 기준. 시안의 좌표 그대로 놓는다. h(내용이 끝나는 y)를 주면 화면이 모자랄 때 세로로 스크롤된다.
+ * - footer: 아래쪽 기준. 시안의 좌표 그대로 주면 화면 아래 끝에 붙는다. foot은 그 영역이 시작하는 y다.
+ * - 가운데 기준으로 둘 것은 Center로 감싼다.
+ */
+export function Screen({ children, footer, foot = 740, veil = true, h, resetOn, bg = "#fff", className = "" }) {
+  const scroller = useRef(null);
+  useEffect(() => {
+    scroller.current.scrollTop = 0;
+  }, [resetOn]);
   return (
     <div className={`absolute inset-0 overflow-hidden ${className}`} style={{ background: bg }}>
-      {children}
+      <div ref={scroller} className="no-scrollbar absolute inset-0 overflow-y-auto overflow-x-hidden">
+        <div
+          className="relative min-h-full"
+          style={h ? { height: `calc(${h + (footer ? ARTBOARD_H - foot : 0)}px - (var(--tt) + var(--bt)) * 1px)` } : undefined}
+        >
+          <div className="absolute inset-x-0 bottom-0" style={{ top: "calc(var(--tt) * -1px)" }}>
+            {children}
+          </div>
+        </div>
+      </div>
+      {footer && (
+        <div
+          className="pointer-events-none absolute inset-x-0 *:pointer-events-auto"
+          style={{ height: ARTBOARD_H, bottom: "calc(var(--bt) * -1px)" }}
+        >
+          {/* 스크롤된 내용이 아래 버튼 뒤로 비치지 않게 가린다. */}
+          {veil && (
+            <div
+              className="absolute inset-x-0 bottom-0"
+              style={{ top: foot, background: `linear-gradient(transparent, ${veil === true ? bg : veil} 12px)` }}
+            />
+          )}
+          {footer}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 화면 가운데를 기준으로 놓는 내용(마스코트, 증명서). 안에는 시안의 좌표를 그대로 쓴다. */
+export function Center({ children }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute inset-x-0 top-1/2" style={{ height: ARTBOARD_H, marginTop: -ARTBOARD_H / 2 }}>
+        {children}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { Fragment, useEffect, useRef, useState } from "react";
 import { icon, img } from "./assets.js";
 import {
   BackButton,
+  Center,
   Confetti,
   delay,
   Header,
@@ -89,24 +90,30 @@ const stamp = (date) =>
 
 export function Splash({ nav }) {
   return (
-    <Screen>
-      <div className="a-drop absolute left-[110px] top-[281px] h-[170px] w-[162px]" style={delay(0.1)}>
+    <Screen
+      foot={724}
+      footer={
+        <OutlineButton top={740} onClick={() => nav.push("interest")} className="a-up" style={delay(0.8)}>
+          입학하기
+        </OutlineButton>
+      }
+    >
+      <Center>
+        <div className="a-drop absolute left-[110px] top-[281px] h-[170px] w-[162px]" style={delay(0.1)}>
+          <img
+            src={img.mascotSplash}
+            alt="캠퍼스하이 마스코트"
+            className="loop h-full w-full"
+            style={{ animation: "float 3.2s ease-in-out 1.1s infinite" }}
+          />
+        </div>
         <img
-          src={img.mascotSplash}
-          alt="캠퍼스하이 마스코트"
-          className="loop h-full w-full"
-          style={{ animation: "float 3.2s ease-in-out 1.1s infinite" }}
+          src={img.wordmark}
+          alt="캠퍼스하이"
+          className="a-up absolute left-[127px] top-[474px] h-[33px] w-[148px]"
+          style={delay(0.55)}
         />
-      </div>
-      <img
-        src={img.wordmark}
-        alt="캠퍼스하이"
-        className="a-up absolute left-[127px] top-[474px] h-[33px] w-[148px]"
-        style={delay(0.55)}
-      />
-      <OutlineButton top={740} onClick={() => nav.push("interest")} className="a-up" style={delay(0.8)}>
-        입학하기
-      </OutlineButton>
+      </Center>
     </Screen>
   );
 }
@@ -150,7 +157,7 @@ export function Interest({ nav }) {
     window.setTimeout(() => nav.push("explore", { start: i === 0 ? 1 : 8, direct: i === 1 }), 260);
   };
   return (
-    <Screen>
+    <Screen h={420}>
       <QuestionTitle title="관심이 있는 분야가 있나요?" sub="지금의 관심에서 출발해도, 저와 함께 찾아도 괜찮아요" />
       <OptionButton index={0} top={295} label="관심 분야가 없어요" selected={picked === 0} onClick={() => choose(0)} />
       <OptionButton index={1} top={357} label="관심 분야가 있어요" selected={picked !== 0} onClick={() => choose(1)} />
@@ -223,9 +230,10 @@ export function Explore({ nav, route, state, setState }) {
   };
 
   const msg = keywordMessage(state.interests);
+  const bottom = step < 8 && q ? 295 + q.options.length * 62 : msg ? 672 : 520;
 
   return (
-    <Screen>
+    <Screen h={bottom} resetOn={step} footer={<OutlineButton onClick={next}>{step < 8 ? "다음" : "결과 보기"}</OutlineButton>}>
       <Header title="관심 분야 탐색하기" count={`${step}/8`} onBack={back} />
       <ProgressBar value={progressFor(step)} />
 
@@ -287,8 +295,6 @@ export function Explore({ nav, route, state, setState }) {
           </>
         )}
       </Fragment>
-
-      <OutlineButton onClick={next}>{step < 8 ? "다음" : "결과 보기"}</OutlineButton>
     </Screen>
   );
 }
@@ -305,17 +311,19 @@ export function Loading({ nav }) {
   return (
     <Screen>
       <Header title="관심 분야 탐색하기" onBack={nav.back} />
-      <T y={308} size={20} center className="a-fade font-bold text-navy">
-        탐색 중{" "}
-        {[0, 1, 2].map((i) => (
-          <span key={i} className="loop" style={{ animation: `dot 1.2s ease-in-out ${i * 0.2}s infinite alternate` }}>
-            .
-          </span>
-        ))}
-      </T>
-      <div className="a-pop absolute left-[96px] top-[349px] h-[175px] w-[196px]" style={delay(0.1)}>
-        <img src={img.mascotLoading} alt="" className="loop h-full w-full" style={{ animation: "scurry 0.9s ease-in-out infinite" }} />
-      </div>
+      <Center>
+        <T y={308} size={20} center className="a-fade font-bold text-navy">
+          탐색 중{" "}
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="loop" style={{ animation: `dot 1.2s ease-in-out ${i * 0.2}s infinite alternate` }}>
+              .
+            </span>
+          ))}
+        </T>
+        <div className="a-pop absolute left-[96px] top-[349px] h-[175px] w-[196px]" style={delay(0.1)}>
+          <img src={img.mascotLoading} alt="" className="loop h-full w-full" style={{ animation: "scurry 0.9s ease-in-out infinite" }} />
+        </div>
+      </Center>
     </Screen>
   );
 }
@@ -359,7 +367,14 @@ export function Result({ nav, state }) {
     : `질문 ${answered}개의 답을 바탕으로 골랐어요.`;
   const open = (field) => nav.push("schools", { field });
   return (
-    <Screen>
+    <Screen
+      h={737}
+      footer={
+        <OutlineButton onClick={() => open(best.id)} className="a-up" style={delay(0.7)}>
+          다음
+        </OutlineButton>
+      }
+    >
       <Header title="관심 분야 탐색하기" onBack={nav.back} />
       <div className="a-pop absolute left-[117px] top-[149px] h-[124px] w-[140px]" style={delay(0.05)}>
         <img
@@ -414,9 +429,6 @@ export function Result({ nav, state }) {
         className="a-up"
         style={delay(0.62)}
       />
-      <OutlineButton onClick={() => open(best.id)} className="a-up" style={delay(0.7)}>
-        다음
-      </OutlineButton>
     </Screen>
   );
 }
@@ -509,7 +521,7 @@ export function Schools({ nav, route, setState }) {
   };
 
   return (
-    <Screen>
+    <Screen footer={<OutlineButton onClick={() => (list[0] ? open(list[0]) : undefined)}>다음</OutlineButton>}>
       <BackButton onClick={nav.back} />
       <T y={126} size={20} lh={25} left={29.5} className="a-up font-semibold text-mint">
         {"궁금했던 학과와 학교\n저와 함께 체험해볼까요?"}
@@ -550,13 +562,14 @@ export function Schools({ nav, route, setState }) {
           const el = e.currentTarget;
           if (el.scrollTop + el.clientHeight > el.scrollHeight - 300) more();
         }}
-        className="no-scrollbar absolute left-0 top-[380px] h-[370px] w-full overflow-y-auto"
+        className="no-scrollbar absolute left-0 top-[380px] w-full overflow-y-auto"
         style={{
+          bottom: "calc(124px - var(--bt) * 1px)",
           WebkitMaskImage: "linear-gradient(180deg, #000 0%, #000 50%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.12) 96%, transparent 100%)",
           maskImage: "linear-gradient(180deg, #000 0%, #000 50%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.12) 96%, transparent 100%)",
         }}
       >
-        <div key={filter + search + retry} className="relative" style={{ height: Math.max(370, 5 + list.length * 91 + 90) }}>
+        <div key={filter + search + retry} className="relative" style={{ height: Math.max(110, 5 + list.length * 91 + 90) }}>
           {list.map((p, i) => {
             const key = keyOf(p);
             return (
@@ -605,7 +618,6 @@ export function Schools({ nav, route, setState }) {
           )}
         </div>
       </div>
-      <OutlineButton onClick={() => (list[0] ? open(list[0]) : undefined)}>다음</OutlineButton>
     </Screen>
   );
 }
@@ -657,7 +669,14 @@ export function Detail({ active, nav, state, setState }) {
     nav.push("enrolled", undefined, "rise");
   };
   return (
-    <Screen>
+    <Screen
+      h={Math.min(740, 580 + (total - 1) * step)}
+      footer={
+        <OutlineButton onClick={enroll} className="a-up" style={delay(0.5)}>
+          {finished ? "졸업 리포트 보기" : journey ? "이어서 체험하기" : `${d.name} 입학하기`}
+        </OutlineButton>
+      }
+    >
       <BackButton onClick={nav.back} />
       <div className="a-up absolute left-[20px] top-[116px] h-[112px] w-[362px] rounded-[16px] border border-cream-line bg-cream">
         <div className="absolute left-[11px] top-[21px] h-[72px] w-[108px]">
@@ -712,9 +731,6 @@ export function Detail({ active, nav, state, setState }) {
           </T>
         </div>
       ))}
-      <OutlineButton onClick={enroll} className="a-up" style={delay(0.5)}>
-        {finished ? "졸업 리포트 보기" : journey ? "이어서 체험하기" : `${d.name} 입학하기`}
-      </OutlineButton>
     </Screen>
   );
 }
@@ -754,10 +770,12 @@ function CertificateShell({ onBack, onNext, children }) {
     <Screen bg="#27d8cd">
       <BackButton onClick={onBack} color="#fff" />
       <button aria-label="다음으로" onClick={onNext} className="absolute inset-0 top-[100px] z-0 cursor-pointer" />
-      <Paper className="a-paper pointer-events-none z-10 shadow-[0_18px_40px_rgba(0,80,76,0.18)]" style={delay(0.05)}>
-        <PaperFold src={img.paperFold} />
-        {children}
-      </Paper>
+      <Center>
+        <Paper className="a-paper z-10 shadow-[0_18px_40px_rgba(0,80,76,0.18)]" style={delay(0.05)}>
+          <PaperFold src={img.paperFold} />
+          {children}
+        </Paper>
+      </Center>
     </Screen>
   );
 }
@@ -881,7 +899,24 @@ export function Welcome({ active, nav, state }) {
   if (!v?.journey) return null;
   const { d } = v;
   return (
-    <Screen>
+    <Screen
+      h={725}
+      foot={725}
+      footer={
+        <>
+          <button
+            onClick={() => nav.reset(["home"], "fade")}
+            className="pressable a-up absolute left-[20px] top-[737px] flex h-[67px] w-[362px] items-center justify-center rounded-[14px] bg-mint text-[18px] font-semibold text-white active:brightness-95"
+            style={delay(0.9)}
+          >
+            첫 과제 시작하기
+          </button>
+          <T y={820} size={11.5} center className="a-fade text-ink-3" style={delay(1)}>
+            학년은 체험 단계예요. 내 속도에 맞춰 진행해요.
+          </T>
+        </>
+      }
+    >
       <button aria-label="뒤로" onClick={nav.back} className="pressable absolute left-[17px] top-[48px] z-20 flex h-[40px] w-[36px] items-center justify-center">
         <Mask src={icon.back} w={10} h={15} color="#2c1502" />
       </button>
@@ -919,16 +954,6 @@ export function Welcome({ active, nav, state }) {
           {"학년마다 수업을 하나씩 체험하고\n마지막 학년에는 졸업 과제에 도전해요."}
         </T>
       </div>
-      <button
-        onClick={() => nav.reset(["home"], "fade")}
-        className="pressable a-up absolute left-[20px] top-[737px] flex h-[67px] w-[362px] items-center justify-center rounded-[14px] bg-mint text-[18px] font-semibold text-white active:brightness-95"
-        style={delay(0.9)}
-      >
-        첫 과제 시작하기
-      </button>
-      <T y={820} size={11.5} center className="a-fade text-ink-3" style={delay(1)}>
-        학년은 체험 단계예요. 내 속도에 맞춰 진행해요.
-      </T>
     </Screen>
   );
 }
@@ -1034,7 +1059,12 @@ export function Home({ active, nav, state }) {
   // 지금 과제 다음에 남은 과제(최대 2개).
   const upcoming = finished ? [] : d.lessons.map((lesson, i) => ({ lesson, i })).slice(index + 1, index + 3);
   return (
-    <Screen>
+    <Screen
+      h={upcoming.length ? 565 + upcoming.length * 84 : 615}
+      foot={739}
+      veil={false}
+      footer={<TabBar active="home" nav={nav} />}
+    >
       <Mask src={icon.cap} w={24} h={18} color="#087f77" className="absolute left-[23px] top-[59px]" />
       <T y={61} size={16} center clip={270} className="font-semibold text-mint">
         {d.school}
@@ -1099,7 +1129,6 @@ export function Home({ active, nav, state }) {
           {finished ? "모든 과제를 마쳤어요." : "지금 하는 과제가 마지막이에요."}
         </T>
       )}
-      <TabBar active="home" nav={nav} />
     </Screen>
   );
 }
@@ -1196,68 +1225,78 @@ function Studio({ year, onDone, onQuit }) {
     advance(2);
   };
 
+  // 화면이 낮으면 '그만하기'까지 다 보이도록 장면을 줄이고, 양옆에 남는 자리는 같은 그림을 흐리게 깔아 채운다.
   return (
-    <div
-      ref={area}
-      tabIndex={0}
-      role="application"
-      aria-label={`${year}학년 졸업작품 ${phase === "sand" ? "사포질하기" : "도색하기"}. 작품을 문지르거나 스페이스를 눌러요.`}
-      className="absolute left-0 top-[112px] h-[762px] w-[402px] touch-none select-none overflow-hidden outline-none"
-      onPointerDown={down}
-      onPointerMove={move}
-      onPointerUp={up}
-      onPointerCancel={up}
-      onKeyDown={key}
-    >
-      {/* 장면 그림 아래쪽에 함께 그려진 기기 장식이 보이지 않도록 조금 키워서 잘라낸다. */}
-      <div className="absolute left-[-7px] top-0 h-[789px] w-[416px]" style={{ animation: rubbing ? "rub 0.14s linear infinite" : undefined }}>
-        <img src={img.sceneSand} alt="" draggable={false} className="absolute inset-0 h-full w-full" />
-        <img
-          src={img.scenePaint}
-          alt=""
-          draggable={false}
-          className="absolute inset-0 h-full w-full transition-opacity duration-700"
-          style={{ opacity: phase === "paint" ? 1 : 0 }}
-        />
-      </div>
-      <div className="pointer-events-none absolute left-[26px] top-[42px] h-[108px] w-[349px] rounded-[21px] bg-white">
-        <T y={31} size={18} center className="font-bold text-ink">
-          {year}학년 졸업작품
-        </T>
-        <T y={66} size={15} center className="text-gray">
-          {phase === "sand" ? "사포질하기" : "도색하기"}
-        </T>
-      </div>
-      {!touched && (
-        <span
-          className="loop pointer-events-none absolute left-[161px] top-[290px] h-[80px] w-[80px] rounded-full border-2 border-white/90"
-          style={{ animation: "ripple 1.6s ease-out infinite" }}
-        />
-      )}
-      {particles.map((p) => (
-        <span
-          key={p.id}
-          className="pointer-events-none absolute rounded-full"
-          style={{
-            left: p.x - p.size / 2,
-            top: p.y - p.size / 2,
-            width: p.size,
-            height: p.size,
-            background: p.color,
-            boxShadow: p.kind === "dust" ? "0 0 2px rgba(0,0,0,0.15)" : undefined,
-            animation: p.kind === "paint" ? "splat 0.8s ease-out both" : "particle 0.85s cubic-bezier(0.22,1,0.36,1) both",
-            "--dx": `${p.dx}px`,
-            "--dy": `${p.dy}px`,
-          }}
-        />
-      ))}
-      <button
-        onPointerDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        onClick={onQuit}
-        aria-label="그만하기"
-        className="absolute left-[14px] top-[676px] h-[46px] w-[375px] rounded-[12px] transition-colors active:bg-black/5"
+    <div className="absolute inset-x-0 bottom-0 top-[112px] overflow-hidden bg-[#b3a28e]">
+      <img
+        src={phase === "paint" ? img.scenePaint : img.sceneSand}
+        alt=""
+        draggable={false}
+        className="absolute inset-0 h-full w-full scale-125 object-cover blur-[12px]"
       />
+      <div
+        ref={area}
+        tabIndex={0}
+        role="application"
+        aria-label={`${year}학년 졸업작품 ${phase === "sand" ? "사포질하기" : "도색하기"}. 작품을 문지르거나 스페이스를 눌러요.`}
+        className="absolute left-0 top-0 h-[762px] w-[402px] origin-top touch-none select-none overflow-hidden outline-none"
+        style={{ scale: "min(1, (var(--vh) + var(--tt) - 112) / 734)" }}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+        onKeyDown={key}
+      >
+        {/* 장면 그림 아래쪽에 함께 그려진 기기 장식이 보이지 않도록 조금 키워서 잘라낸다. */}
+        <div className="absolute left-[-7px] top-0 h-[789px] w-[416px]" style={{ animation: rubbing ? "rub 0.14s linear infinite" : undefined }}>
+          <img src={img.sceneSand} alt="" draggable={false} className="absolute inset-0 h-full w-full" />
+          <img
+            src={img.scenePaint}
+            alt=""
+            draggable={false}
+            className="absolute inset-0 h-full w-full transition-opacity duration-700"
+            style={{ opacity: phase === "paint" ? 1 : 0 }}
+          />
+        </div>
+        <div className="pointer-events-none absolute left-[26px] top-[42px] h-[108px] w-[349px] rounded-[21px] bg-white">
+          <T y={31} size={18} center className="font-bold text-ink">
+            {year}학년 졸업작품
+          </T>
+          <T y={66} size={15} center className="text-gray">
+            {phase === "sand" ? "사포질하기" : "도색하기"}
+          </T>
+        </div>
+        {!touched && (
+          <span
+            className="loop pointer-events-none absolute left-[161px] top-[290px] h-[80px] w-[80px] rounded-full border-2 border-white/90"
+            style={{ animation: "ripple 1.6s ease-out infinite" }}
+          />
+        )}
+        {particles.map((p) => (
+          <span
+            key={p.id}
+            className="pointer-events-none absolute rounded-full"
+            style={{
+              left: p.x - p.size / 2,
+              top: p.y - p.size / 2,
+              width: p.size,
+              height: p.size,
+              background: p.color,
+              boxShadow: p.kind === "dust" ? "0 0 2px rgba(0,0,0,0.15)" : undefined,
+              animation: p.kind === "paint" ? "splat 0.8s ease-out both" : "particle 0.85s cubic-bezier(0.22,1,0.36,1) both",
+              "--dx": `${p.dx}px`,
+              "--dy": `${p.dy}px`,
+            }}
+          />
+        ))}
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={onQuit}
+          aria-label="그만하기"
+          className="absolute left-[14px] top-[676px] h-[46px] w-[375px] rounded-[12px] transition-colors active:bg-black/5"
+        />
+      </div>
     </div>
   );
 }
@@ -1332,10 +1371,13 @@ export function Lesson({ active, nav, state, setState }) {
   };
 
   return (
-    <Screen>
+    <Screen footer={<OutlineButton onClick={finish}>{isFinal ? `${final.name} 제출하고 졸업하기` : "기록하고 마치기"}</OutlineButton>}>
       <Header title={d.name} count={`${index + 1}/${total}`} onBack={nav.back} />
       <ProgressBar value={Math.max(0.04, index / total)} />
-      <div className="flow no-scrollbar absolute left-0 top-[124px] h-[620px] w-full overflow-y-auto px-[20px] pb-[20px] pt-[24px]">
+      <div
+        className="flow no-scrollbar absolute left-0 top-[124px] w-full overflow-y-auto px-[20px] pb-[20px] pt-[24px]"
+        style={{ bottom: "calc(130px - var(--bt) * 1px)" }}
+      >
         <h1 className="a-up text-[20px] font-semibold leading-[28px] text-mint">{d.lessons[index]}</h1>
         <p className="a-up mt-[4px] text-[14px] leading-[22px] text-gray" style={delay(0.06)}>
           {isFinal ? `${year}학년 · 마지막 과제예요` : `${year}학년 수업 · 직접 해보고 느낀 점을 남겨요`}
@@ -1382,7 +1424,6 @@ export function Lesson({ active, nav, state, setState }) {
           {notice}
         </p>
       </div>
-      <OutlineButton onClick={finish}>{isFinal ? `${final.name} 제출하고 졸업하기` : "기록하고 마치기"}</OutlineButton>
     </Screen>
   );
 }
@@ -1407,7 +1448,16 @@ export function Graduation({ active, nav, state }) {
   const { d, total } = v;
   const title = `${d.school} ${d.name}`;
   return (
-    <Screen>
+    <Screen
+      h={754}
+      foot={754}
+      veil="#feeaa0"
+      footer={
+        <OutlineButton onClick={() => nav.reset(["home", "schools"], "fade")} className="a-up" style={delay(0.95)}>
+          다른 학과도 체험하러가기
+        </OutlineButton>
+      }
+    >
       <Header title="졸업을 축하합니다" onBack={() => nav.reset(["home"], "fade")} />
       <div className="a-pop absolute left-[100px] top-[128px] h-[158px] w-[190px]" style={delay(0.05)}>
         <img
@@ -1437,7 +1487,7 @@ export function Graduation({ active, nav, state }) {
           </div>
         ))}
       </div>
-      <div className="absolute left-0 top-[507px] h-[367px] w-full bg-butter">
+      <div className="absolute bottom-0 left-0 top-[507px] w-full bg-butter">
         <div className="a-up" style={delay(0.65)}>
           <T y={53.5} size={21} left={21} clip={360} className="font-bold text-ink-2">
             {`나의 ${d.name} 체험 리포트`}
@@ -1460,9 +1510,6 @@ export function Graduation({ active, nav, state }) {
           </div>
         </div>
       </div>
-      <OutlineButton onClick={() => nav.reset(["home", "schools"], "fade")} className="a-up" style={delay(0.95)}>
-        다른 학과도 체험하러가기
-      </OutlineButton>
     </Screen>
   );
 }
@@ -1504,9 +1551,12 @@ export function My({ nav, state, setState }) {
     else nav.push(to);
   };
   return (
-    <Screen>
+    <Screen foot={739} veil={false} footer={<TabBar active="my" nav={nav} />}>
       <Header title="마이페이지" onBack={nav.back} />
-      <div className="flow no-scrollbar absolute left-0 top-[104px] h-[635px] w-full overflow-y-auto px-[20px] pb-[24px] pt-[20px]">
+      <div
+        className="flow no-scrollbar absolute left-0 top-[104px] w-full overflow-y-auto px-[20px] pb-[24px] pt-[20px]"
+        style={{ bottom: "calc(135px - var(--bt) * 1px)" }}
+      >
         <h1 className="a-up text-[20px] font-semibold leading-[28px] text-mint">나의 체험 기록</h1>
         <p className="a-up mt-[4px] text-[14px] leading-[22px] text-gray" style={delay(0.06)}>
           기록은 이 브라우저에만 저장돼요.
@@ -1567,7 +1617,6 @@ export function My({ nav, state, setState }) {
           )}
         </div>
       </div>
-      <TabBar active="my" nav={nav} />
     </Screen>
   );
 }

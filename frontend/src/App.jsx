@@ -5,6 +5,11 @@ import { STORAGE_KEY, loadState } from "./model.js";
 // 화면은 402×874 아트보드에 맞춰 그리고, 창 크기에 맞게 통째로 줄이거나 늘린다.
 const W = 402;
 const H = 874;
+// 휴대폰에서 아트보드가 이보다 낮아지면 폭을 채우지 않고 높이에 맞춰 줄인다.
+const MIN_H = 560;
+// 시안에서 기기 상태바와 홈 인디케이터 자리였던 위아래 여백. 높이가 모자라면 이만큼까지 먼저 줄인다.
+const TRIM_TOP = 32;
+const TRIM_BOTTOM = 28;
 const DURATION = 520;
 const STACK_KEY = "hi-campus-stack";
 
@@ -29,22 +34,29 @@ function initialStack(state) {
   return [make(Object.keys(state.journeys).length ? "home" : "splash")];
 }
 
-function useFitScale() {
-  const [scale, setScale] = useState(1);
+// 폭이 좁은 화면(휴대폰)에서는 폭을 꽉 채우고 아트보드의 높이를 화면에 맞춘다. 주소창 때문에 화면이
+// 시안보다 납작해도 양옆이 비지 않는다. 넓은 화면에서는 시안 비율 그대로 가운데에 둔다.
+function fit() {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  if (vw >= 520) return { scale: Math.min(1, vw / W, vh / H), height: H };
+  const scale = Math.min(vw / W, vh / MIN_H);
+  return { scale, height: vh / scale };
+}
+
+function useFit() {
+  const [box, setBox] = useState(fit);
   useEffect(() => {
-    const fit = () =>
-      setScale(
-        Math.min(
-          window.innerWidth / W,
-          window.innerHeight / H,
-          window.innerWidth < 520 ? Infinity : 1,
-        ),
-      );
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
+    const update = () =>
+      setBox((cur) => {
+        const next = fit();
+        return next.scale === cur.scale && next.height === cur.height ? cur : next;
+      });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, []);
-  return scale;
+  return box;
 }
 
 export default function App() {
@@ -55,7 +67,10 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const stackRef = useRef(stack);
   stackRef.current = stack;
-  const scale = useFitScale();
+  const { scale, height } = useFit();
+  const short = Math.max(0, H - height);
+  const trimBottom = Math.min(short, TRIM_BOTTOM);
+  const trimTop = Math.min(short - trimBottom, TRIM_TOP);
 
   useEffect(() => {
     try {
@@ -140,37 +155,40 @@ export default function App() {
   ];
 
   return (
-    <main className="flex h-full w-full items-center justify-center bg-white min-[520px]:bg-[#e9ecef]">
-      <div className="relative shrink-0 overflow-hidden" style={{ width: W * scale, height: H * scale }}>
+    <main className="stage flex w-full items-center justify-center bg-white min-[520px]:bg-[#e9ecef]">
+      <div className="relative shrink-0 overflow-hidden" style={{ width: W * scale, height: height * scale }}>
         <div
-          className="absolute left-1/2 top-1/2"
-          style={{ width: W, height: H, marginLeft: -W / 2, marginTop: -H / 2 }}
+          className="absolute left-0 top-0 overflow-hidden bg-white"
+          style={{
+            width: W,
+            height,
+            transform: `scale(${scale})`,
+            transformOrigin: "0 0",
+            "--vh": height,
+            "--tt": trimTop,
+            "--bt": trimBottom,
+          }}
         >
-          <div
-            className="relative overflow-hidden bg-white"
-            style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "center center" }}
-          >
-            {layers.map(({ route, cls, ghost }) => {
-              const S = SCREENS[route.name];
-              return (
-                <div
-                  key={route.key}
-                  className={`absolute inset-0 ${cls}`}
-                  style={ghost ? { zIndex: 3 } : undefined}
-                  aria-hidden={route.key !== top.key}
-                >
-                  <S
-                    nav={nav}
-                    route={route}
-                    state={state}
-                    setState={setState}
-                    active={!ghost && route.key === top.key}
-                  />
-                </div>
-              );
-            })}
-            {busy && <div className="absolute inset-0 z-50" />}
-          </div>
+          {layers.map(({ route, cls, ghost }) => {
+            const S = SCREENS[route.name];
+            return (
+              <div
+                key={route.key}
+                className={`absolute inset-0 ${cls}`}
+                style={ghost ? { zIndex: 3 } : undefined}
+                aria-hidden={route.key !== top.key}
+              >
+                <S
+                  nav={nav}
+                  route={route}
+                  state={state}
+                  setState={setState}
+                  active={!ghost && route.key === top.key}
+                />
+              </div>
+            );
+          })}
+          {busy && <div className="absolute inset-0 z-50" />}
         </div>
       </div>
     </main>

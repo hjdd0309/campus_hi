@@ -31,6 +31,12 @@ body,
   height: 100%;
 }
 
+/* 주소창이 접히고 펴질 때도 보이는 영역 높이를 따라간다. */
+.stage {
+  height: 100%;
+  height: 100dvh;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);

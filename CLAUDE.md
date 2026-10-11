@@ -61,7 +61,7 @@
 
 - `frontend/`: React 19 + Vite + Tailwind CSS v4. 진입점은 `src/main.jsx`, API 호출은 `src/api.js`, 상태와 규칙은 `src/model.js`.
   - 화면 디자인과 모션은 처음 만든 Figma Make 시안(https://scrum-heave-00503286.figma.site/)을 그대로 따른다. `src/screens.jsx`가 화면, `src/ui.jsx`가 공용 부품, `src/App.jsx`가 화면 전환, `src/index.css`가 색·모션, `src/assets/`가 이미지다.
-  - 화면은 402×874 아트보드에 절대 좌표로 배치하고, 창 크기에 맞게 통째로 확대·축소한다. 새 화면을 만들 때도 시안의 부품(`T`, `OutlineButton`, `Header` 등)과 등장 모션 클래스(`a-up`, `a-pop`, `a-fade`, `a-drop`, `a-shake`)를 쓴다. 길이를 알 수 없는 글(학교·학과 이름)은 `T`의 `clip`으로 자른다.
+  - 화면은 402×874 아트보드에 절대 좌표로 배치하고, 창 크기에 맞게 통째로 확대·축소한다. 휴대폰(폭 520px 미만)에서는 폭을 꽉 채우고 아트보드 높이가 화면에 따라 달라지므로(`App.jsx`의 `fit`), 아래에 붙는 버튼·탭바는 `Screen`의 `footer`로, 가운데에 둘 것은 `Center`로 넘기고, 내용이 길면 `h`를 줘서 스크롤되게 한다(`ui.jsx`). 새 화면을 만들 때도 시안의 부품(`T`, `OutlineButton`, `Header` 등)과 등장 모션 클래스(`a-up`, `a-pop`, `a-fade`, `a-drop`, `a-shake`)를 쓴다. 길이를 알 수 없는 글(학교·학과 이름)은 `T`의 `clip`으로 자른다.
   - 시안에 있던 가짜 요소는 넣지 않는다: 기기 상태바(9:41), 홈 인디케이터, "김이름" 같은 고정 이름, 고정된 진행률·리포트 문구. 실제 데이터로 채운다.
 - `backend/`: FastAPI. `main.py` 하나에 API가 있고, 데이터는 `data/courses.csv.gz`를 읽는다. 데이터 출처는 `backend/SOURCE.md`에 있다.
 - `backend/pipeline.py`: 학교 홈페이지에서 학년별 편성을 모아 `data/year_curricula.json`에 저장하는 수집 도구. 서버는 이 파일의 검증된 항목만 내보낸다.
