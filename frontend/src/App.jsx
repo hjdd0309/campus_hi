@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SCREENS } from "./screens.jsx";
 import { STORAGE_KEY, loadState } from "./model.js";
 
@@ -36,26 +36,28 @@ function initialStack(state) {
 
 // 폭이 좁은 화면(휴대폰)에서는 폭을 꽉 채우고 아트보드의 높이를 화면에 맞춘다. 주소창 때문에 화면이
 // 시안보다 납작해도 양옆이 비지 않는다. 넓은 화면에서는 시안 비율 그대로 가운데에 둔다.
-function fit() {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+function fit(vw, vh) {
   if (vw >= 520) return { scale: Math.min(1, vw / W, vh / H), height: H };
   const scale = Math.min(vw / W, vh / MIN_H);
   return { scale, height: vh / scale };
 }
 
-function useFit() {
-  const [box, setBox] = useState(fit);
-  useEffect(() => {
+// 창 크기가 아니라 실제로 그려지는 영역(main)을 재서 맞춘다. 모바일 브라우저는 주소창·도구 막대 때문에
+// 창 높이와 보이는 영역이 다를 수 있다.
+function useFit(ref) {
+  const [box, setBox] = useState(() => fit(window.innerWidth, window.innerHeight));
+  useLayoutEffect(() => {
+    const el = ref.current;
     const update = () =>
       setBox((cur) => {
-        const next = fit();
+        const next = fit(el.clientWidth, el.clientHeight);
         return next.scale === cur.scale && next.height === cur.height ? cur : next;
       });
     update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
   return box;
 }
 
@@ -67,7 +69,8 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const stackRef = useRef(stack);
   stackRef.current = stack;
-  const { scale, height } = useFit();
+  const stage = useRef(null);
+  const { scale, height } = useFit(stage);
   const short = Math.max(0, H - height);
   const trimBottom = Math.min(short, TRIM_BOTTOM);
   const trimTop = Math.min(short - trimBottom, TRIM_TOP);
@@ -155,7 +158,7 @@ export default function App() {
   ];
 
   return (
-    <main className="stage flex w-full items-center justify-center bg-white min-[520px]:bg-[#e9ecef]">
+    <main ref={stage} className="stage flex w-full items-center justify-center bg-white min-[520px]:bg-[#e9ecef]">
       <div className="relative shrink-0 overflow-hidden" style={{ width: W * scale, height: height * scale }}>
         <div
           className="absolute left-0 top-0 overflow-hidden bg-white"

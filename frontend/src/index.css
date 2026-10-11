@@ -43,8 +43,16 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   letter-spacing: -0.02em;
-  background: #e9ecef;
+  background: #fff;
   overflow: hidden;
+}
+
+/* 넓은 화면에서만 아트보드 바깥을 회색으로 둔다. 휴대폰에서는 상태바 뒤와 아래 도구 막대 뒤로 비치는
+   바탕이 화면과 같은 흰색이어야 위아래가 잘려 보이지 않는다. */
+@media (min-width: 520px) {
+  body {
+    background: #e9ecef;
+  }
 }
 
 @layer base {
