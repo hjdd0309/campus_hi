@@ -2,6 +2,7 @@ import csv
 import gzip
 import json
 import logging
+import math
 import re
 from collections import Counter, defaultdict
 from contextlib import asynccontextmanager
@@ -110,8 +111,24 @@ def compact(text):
     return re.sub(r"\s+", "", text).lower()
 
 
+# 학년별 전공 체험을 만들 수 없는 과정: 입학 뒤에 전공을 정하는 자유·자율전공, 교양 과정, 학년이 하나뿐인 1년 과정.
+# 무전공은 이름 맨 앞이나 띄어쓰기·괄호 뒤에서만 본다("사무전공", "법무전공"은 실제 전공). 문화교양학과는 실제 전공이다.
+UNDECIDED = re.compile(r"자유전공|자율전공|(?:^|[\s(])무전공|자유학부|자율학부|학생설계|(?<!문화)교양")
+
+
+def study_years(duration):
+    """수업연한("4년", "2.5년", "1년(전공심화)")을 학년 수로 바꾼다. 읽을 수 없으면 None."""
+    match = re.match(r"\d+(\.\d+)?", duration)
+    return math.ceil(float(match.group())) if match else None
+
+
+def excluded(course, duration):
+    years = study_years(duration)
+    return bool(UNDECIDED.search(course)) or (years is not None and years < 2)
+
+
 class Catalog:
-    """학부 과정 중 교과목이 등록된 학교·학과만 담는다(대학원, 폐과, 교과목 없는 학과 제외)."""
+    """학부 과정 중 교과목이 등록된 학교·학과만 담는다(대학원, 폐과, 교과목 없는 학과, 학년별 체험을 만들 수 없는 과정 제외)."""
 
     def __init__(self, records):
         self.programs = {}
@@ -120,7 +137,7 @@ class Catalog:
         for row in records:
             school, course = row["학교명"].strip(), row["학과명"].strip()
             subjects = [subject.strip() for subject in row["주요교과목명"].split("+") if subject.strip()]
-            if row["학과상태명"] == "폐과" or "대학원" in school or not school or not course or not subjects:
+            if row["학과상태명"] == "폐과" or "대학원" in school or not school or not course or not subjects or excluded(course, row["수업연한"].strip()):
                 continue
             program = self.programs.setdefault((school, course), {"curriculum": {}, "duration": row["수업연한"].strip(), "region": row["시도명"].strip()})
             program["curriculum"].update(dict.fromkeys(subjects))

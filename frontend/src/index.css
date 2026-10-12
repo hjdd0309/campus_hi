@@ -653,6 +653,10 @@ body {
   gap: 8px;
   margin-top: 10px;
 }
+/* 칸이 하나인 분류하기는 보기를 화면 폭 가득 늘어놓는다. */
+.journal-entry.single {
+  grid-template-columns: 1fr;
+}
 .journal-side {
   display: grid;
   gap: 6px;

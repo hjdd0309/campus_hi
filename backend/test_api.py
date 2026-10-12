@@ -36,6 +36,23 @@ class ApiTests(unittest.TestCase):
             self.assertTrue(all((school, course) in data.programs for school in schools))
         self.assertEqual(self.client.post("/api/school_list", json={"course": "없는학과-999"}).json(), {"school_list": []})
 
+    def test_programs_without_a_major_to_experience_are_excluded(self):
+        from backend.main import catalog, excluded
+        data = catalog()
+        # 입학 뒤 전공을 정하는 과정, 교양 과정, 학년이 하나뿐인 1년 과정은 학년별 체험을 만들 수 없어 뺀다.
+        for course in ("자유전공학부", "자율전공학과", "교양학부", "경영대학 무전공학과", "IT대학 자율학부"):
+            self.assertNotIn(course, data.schools, course)
+            self.assertEqual(self.client.post("/api/school_list", json={"course": course}).json(), {"school_list": []})
+        self.assertFalse(any(study.startswith("1년") for study in (program["duration"] for program in data.programs.values())))
+        self.assertTrue(any("전공심화" in program["duration"] for program in data.programs.values()))
+        # 이름에 비슷한 글자가 들어간 실제 전공은 남긴다.
+        for course in ("국제비서사무전공", "문화교양학과", "과학기술법무전공"):
+            self.assertIn(course, data.schools, course)
+        self.assertFalse(excluded("자율주행공학과", "4년"))
+        self.assertTrue(excluded("간호학과", "1년(전공심화)"))
+        self.assertFalse(excluded("간호학과", "2년(전공심화)"))
+        self.assertFalse(excluded("간호학과", "모름"))
+
     def test_search_filter_and_paging(self):
         everything = self.client.post("/api/course_list", json={"interests": "전체"}).json()
         self.assertEqual(len(everything["course_list"]), 30)
@@ -66,7 +83,7 @@ class ApiTests(unittest.TestCase):
 
     def test_program_list_searches_school_and_course(self):
         everything = self.client.post("/api/program_list", json={"interests": "전체"}).json()
-        self.assertEqual(everything["total"], 13347)
+        self.assertEqual(everything["total"], 12732)
         self.assertEqual(len(everything["programs"]), 30)
         self.assertEqual(set(everything["programs"][0]), {"school", "course", "category", "duration", "region"})
         both = self.client.post("/api/program_list", json={"interests": "전체", "query": "경희대 산업디자인"}).json()["programs"]

@@ -74,8 +74,8 @@ function cleanClassify(raw) {
 }
 
 // 반응 실험. 자극마다 알맞은 보기를 빨리 고르고, 두 조건의 평균 반응 시간을 비교한다.
-// 자극은 만드는 방식(generator)으로 정한다. 지금은 스트룹(글자의 뜻과 색이 같거나 다름)뿐이다.
-const GENERATORS = ["stroop"];
+// 자극은 만드는 방식(generator)으로 정한다. 지금은 힉의 법칙(신호가 하나일 때와 여럿일 때)뿐이다.
+const GENERATORS = ["hick"];
 function cleanReaction(raw) {
   const choices = all(
     list(raw.choices, 2, 4)?.map((choice) =>
@@ -135,11 +135,13 @@ export const templates = {
 };
 
 // 체험 데이터를 검사한다. 형식이 맞지 않으면 null이다.
+// learn(알아두기)은 수업의 "배우기"와 "기록" 단계에 보여주는 2~3줄 설명으로, 없어도 된다.
 export function cleanExperience(raw) {
   if (!raw || typeof raw !== "object" || !Object.hasOwn(templates, raw.template)) return null;
   const body = templates[raw.template].clean(raw);
-  return body && text(raw.title, 20) && text(raw.task, 60)
-    ? { template: raw.template, title: raw.title, task: raw.task, ...body }
+  const learn = raw.learn === undefined || raw.learn === "" ? "" : text(raw.learn, 120);
+  return body && text(raw.title, 20) && text(raw.task, 60) && learn !== null
+    ? { template: raw.template, title: raw.title, task: raw.task, learn, ...body }
     : null;
 }
 
@@ -174,17 +176,16 @@ export function startOrder(size, swap, random = Math.random) {
 export const checkPicks = (item, picks) => item.answer.every((id, i) => picks[i] === id);
 
 // ---- D 반응 실험
-// 스트룹: 보기마다 뜻과 색이 같은 자극과 다른 자극을 하나씩, pairs쌍을 만든다. condition 0 = 같음, 1 = 다름.
+// 힉의 법칙: 앞의 pairs문제는 늘 첫 번째 보기의 신호(condition 0 = 신호 하나),
+// 뒤의 pairs문제는 모든 보기 중 하나(condition 1 = 신호 여럿)가 나온다. 두 묶음을 섞지 않는다.
 export function makeTrials(data, random = Math.random) {
-  const trials = [];
-  for (let i = 0; i < data.pairs; i++) {
-    const ink = data.choices[i % data.choices.length];
-    const others = data.choices.filter((choice) => choice.id !== ink.id);
-    const word = others[Math.floor(random() * others.length)];
-    trials.push({ text: ink.label, color: ink.color, answer: ink.id, condition: 0 });
-    trials.push({ text: word.label, color: ink.color, answer: ink.id, condition: 1 });
-  }
-  return shuffle(trials, random);
+  const signal = (choice, condition) => ({ text: "●", color: choice.color, answer: choice.id, condition });
+  const single = Array.from({ length: data.pairs }, () => signal(data.choices[0], 0));
+  const many = shuffle(
+    Array.from({ length: data.pairs }, (_, i) => signal(data.choices[i % data.choices.length], 1)),
+    random,
+  );
+  return [...single, ...many];
 }
 // responses: [{ condition, correct, ms }]. 평균 반응 시간은 맞힌 시행만으로 구한다.
 export function summarizeReaction(responses) {
@@ -214,7 +215,7 @@ const ACCOUNTS = [
 ];
 
 const raw = {
-  // 수업 맞춤 체험: 과목명이 games.js의 pattern에 맞으면 붙는다.
+  // 학과군 실습의 바탕이 되는 체험(groupData.js의 base). 학과군 데이터가 learn 등을 덧붙인다.
   sorting: {
     template: "B",
     title: "버블 정렬 직접 해보기",
@@ -266,28 +267,6 @@ const raw = {
     unit: "건",
     retry: "아직 아니에요. 무엇이 늘고 무엇이 줄었는지 다시 생각해 보세요.",
     explanation: "회계는 모든 거래를 이렇게 차변과 대변에 같은 금액으로 나누어 적는 데서 시작해요.",
-  },
-  stroop: {
-    template: "D",
-    title: "스트룹 실험",
-    task: "글자의 뜻이 아니라 글자가 쓰인 색을 최대한 빨리 골라요.",
-    generator: "stroop",
-    pairs: 8,
-    choices: [
-      { id: "red", label: "빨강", color: "#ff6b61" },
-      { id: "blue", label: "파랑", color: "#5aa9ff" },
-      { id: "green", label: "초록", color: "#44d68a" },
-      { id: "yellow", label: "노랑", color: "#ffd84d" },
-    ],
-    conditions: ["색과 글자가 같을 때", "색과 글자가 다를 때"],
-    prompt:
-      "글자가 무슨 색으로 쓰여 있는지 최대한 빨리 골라요. 글자의 뜻은 무시하세요. 예를 들어 파란색으로 쓰인 ‘빨강’의 답은 파랑이에요. 모두 16문제예요.",
-    notice: "색을 구분하기 어려우면 정확한 결과가 나오지 않을 수 있어요.",
-    effect: "글자를 읽는 일이 자동으로 일어나 색을 말하는 일을 방해하기 때문이에요. 이것을 스트룹 효과라고 해요.",
-    noEffect:
-      "보통은 글자를 읽는 일이 자동으로 일어나 색을 말하는 일을 방해해서 더 느려지는데, 이것을 스트룹 효과라고 해요. 문제 수가 적으면 결과가 달라질 수 있어요.",
-    tooFew: "맞힌 문제가 부족해 반응 시간을 비교할 수 없어요. 다시 해보세요.",
-    footnote: "1935년 J. R. 스트룹이 발표한 실험으로, 주의와 자동 처리를 연구할 때 지금도 쓰여요.",
   },
   // 졸업 과제: model.js의 finals가 학과에 맞는 것을 고른다.
   artwork: {

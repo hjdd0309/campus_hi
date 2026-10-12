@@ -1,10 +1,13 @@
 import { isGame, pickLessons } from "./games.js";
 import { cleanLessonGames } from "./lessonGames.js";
 import { experiences } from "./experiences.js";
+import { groupExperience, groupOf } from "./groups.js";
 
-export const STORAGE_KEY = "hi-campus-v3";
-// 예전 저장 데이터: [저장 키, 그때의 체험 단계 수]
+export const STORAGE_KEY = "hi-campus-v4";
+// 예전 저장 데이터: [저장 키, 그때의 체험 단계 수]. 0이면 학년별 구조다.
+// v3는 학년별 구조지만 학과군 실습이 없던 때라, 학년 자리의 수업이 바뀐 기록은 archive로 옮긴다.
 const LEGACY_KEYS = [
+  ["hi-campus-v3", 0],
   ["mirae-campus-v2", 3],
   ["mirae-campus-v1", 8],
 ];
@@ -12,7 +15,7 @@ const LEGACY_KEYS = [
 export const PLAN_FIELDS = ["topic", "reason", "method"];
 // 체험 데이터(experiences.js)의 졸업 과제를 그대로 쓴다. artwork는 틀 A, 나머지는 틀 F의 계획서다.
 export const finals = {
-  artwork: { kind: "artwork", name: experiences.artwork.title },
+  artwork: { kind: "artwork", name: experiences.artwork.title, ...experiences.artwork },
   capstone: { kind: "plan", name: experiences.capstone.title, ...experiences.capstone },
   thesis: { kind: "plan", name: experiences.thesis.title, ...experiences.thesis },
   showcase: { kind: "plan", name: experiences.showcase.title, ...experiences.showcase },
@@ -26,9 +29,14 @@ export function finalFor(course, category) {
 }
 export const planReady = (plan) =>
   !!plan && PLAN_FIELDS.every((field) => typeof plan[field] === "string" && plan[field].trim());
+// 학과의 졸업 과제. 학과군 데이터로 만든 학과는 졸업 과제 데이터를, 기본 학과는 finals의 이름을 갖고 있다.
+export const finalOf = (department) =>
+  department?.final && typeof department.final === "object" ? department.final : finals[department?.final] || finals.artwork;
+// 체험 데이터(틀 A 또는 F)를 졸업 과제로 쓴다. A는 칠해서 완성하는 작품, F는 계획서다.
+const asFinal = (data) => ({ kind: data.template === "A" ? "artwork" : "plan", name: data.title, ...data });
 // 마지막 학년을 완료할 준비가 됐는지: 졸업작품은 칠한 작품이, 계획서는 세 칸이 모두 있어야 한다.
 export function finalReady(state, department) {
-  return (finals[department.final] || finals.artwork).kind === "artwork"
+  return finalOf(department).kind === "artwork"
     ? !!state.artworks?.[department.id]
     : planReady(state.capstones?.[department.id]);
 }
@@ -217,7 +225,7 @@ export const KEYWORD_GROUPS = [
   { label: "기술 / 공학", items: ["컴퓨터", "데이터", "공학", "생명과학"] },
 ];
 export const initialState = {
-  version: 3,
+  version: 4,
   interests: [],
   answers: {},
   journeys: {},
@@ -229,6 +237,8 @@ export const initialState = {
   catalog: [],
   artworks: {},
   capstones: {},
+  // 체험 구조가 바뀌어 학년 자리에서 빠진 예전 기록: [{ id, title, note }]. 마이페이지 리포트에 함께 담는다.
+  archive: [],
   onboarded: false,
 };
 // 수집 파이프라인이 검증한 학년별 편성. 형식이 맞지 않으면 없는 것으로 본다.
@@ -257,6 +267,8 @@ export function cleanYears(years) {
     checked_at: typeof years.checked_at === "string" ? years.checked_at : "",
   };
 }
+// 학과 하나의 학년별 체험. 마지막 학년은 졸업 과제, 그 바로 앞 학년은 학과군 전공 실습, 나머지 학년은 이론 수업(과목 하나)이다.
+// 학과군 데이터가 아직 공개되지 않았으면 실습 자리도 이론 수업으로, 졸업 과제는 계열에 맞는 기본 과제로 채운다.
 export function createDepartment(
   course,
   school,
@@ -271,20 +283,22 @@ export function createDepartment(
   // 미리 만들어 둔 연습 문제가 있는 과목과 그 유형.
   const lessonGames = cleanLessonGames(games);
   const yearNumbers = stageYears(duration);
-  // 마지막 학년은 졸업 과제, 그 앞 학년은 과목 하나씩을 체험한다.
-  const subjectYears = yearNumbers.slice(0, -1);
+  const field = fields.find((item) => item.id === category) || fallbackField;
+  const group = groupOf(course, field.id);
+  const practice = yearNumbers.length >= 2 ? groupExperience(group, "practice") : null;
+  const groupFinal = groupExperience(group, "final");
+  const final = groupFinal ? asFinal(groupFinal) : finals[finalFor(course, field.id)];
+  const theoryYears = yearNumbers.slice(0, practice ? -2 : -1);
   const subjectsOf = (year) =>
     yearly.terms.filter((t) => t.year === year).flatMap((t) => t.subjects);
-  // 검증된 학년별 편성이 모든 학년에 있으면 그 학년의 과목으로, 없으면 교과목 목록에서 고른다.
+  // 검증된 학년별 편성이 이론 학년 모두에 있으면 그 학년의 과목으로, 없으면 교과목 목록에서 고른다.
   const lessonsFromYears =
     !!yearly &&
-    subjectYears.length > 0 &&
-    subjectYears.every((year) => subjectsOf(year).length > 0);
+    theoryYears.length > 0 &&
+    theoryYears.every((year) => subjectsOf(year).length > 0);
   const picked = lessonsFromYears
-    ? subjectYears.map((year) => pickLessons(subjectsOf(year), 1, lessonGames)[0])
-    : pickLessons(curriculum, subjectYears.length, lessonGames);
-  const field = fields.find((item) => item.id === category) || fallbackField;
-  const final = finalFor(course, field.id);
+    ? theoryYears.map((year) => pickLessons(subjectsOf(year), 1, lessonGames)[0])
+    : pickLessons(curriculum, theoryYears.length, lessonGames);
   const template = departments.find((d) => d.name === course) || {
     category: field.id,
     group: field.group,
@@ -304,16 +318,18 @@ export function createDepartment(
     description: `${school} ${course}의 교과목을 살펴보고, 학년별 체험으로 전공을 미리 경험해요.`,
     yearly,
     yearNumbers,
+    studyGroup: group,
+    practice,
     final,
     lessonsFromYears,
     lessonGames,
     lessons: [
-      ...subjectYears.map(
-        (year, i) => picked[i]?.subject || `${year}학년 전공 탐색`,
-      ),
-      finals[final].name,
+      ...theoryYears.map((year, i) => picked[i]?.subject || `${year}학년 전공 탐색`),
+      ...(practice ? [practice.title] : []),
+      final.name,
     ],
-    games: [...subjectYears.map((_, i) => picked[i]?.game || null), null],
+    // 학년마다의 체험: 연습 문제의 유형, 학과군 실습(group:학과군), 없으면 null.
+    games: [...theoryYears.map((_, i) => picked[i]?.game || null), ...(practice ? [`group:${group}`] : []), null],
   };
 }
 export function loadState(storage) {
@@ -321,10 +337,12 @@ export function loadState(storage) {
     // stages: 저장 당시의 체험 단계 수. 0이면 지금 구조(학년별)로 저장된 데이터다.
     let value = JSON.parse(storage.getItem(STORAGE_KEY));
     let stages = 0;
+    let from = STORAGE_KEY;
     for (const [key, count] of LEGACY_KEYS) {
       if (value) break;
       value = JSON.parse(storage.getItem(key));
       stages = count;
+      from = key;
     }
     if (!value || typeof value !== "object")
       return structuredClone(initialState);
@@ -354,6 +372,30 @@ export function loadState(storage) {
     const counts = new Map(
       [...departments, ...catalog].map((d) => [d.id, d.lessons.length]),
     );
+    // v3에서 옮길 때: 학년 자리의 수업 이름이 바뀌었으면(학과군 실습이 들어오는 등) 그 자리의 기록은 archive로 옮긴다.
+    const lessonsOf = new Map([...departments, ...catalog].map((d) => [d.id, d.lessons]));
+    const oldLessons = new Map(
+      from === "hi-campus-v3" && Array.isArray(value.catalog)
+        ? value.catalog
+            .filter((d) => typeof d?.id === "string" && Array.isArray(d.lessons))
+            .map((d) => [d.id, d.lessons])
+        : [],
+    );
+    const archive = [];
+    // 바뀐 자리면 예전 수업 이름을, 그대로면 null을 돌려준다.
+    const replaced = (key) => {
+      const match = key.match(/^(.*)-(\d+)$/);
+      if (!match || !oldLessons.has(match[1])) return null;
+      const before = oldLessons.get(match[1])[Number(match[2])];
+      const now = lessonsOf.get(match[1])?.[Number(match[2])];
+      return typeof before === "string" && before !== now ? before : null;
+    };
+    const keep = (key, text) => {
+      const before = replaced(key);
+      if (!before) return true;
+      if (text.trim()) archive.push({ id: key.replace(/-\d+$/, ""), title: before.slice(0, 60), note: text.slice(0, 3000) });
+      return false;
+    };
     const validIds = new Set(counts.keys());
     // 예전 단계 번호를 지금의 학년 단계 번호로 옮긴다. 마지막 단계(졸업작품)는 마지막 학년으로 간다.
     const moveIndex = (id, index) => {
@@ -389,7 +431,7 @@ export function loadState(storage) {
     const notes = {};
     if (value.notes && typeof value.notes === "object")
       for (const [key, note] of Object.entries(value.notes)) {
-        if (typeof note !== "string") continue;
+        if (typeof note !== "string" || !keep(key, note)) continue;
         const target = moveKey(key);
         if (!target) continue;
         notes[target] = notes[target] ? `${notes[target]}\n\n${note}` : note;
@@ -397,14 +439,14 @@ export function loadState(storage) {
     const drafts = {};
     if (value.drafts && typeof value.drafts === "object")
       for (const [key, text] of Object.entries(value.drafts)) {
+        if (typeof text !== "string" || !keep(key, text)) continue;
         const target = moveKey(key);
-        if (typeof text === "string" && target)
-          drafts[target] = text.slice(0, 3000);
+        if (target) drafts[target] = text.slice(0, 3000);
       }
     const plays = {};
     if (value.plays && typeof value.plays === "object")
       for (const [key, play] of Object.entries(value.plays)) {
-        const target = moveKey(key);
+        const target = replaced(key) ? null : moveKey(key);
         if (
           target &&
           isGame(play?.game) &&
@@ -412,9 +454,15 @@ export function loadState(storage) {
         )
           plays[target] = { game: play.game, summary: play.summary.slice(0, 200) };
       }
+    // 지난 버전에서 옮겨 둔 기록. 학과가 남아 있는 것만 둔다.
+    if (Array.isArray(value.archive))
+      for (const item of value.archive)
+        if (validIds.has(item?.id) && typeof item.title === "string" && typeof item.note === "string" && item.note.trim())
+          archive.push({ id: item.id, title: item.title.slice(0, 60), note: item.note.slice(0, 3000) });
     return {
       ...structuredClone(initialState),
       catalog,
+      archive,
       journeys,
       notes,
       drafts,
@@ -501,8 +549,7 @@ export function completeLesson(state, id, index, note) {
   )
     return state;
   // 졸업작품은 만드는 것으로 완료된다. 그 밖의 수업은 느낀 점을 적어야 한다.
-  const artworkFinal =
-    index === total - 1 && (finals[department.final] || finals.artwork).kind === "artwork";
+  const artworkFinal = index === total - 1 && finalOf(department).kind === "artwork";
   if (!note.trim() && !artworkFinal) return state;
   const { [`${id}-${index}`]: finished, ...drafts } = state.drafts || {};
   return {

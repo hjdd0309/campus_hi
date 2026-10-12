@@ -4,6 +4,7 @@ import {
   STORAGE_KEY,
   finals,
   finalFor,
+  finalOf,
   finalReady,
   planReady,
   stageYears,
@@ -36,25 +37,46 @@ test("수업연한에 따라 체험할 학년이 정해진다", () => {
   assert.deepEqual(stageYears(""), [1, 2, 3, 4]);
   assert.deepEqual(stageYears(undefined), [1, 2, 3, 4]);
 });
-test("학과는 학년마다 체험이 하나씩 있고 마지막 학년은 졸업작품이다", () => {
+test("마지막 학년은 졸업 과제, 그 앞 학년은 학과군 실습, 나머지 학년은 이론 수업이다", () => {
   const subjects = ["기초디자인", "제품설계", "고급설계", "종합설계"];
   const four = createDepartment("산업디자인학과", "경희대학교", subjects, "예체능", null, "4년");
   assert.deepEqual(four.yearNumbers, [1, 2, 3, 4]);
-  assert.deepEqual(four.lessons, ["기초디자인", "제품설계", "고급설계", "졸업작품"]);
-  assert.equal(four.final, "artwork");
-  assert.deepEqual(four.games, [null, null, null, null]);
+  assert.deepEqual(four.lessons, ["기초디자인", "제품설계", "디자인 과정", "졸업작품"]);
+  assert.equal(four.studyGroup, "design");
+  assert.equal(finalOf(four).kind, "artwork");
+  assert.deepEqual(four.games, [null, null, "group:design", null]);
   assert.equal(four.lessonsFromYears, false);
+  // 2년제: 1학년 실습, 2학년 졸업 과제
   const two = createDepartment("간호과", "전문대학", subjects, "자연과학", null, "2년");
   assert.deepEqual(two.yearNumbers, [1, 2]);
-  assert.deepEqual(two.lessons, ["기초디자인", "졸업 연구"]);
+  assert.deepEqual(two.lessons, ["환자 응급도 분류", "졸업 연구"]);
+  assert.deepEqual(two.games, ["group:health", null]);
+  // 3년제·6년제·전공심화도 같은 규칙이다.
+  const three = createDepartment("치위생과", "전문대학", subjects, "자연과학", null, "3년");
+  assert.deepEqual(three.lessons, ["기초디자인", "환자 응급도 분류", "졸업 연구"]);
+  const six = createDepartment("약학과", "약학대학", subjects, "자연과학", null, "6년");
+  assert.deepEqual(six.yearNumbers, [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(six.lessons.slice(4), ["환자 응급도 분류", "졸업 연구"]);
+  const deep = createDepartment("간호학과", "전문대학", subjects, "", null, "2년(전공심화)");
+  assert.deepEqual(deep.yearNumbers, [3, 4]);
+  assert.deepEqual(deep.lessons, ["환자 응급도 분류", "졸업 연구"]);
+  // 학년이 하나뿐이면(서버는 이런 과정을 내보내지 않지만) 실습 없이 졸업 과제만 남는다.
   const advanced = createDepartment("간호학과", "전문대학", subjects, "", null, "1년(전공심화)");
   assert.deepEqual(advanced.yearNumbers, [4]);
   assert.deepEqual(advanced.lessons, ["졸업 연구"]);
+  // 과목이 모자라면 학년을 지어내지 않고 "전공 탐색"으로 둔다.
   const short = createDepartment("새학과", "새대학교", ["과목"], "", null, "4년");
-  assert.deepEqual(short.lessons, ["과목", "2학년 전공 탐색", "3학년 전공 탐색", "졸업 연구"]);
-  for (const d of [...departments, four, two, advanced, short]) {
+  assert.deepEqual(short.lessons, ["과목", "2학년 전공 탐색", "어떤 법이 다룰까", "졸업 연구"]);
+  // 같은 학과군은 같은 실습, 학과군이 다르면 다른 실습과 졸업 과제다.
+  const a = createDepartment("기계공학과", "가대학교", subjects, "공학", null, "4년");
+  const b = createDepartment("전자공학과", "나대학교", ["회로이론"], "공학", null, "4년");
+  const c = createDepartment("경영학과", "다대학교", subjects, "인문사회", null, "4년");
+  assert.deepEqual(a.practice, b.practice);
+  assert.notDeepEqual(a.practice, c.practice);
+  assert.notEqual(finalOf(a).name, finalOf(c).name);
+  for (const d of [...departments, four, two, three, six, deep, advanced, short, a, b, c]) {
     assert.equal(d.lessons.length, d.yearNumbers.length);
-    assert.equal(d.lessons.at(-1), finals[d.final].name);
+    assert.equal(d.lessons.at(-1), finalOf(d).name);
   }
 });
 test("검증된 학년별 편성이 있으면 그 학년의 과목으로 체험을 만든다", () => {
@@ -72,13 +94,17 @@ test("검증된 학년별 편성이 있으면 그 학년의 과목으로 체험�
   const curriculum = ["알고리즘", "프로그래밍기초", "자료구조", "운영체제"];
   const d = createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", years, "4년");
   assert.equal(d.lessonsFromYears, true);
-  assert.deepEqual(d.lessons, ["프로그래밍기초", "자료구조", "운영체제", "캡스톤 디자인"]);
-  assert.deepEqual(d.games, [null, "sorting", null, null]);
-  // 어느 학년이라도 편성이 비어 있으면 학년을 지어내지 않고 교과목 목록에서 고른다.
-  const partial = { ...years, terms: years.terms.filter((term) => term.year !== 3) };
+  // 이론 학년(1·2학년)은 그 학년의 과목으로, 3학년은 학과군 실습이다.
+  assert.deepEqual(d.lessons, ["프로그래밍기초", "컴퓨터구조", "버블 정렬 직접 해보기", "캡스톤 디자인"]);
+  assert.deepEqual(d.games, [null, null, "group:computing", null]);
+  // 이론 학년 중 하나라도 편성이 비어 있으면 학년을 지어내지 않고 교과목 목록에서 고른다.
+  const partial = { ...years, terms: years.terms.filter((term) => term.year !== 2) };
   const fallback = createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", partial, "4년");
   assert.equal(fallback.lessonsFromYears, false);
-  assert.deepEqual(fallback.lessons, ["알고리즘", "프로그래밍기초", "자료구조", "캡스톤 디자인"]);
+  assert.deepEqual(fallback.lessons, ["알고리즘", "프로그래밍기초", "버블 정렬 직접 해보기", "캡스톤 디자인"]);
+  // 실습 학년의 편성은 없어도 된다.
+  const noThird = { ...years, terms: years.terms.filter((term) => term.year !== 3) };
+  assert.equal(createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", noThird, "4년").lessonsFromYears, true);
 });
 test("손상된 저장 데이터는 초기 상태로 복구하고 진행률 범위를 제한한다", () => {
   assert.deepEqual(loadState({ getItem: () => "{broken" }), initialState);
@@ -188,6 +214,9 @@ test("마지막 학년은 졸업작품이 있어야 완료되고, 다른 학과�
     artworks: { [two.id]: "data:image/png;base64,AA==" },
     journeys: { [two.id]: { completed: 0, paused: false } },
   };
+  // 1학년은 학과군 실습이라 체험을 마쳐야 완료된다.
+  assert.equal(completeLesson(short, two.id, 0, "1학년"), short);
+  short = { ...short, plays: { [`${two.id}-0`]: { game: "group:health", summary: "환자 6명" } } };
   short = completeLesson(short, two.id, 0, "1학년");
   assert.equal(completeLesson(short, two.id, 1, "작품만 있고 계획서 없음"), short);
   short = { ...short, capstones: { [two.id]: { topic: "질문", reason: "이유", method: " " } } };
@@ -257,7 +286,7 @@ test("3단계였던 기록을 학년별 구조로 옮긴다", () => {
       reports: [{ id: "design", date: "2026-10-09" }],
     }),
   );
-  assert.equal(migrated.version, 3);
+  assert.equal(migrated.version, 4);
   assert.equal(migrated.journeys.design.completed, TOTAL);
   assert.deepEqual(migrated.journeys.psychology, { completed: 2, paused: true });
   assert.equal(migrated.journeys["api:전문대학:간호과"].completed, 1);
@@ -268,6 +297,46 @@ test("3단계였던 기록을 학년별 구조로 옮긴다", () => {
   });
   assert.deepEqual(migrated.drafts, { [`psychology-${TOTAL - 1}`]: "쓰던 졸업작품 글" });
   assert.equal(migrated.reports.length, 1);
+});
+test("v3 기록은 학년 자리의 수업이 바뀌었으면 버리지 않고 이전 체험 기록으로 옮긴다", () => {
+  const id = "api:가천대학교:컴퓨터공학과";
+  // v3 때는 3학년도 과목(운영체제)이었고, 지금은 학과군 실습이다.
+  const old = {
+    id,
+    name: "컴퓨터공학과",
+    school: "가천대학교",
+    curriculum: ["C언어", "자료구조", "운영체제"],
+    category: "공학",
+    duration: "4년",
+    lessons: ["C언어", "자료구조", "운영체제", "캡스톤 디자인"],
+  };
+  const migrated = loadState(
+    only("hi-campus-v3", {
+      catalog: [old],
+      journeys: { [id]: { completed: 3, paused: false } },
+      notes: { [`${id}-0`]: "C언어 기록", [`${id}-2`]: "운영체제 기록" },
+      drafts: { [`${id}-2`]: "쓰던 글", [`${id}-1`]: "  " },
+      plays: { [`${id}-2`]: { game: "match", summary: "x" }, [`${id}-0`]: { game: "ox", summary: "5문제 중 5개 정답" } },
+    }),
+  );
+  assert.equal(migrated.version, 4);
+  assert.deepEqual(migrated.catalog[0].lessons, ["C언어", "자료구조", "버블 정렬 직접 해보기", "캡스톤 디자인"]);
+  assert.equal(migrated.journeys[id].completed, 3);
+  assert.deepEqual(migrated.notes, { [`${id}-0`]: "C언어 기록" });
+  assert.deepEqual(migrated.plays, { [`${id}-0`]: { game: "ox", summary: "5문제 중 5개 정답" } });
+  assert.deepEqual(migrated.drafts, { [`${id}-1`]: "  " });
+  assert.deepEqual(migrated.archive, [
+    { id, title: "운영체제", note: "운영체제 기록" },
+    { id, title: "운영체제", note: "쓰던 글" },
+  ]);
+  // 새 구조로 저장한 뒤 다시 불러와도 이전 체험 기록은 남고, 없는 학과의 기록과 빈 기록은 버린다.
+  const again = loadState(
+    only(STORAGE_KEY, {
+      ...migrated,
+      archive: [...migrated.archive, { id: "missing", title: "x", note: "y" }, { id, title: "빈 기록", note: " " }],
+    }),
+  );
+  assert.deepEqual(again.archive, migrated.archive);
 });
 test("8단계였던 기록을 삭제하지 않고 학년별 구조로 옮긴다", () => {
   const migrated = loadState(
@@ -310,7 +379,7 @@ test("어느 학교·학과든 만들 수 있고 계열에 맞는 기본 구성�
   assert.equal(d.id, "api:가천대학교:컴퓨터공학과");
   assert.equal(d.category, "공학");
   assert.equal(d.icon, "code");
-  assert.deepEqual(d.lessons, ["자료구조", "운영체제", "3학년 전공 탐색", "캡스톤 디자인"]);
+  assert.deepEqual(d.lessons, ["자료구조", "운영체제", "버블 정렬 직접 해보기", "캡스톤 디자인"]);
   assert.equal(d.jobs, undefined);
   const unknown = createDepartment("새학과", "새대학교", ["과목"], "없는계열");
   assert.equal(unknown.icon, "cap");

@@ -22,7 +22,7 @@ import {
   departments,
   fields,
   fieldOf,
-  finals,
+  finalOf,
   planReady,
   PLAN_FIELDS,
   createDepartment,
@@ -30,11 +30,11 @@ import {
   completeLesson,
   initialState,
 } from "./model.js";
-import { games } from "./games.js";
 import { isLessonType, lessonTypes } from "./lessonGames.js";
 import LessonGame, { useLessonGame } from "./Games.jsx";
 import { PlanSummary, PlanTemplate, Rub } from "./Templates.jsx";
-import { experiences } from "./experiences.js";
+import { templates } from "./experiences.js";
+import { groupName } from "./groups.js";
 
 /* ------------------------------------------------------------------ */
 /* 공통                                                                */
@@ -58,7 +58,7 @@ function view(state) {
     index,
     year: d.yearNumbers[index],
     lastYear: d.yearNumbers[total - 1],
-    final: finals[d.final] || finals.artwork,
+    final: finalOf(d),
     finished: !!journey && completed === total,
   };
 }
@@ -1028,8 +1028,8 @@ function TabBar({ active, nav }) {
 function taskKind(d, index) {
   if (index === d.lessons.length - 1) return "졸업 과제";
   const id = d.games?.[index];
-  const title = games.find((item) => item.id === id)?.title || lessonTypes[id]?.title;
-  return title || "직접 해보고 느낀 점 기록하기";
+  if (typeof id === "string" && id.startsWith("group:") && d.practice) return `전공 실습(${templates[d.practice.template].title})`;
+  return lessonTypes[id]?.title || "직접 해보고 느낀 점 기록하기";
 }
 
 /** 아직 열리지 않은 과제. 누르면 언제 열리는지 잠깐 알려준다. */
@@ -1140,7 +1140,7 @@ export function Home({ active, nav, state }) {
         졸업까지 남은 과제
       </T>
       {upcoming.map(({ lesson, i }, n) => (
-        <TaskCard key={i} top={565 + n * 84} d={0.42 + n * 0.06} title={lesson} sub={`${d.yearNumbers[i]}학년 실습 · ${taskKind(d, i)}`} hint={hint?.i === i ? hint.text : ""} onClick={() => tellLocked(i)} />
+        <TaskCard key={i} top={565 + n * 84} d={0.42 + n * 0.06} title={lesson} sub={`${d.yearNumbers[i]}학년 · ${taskKind(d, i)}`} hint={hint?.i === i ? hint.text : ""} onClick={() => tellLocked(i)} />
       ))}
       <p className="sr-only" role="status">
         {hint?.text}
@@ -1229,8 +1229,9 @@ export function Lesson({ active, nav, state, setState }) {
   const subject = ok ? v.d.lessons[v.index] : "";
   const isFinal = ok && v.index === v.total - 1;
   const game = ok && !isFinal ? v.d.games?.[v.index] || null : null;
-  const dedicated = games.some((item) => item.id === game);
-  const typed = !dedicated && isLessonType(game);
+  // 학과군 전공 실습이면 그 체험 데이터. 아니면 연습 문제 유형(이론 수업)이거나 null(기본 체험).
+  const practice = typeof game === "string" && game.startsWith("group:") ? v.d.practice : null;
+  const typed = !practice && isLessonType(game);
   const quiz = useLessonGame(typed ? subject : null);
   const [draft, setDraft] = useState(() => (ok ? state.drafts[key] ?? state.notes[key] ?? "" : ""));
   // 체험이나 기록을 이미 시작한 수업은 기록 단계부터 이어간다.
@@ -1265,7 +1266,7 @@ export function Lesson({ active, nav, state, setState }) {
       <Screen>
         <Header title={d.name} count={`${index + 1}/${total}`} onBack={nav.back} />
         <Rub
-          data={experiences.artwork}
+          data={final}
           year={year}
           onQuit={nav.back}
           onDone={() => {
@@ -1276,14 +1277,14 @@ export function Lesson({ active, nav, state, setState }) {
       </Screen>
     );
 
-  // 수업의 종류: 졸업 계획서, 전용 미니게임, 연습 문제(불러오는 중·오류 포함), 기본 체험.
-  const mode = isFinal ? "plan" : dedicated ? "game" : typed && quiz.status !== "basic" ? quiz.status === "ready" ? "quiz" : quiz.status : "basic";
+  // 수업의 종류: 졸업 계획서, 학과군 전공 실습, 연습 문제(불러오는 중·오류 포함), 기본 체험.
+  const mode = isFinal ? "plan" : practice ? "practice" : typed && quiz.status !== "basic" ? quiz.status === "ready" ? "quiz" : quiz.status : "basic";
   const play = game && state.plays[key]?.game === game ? state.plays[key] : null;
   const played = play?.summary || "";
   const plan = state.capstones[d.id];
-  const tried = mode === "plan" ? planReady(plan) : mode === "game" || mode === "quiz" ? !!played : mode === "basic";
+  const tried = mode === "plan" ? planReady(plan) : mode === "practice" || mode === "quiz" ? !!played : mode === "basic";
 
-  const headline = mode === "plan" ? final.name : mode === "game" ? experiences[game].title : mode === "quiz" ? quiz.game.title : subject;
+  const headline = mode === "plan" ? final.name : mode === "practice" ? practice.title : mode === "quiz" ? quiz.game.title : subject;
   const warn = (message) => {
     setNotice(message);
     setShake((n) => n + 1);
@@ -1315,7 +1316,7 @@ export function Lesson({ active, nav, state, setState }) {
   if (step === 0) {
     const task =
       mode === "plan" ? final.intro
-      : mode === "game" ? experiences[game].task
+      : mode === "practice" ? practice.task
       : mode === "quiz" ? quizTask(quiz.game)
       : mode === "basic"
         ? index === 0
@@ -1340,8 +1341,13 @@ export function Lesson({ active, nav, state, setState }) {
             </button>
           </div>
         )}
+        {mode === "practice" && practice.learn && (
+          <MintCard title="알아두기" className="a-up mt-[22px]">
+            <p style={delay(0.1)}>{practice.learn}</p>
+          </MintCard>
+        )}
         {task && (
-          <MintCard title="이 수업에서 해볼 것" className="a-up mt-[22px]">
+          <MintCard title="이 수업에서 해볼 것" className={`a-up ${mode === "practice" && practice.learn ? "mt-[12px]" : "mt-[22px]"}`}>
             <p style={delay(0.12)}>{task}</p>
           </MintCard>
         )}
@@ -1365,9 +1371,9 @@ export function Lesson({ active, nav, state, setState }) {
             }}
           />
         )}
-        {(mode === "game" || mode === "quiz") && (
+        {(mode === "practice" || mode === "quiz") && (
           <LessonGame
-            game={mode === "game" ? game : quiz.game}
+            game={mode === "practice" ? practice : quiz.game}
             played={played}
             onComplete={(summary) => {
               setNotice("");
@@ -1398,9 +1404,9 @@ export function Lesson({ active, nav, state, setState }) {
   } else {
     body = (
       <>
-        {mode === "quiz" && (
+        {(mode === "quiz" || (mode === "practice" && practice.learn)) && (
           <MintCard title="배운 내용" className="a-up mt-[22px]">
-            <p>{quiz.game.explanation}</p>
+            <p>{mode === "quiz" ? quiz.game.explanation : practice.learn}</p>
           </MintCard>
         )}
         {mode === "plan" && planReady(plan) && (
@@ -1465,7 +1471,7 @@ export function Lesson({ active, nav, state, setState }) {
             {headline}
           </h1>
           <p className="a-up mt-[6px] text-[14px] leading-[22px] text-gray" style={delay(0.06)}>
-            {isFinal ? `${year}학년 · 마지막 과제예요` : `${year}학년 수업 · ${subject}`}
+            {isFinal ? `${year}학년 · 마지막 과제예요` : practice ? `${year}학년 전공 실습 · ${groupName(d.studyGroup)}` : `${year}학년 수업 · ${subject}`}
           </p>
           {body}
         </div>
@@ -1567,12 +1573,18 @@ export function Graduation({ active, nav, state }) {
 function reportText(state, d) {
   const notes = d.lessons.map((lesson, i) => `${d.yearNumbers[i]}학년. ${lesson}\n${state.notes[`${d.id}-${i}`] || "기록 없음"}`).join("\n\n");
   const plan = state.capstones[d.id];
-  const final = finals[d.final];
+  const final = finalOf(d);
   const planText =
     final?.kind === "plan" && planReady(plan)
       ? `\n\n${final.name} 계획\n${final.prompts.map((prompt, i) => `- ${prompt.label}: ${plan[PLAN_FIELDS[i]]}`).join("\n")}`
       : "";
-  return `${d.school} ${d.name} 체험 리포트\n\n${d.lessons.length} / ${d.lessons.length} 실습 완료\n\n${notes}${planText}`;
+  // 체험 구조가 바뀌기 전에 남긴 기록(학년 자리의 수업이 바뀌어 옮겨 둔 것).
+  const archived = (state.archive || []).filter((item) => item.id === d.id);
+  const archiveText = archived.length
+    ? `\n\n이전 체험 기록 (체험 구조가 바뀌기 전에 남긴 기록이에요)\n${archived.map((item) => `- ${item.title}\n${item.note}`).join("\n\n")}`
+    : "";
+  const completed = Math.min(state.journeys[d.id]?.completed || 0, d.lessons.length);
+  return `${d.school} ${d.name} 체험 리포트\n\n${completed} / ${d.lessons.length} 완료\n\n${notes}${planText}${archiveText}`;
 }
 
 function download(name, text) {
@@ -1612,6 +1624,7 @@ export function My({ nav, state, setState }) {
           const total = d.lessons.length;
           const completed = Math.min(journey.completed, total);
           const finished = completed === total;
+          const archived = (state.archive || []).filter((item) => item.id === d.id).length;
           return (
             <div key={d.id} className="a-up mt-[14px] rounded-[16px] border border-cream-line bg-cream p-[16px]" style={delay(0.12 + Math.min(i, 6) * 0.06)}>
               <strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-[16px] font-semibold text-slate">
@@ -1620,11 +1633,16 @@ export function My({ nav, state, setState }) {
               <p className="mt-[4px] text-[12px] leading-[18px] text-gray">
                 {finished ? `졸업 · 학습과 실습 ${total}개 완료` : `${d.yearNumbers[Math.min(completed, total - 1)]}학년 · ${completed} / ${total} 완료`}
               </p>
+              {archived > 0 && (
+                <p className="mt-[4px] text-[12px] leading-[18px] text-mint-deep">
+                  체험 구조가 바뀌기 전에 남긴 기록 {archived}개를 리포트에 함께 담았어요.
+                </p>
+              )}
               <div className="mt-[12px] flex gap-[8px]">
                 <button className="button" onClick={() => choose(d, finished ? "graduation" : "home")}>
                   {finished ? "졸업 리포트 보기" : "이어서 체험하기"}
                 </button>
-                {finished && (
+                {(finished || archived > 0) && (
                   <button className="button ghost" onClick={() => download(`${d.school}-${d.name}-체험-리포트.txt`, reportText(state, d))}>
                     리포트 내려받기
                   </button>
