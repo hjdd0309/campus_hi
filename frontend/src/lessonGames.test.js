@@ -179,21 +179,21 @@ test("순서 맞추기는 섞인 상태로 시작하고, 제자리에 있는 단
   assert.deepEqual(order, [2, 0, 1]);
 });
 
-test("체험은 전용 미니게임, 연습 문제, 기본 체험 순서로 정한다", () => {
+test("이론 수업은 연습 문제가 있는 과목을, 없으면 기본 체험 과목을 고른다", () => {
   const lessonGames = { 자료구조: "ox", 운영체제: "blank", 데이터베이스: "blank", 컴퓨터구조: "order", 이상한값: "scenario" };
-  assert.equal(gameFor("자료구조", lessonGames), "sorting");
+  assert.equal(gameFor("자료구조", lessonGames), "ox");
   assert.equal(gameFor("운영체제", lessonGames), "blank");
   assert.equal(gameFor("이상한값", lessonGames), null);
   assert.equal(gameFor("C언어", lessonGames), null);
   assert.equal(gameFor("constructor", lessonGames), null);
   assert.equal(gameFor("운영체제"), null);
-  assert.ok(isGame("stroop") && isGame("match") && !isGame("없는게임") && !isGame(undefined));
+  assert.ok(isGame("group:music") && isGame("match") && !isGame("stroop") && !isGame("group:없음") && !isGame("없는게임") && !isGame(undefined));
 
   const curriculum = ["C언어", "운영체제", "데이터베이스", "컴퓨터구조", "자료구조", "알고리즘"];
   assert.deepEqual(pickLessons(curriculum, 3, lessonGames), [
-    { subject: "자료구조", game: "sorting" },
     { subject: "운영체제", game: "blank" },
     { subject: "컴퓨터구조", game: "order" },
+    { subject: "자료구조", game: "ox" },
   ]);
   // 유형이 다른 연습 문제가 모자라면 같은 유형의 연습 문제로, 그것도 모자라면 나머지 과목으로 채운다.
   assert.deepEqual(pickLessons(curriculum, 5, lessonGames).slice(3), [
@@ -201,8 +201,8 @@ test("체험은 전용 미니게임, 연습 문제, 기본 체험 순서로 정�
     { subject: "C언어", game: null },
   ]);
   assert.deepEqual(pickLessons(curriculum, 2), [
-    { subject: "자료구조", game: "sorting" },
     { subject: "C언어", game: null },
+    { subject: "운영체제", game: null },
   ]);
   assert.deepEqual(pickLessons(["가", "나"], 2, { 나: "ox" }), [
     { subject: "나", game: "ox" },
@@ -213,8 +213,8 @@ test("체험은 전용 미니게임, 연습 문제, 기본 체험 순서로 정�
 test("연습 문제가 있는 과목이 체험에 들어가고, 저장했다 불러와도 그대로다", () => {
   const curriculum = ["C언어", "운영체제", "데이터베이스"];
   const d = createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", null, "4년", "", { 운영체제: "match", 데이터베이스: "scenario" });
-  assert.deepEqual(d.lessons, ["운영체제", "C언어", "데이터베이스", "캡스톤 디자인"]);
-  assert.deepEqual(d.games, ["match", null, null, null]);
+  assert.deepEqual(d.lessons, ["운영체제", "C언어", "버블 정렬 직접 해보기", "캡스톤 디자인"]);
+  assert.deepEqual(d.games, ["match", null, "group:computing", null]);
   assert.deepEqual(d.lessonGames, { 운영체제: "match" });
   assert.deepEqual(createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", null, "4년").lessonGames, {});
 

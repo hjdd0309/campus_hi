@@ -3,10 +3,9 @@ import { getLessonGame } from "./api.js";
 import { lessonTypes } from "./lessonGames.js";
 import { typedComponents } from "./TypedGames.jsx";
 import { Experience } from "./Templates.jsx";
-import { experiences, templates } from "./experiences.js";
-import { games } from "./games.js";
+import { templates } from "./experiences.js";
 
-// 수업의 "직접 해보기" 단계에 들어가는 체험: 수업 맞춤 체험(체험 틀) 또는 미리 만들어 둔 연습 문제.
+// 수업의 "직접 해보기" 단계에 들어가는 체험: 학과군 실습(체험 틀) 또는 미리 만들어 둔 연습 문제.
 
 function GameFrame({ title, played, note, children }) {
   return (
@@ -58,18 +57,15 @@ export function useLessonGame(subject) {
   };
 }
 
-// game: 수업 맞춤 체험의 id(games.js), 또는 useLessonGame으로 받은 연습 문제.
-// 수업 화면의 큰 제목이 게임·문제 제목이므로, 틀에는 체험의 종류를 적는다.
+// game: 학과군 실습의 체험 데이터(template이 있음), 또는 useLessonGame으로 받은 연습 문제(type이 있음).
+// 수업 화면의 큰 제목이 체험·문제 제목이므로, 틀에는 체험의 종류를 적는다.
 export default function LessonGame({ game, played, onComplete }) {
-  if (typeof game === "string") {
-    const data = games.some((item) => item.id === game) ? experiences[game] : null;
-    if (!data) return null;
+  if (game?.template && templates[game.template])
     return (
-      <GameFrame title={templates[data.template].title} played={played}>
-        <Experience data={data} onComplete={onComplete} />
+      <GameFrame title={templates[game.template].title} played={played} note="AI가 만든 체험이에요. 실제 수업 내용과 다를 수 있어요.">
+        <Experience data={game} onComplete={onComplete} />
       </GameFrame>
     );
-  }
   const Component = game && typedComponents[game.type];
   if (!Component) return null;
   return (

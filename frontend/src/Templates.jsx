@@ -417,7 +417,7 @@ function Classify({ data, onComplete }) {
         {index + 1} / {total}
       </p>
       <p className="journal-text">{item.text}</p>
-      <div className="journal-entry">
+      <div className={`journal-entry ${data.slots.length === 1 ? "single" : ""}`}>
         {data.slots.map((slot, i) =>
           // 보기가 적으면 버튼으로, 많으면 목록에서 고른다.
           slot.options.length <= 4 ? (

@@ -13,7 +13,7 @@ import {
   templates,
 } from "./experiences.js";
 import { finals } from "./model.js";
-import { games } from "./games.js";
+import { groupData } from "./groupData.js";
 
 // 테스트가 매번 같은 결과를 내도록 고정된 난수를 쓴다.
 function seeded(seed) {
@@ -28,11 +28,12 @@ test("지금 쓰는 체험 데이터는 모두 형식 검사를 통과한다", (
   for (const [id, data] of Object.entries(experiences)) assert.ok(data, `${id} 형식이 틀림`);
   assert.deepEqual(
     Object.fromEntries(Object.entries(experiences).map(([id, data]) => [id, data.template])),
-    { sorting: "B", journal: "C", stroop: "D", artwork: "A", capstone: "F", thesis: "F", showcase: "F" },
+    { sorting: "B", journal: "C", artwork: "A", capstone: "F", thesis: "F", showcase: "F" },
   );
-  // 과목명 규칙의 체험과 졸업 과제는 모두 데이터가 있다.
-  for (const game of games) assert.equal(game.title, experiences[game.id].title);
+  // 졸업 과제와, 학과군 데이터가 바탕으로 쓰는 체험은 모두 데이터가 있다.
   for (const final of Object.values(finals)) assert.ok(final.name);
+  for (const group of Object.values(groupData))
+    for (const entry of [group.practice, group.final]) if (entry.base) assert.ok(experiences[entry.base], entry.base);
   assert.ok(Object.keys(templates).length <= 6);
 });
 
@@ -55,10 +56,14 @@ test("형식이 틀린 체험 데이터는 거른다", () => {
   assert.equal(cleanExperience({ ...journal, items: [{ ...journal.items[0], answer: ["cash", "nope"] }, ...journal.items.slice(1)] }), null);
   assert.equal(cleanExperience({ ...journal, slots: [] }), null);
   // D: 색은 #rrggbb, 만드는 방식은 정해진 것만
-  const stroop = experiences.stroop;
-  assert.equal(cleanExperience({ ...stroop, choices: [{ ...stroop.choices[0], color: "red" }, ...stroop.choices.slice(1)] }), null);
-  assert.equal(cleanExperience({ ...stroop, generator: "random" }), null);
-  assert.equal(cleanExperience({ ...stroop, pairs: 2 }), null);
+  const reaction = groupData.sports.practice;
+  assert.ok(cleanExperience(reaction));
+  assert.equal(cleanExperience({ ...reaction, choices: [{ ...reaction.choices[0], color: "red" }, ...reaction.choices.slice(1)] }), null);
+  assert.equal(cleanExperience({ ...reaction, generator: "stroop" }), null);
+  assert.equal(cleanExperience({ ...reaction, pairs: 2 }), null);
+  // 알아두기(learn)는 없어도 되지만, 있으면 120자까지다.
+  assert.equal(cleanExperience({ ...base, learn: "" }).learn, "");
+  assert.equal(cleanExperience({ ...base, learn: "가".repeat(121) }), null);
   // A: 장면은 있는 그림만
   assert.equal(cleanExperience({ ...experiences.artwork, phases: [{ label: "칠하기", scene: "none", particles: "paint" }] }), null);
   // F: 계획서는 세 칸
@@ -119,23 +124,19 @@ test("분류하기: 분개 문제는 차변과 대변이 회계 원칙에 맞는
   );
 });
 
-test("반응 실험: 스트룹은 뜻과 색이 같은 문제와 다른 문제가 반씩이다", () => {
-  const data = experiences.stroop;
+test("반응 실험: 힉 실험은 신호 하나인 묶음 뒤에 신호 넷인 묶음이 온다", () => {
+  const data = groupData.sports.practice;
   for (const seed of [1, 2, 3, 4, 5]) {
     const trials = makeTrials(data, seeded(seed));
     assert.equal(trials.length, 16);
-    assert.equal(trials.filter((t) => t.condition === 0).length, 8);
-    for (const t of trials) {
-      const ink = data.choices.find((choice) => choice.id === t.answer);
-      assert.equal(t.color, ink.color);
-      // 같음: 글자가 색 이름과 같다. 다름: 다른 색 이름이다.
-      assert.equal(t.text === ink.label, t.condition === 0);
-      assert.ok(data.choices.some((choice) => choice.label === t.text));
-    }
-    for (const choice of data.choices) assert.equal(trials.filter((t) => t.answer === choice.id).length, 4);
+    // 앞 8문제는 늘 첫 번째 색, 뒤 8문제는 네 색이 두 번씩 섞여 나온다.
+    assert.ok(trials.slice(0, 8).every((t) => t.condition === 0 && t.answer === data.choices[0].id));
+    const many = trials.slice(8);
+    assert.ok(many.every((t) => t.condition === 1));
+    for (const choice of data.choices) assert.equal(many.filter((t) => t.answer === choice.id).length, 2);
+    for (const t of trials) assert.equal(t.color, data.choices.find((choice) => choice.id === t.answer).color);
   }
 });
-
 test("반응 실험 결과는 맞힌 시행의 평균 시간으로 두 조건을 비교한다", () => {
   assert.deepEqual(
     summarizeReaction([
