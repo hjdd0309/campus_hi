@@ -66,7 +66,7 @@
   - 시안에 있던 가짜 요소는 넣지 않는다: 기기 상태바(9:41), 홈 인디케이터, "김이름" 같은 고정 이름, 고정된 진행률·리포트 문구. 실제 데이터로 채운다.
 - `backend/`: FastAPI. `main.py` 하나에 API가 있고, 데이터는 `data/courses.csv.gz`를 읽는다. 데이터 출처는 `backend/SOURCE.md`에 있다.
 - `backend/pipeline.py`: 학교 홈페이지에서 학년별 편성을 모아 `data/year_curricula.json`에 저장하는 수집 도구. 서버는 이 파일의 검증된 항목만 내보낸다.
-- `frontend/src/games.js`, `Games.jsx`: 과목명에 맞춰 붙는 수업 맞춤 미니게임. 게임 내용(실험 설명, 회계 처리 등)은 사실과 맞아야 하므로 추가·수정할 때 근거를 확인한다.
+- `frontend/src/experiences.js`, `Templates.jsx`: 체험 틀(A 문지르기, B 순서, C 분류, D 반응 실험, F 계획 조립)의 형식 검사·채점과 화면, 그리고 체험 데이터(수업 맞춤 체험 3종, 졸업 과제 4종). 체험은 틀을 늘리지 않고 데이터를 더해 늘린다. 체험 내용(실험 설명, 회계 처리 등)은 사실과 맞아야 하므로 추가·수정할 때 근거를 확인한다. `games.js`는 어느 과목에 어떤 체험을 붙일지 정하는 과목명 규칙이다.
 - `frontend/src/lessonGames.js`, `TypedGames.jsx`, `backend/lesson_games.py`: 전용 미니게임이 없는 과목에 붙는 유형별 연습 문제(빈칸 채우기, OX, 순서 맞추기, 짝 맞추기, 분류하기). 문제는 미리 만들어 `backend/data/lesson_games.jsonl`에 넣고 서버는 검증된 것만 내보낸다. 체험은 전용 미니게임, 연습 문제, 기본 체험 순서로 정한다.
 - `scripts/dev.mjs`: 백엔드 가상환경 준비와 백엔드·프론트 동시 실행을 맡는다.
 

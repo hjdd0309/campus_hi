@@ -33,7 +33,8 @@ import {
 import { games } from "./games.js";
 import { isLessonType, lessonTypes } from "./lessonGames.js";
 import LessonGame, { useLessonGame } from "./Games.jsx";
-import GraduationPlan, { PlanSummary } from "./GraduationPlan.jsx";
+import { PlanSummary, PlanTemplate, Rub } from "./Templates.jsx";
+import { experiences } from "./experiences.js";
 
 /* ------------------------------------------------------------------ */
 /* 공통                                                                */
@@ -1157,170 +1158,6 @@ export function Home({ active, nav, state }) {
 /* 12 · 학년별 수업                                                    */
 /* ------------------------------------------------------------------ */
 
-const GOAL = 26;
-
-/** 졸업작품: 사포질 → 도색. 문지르면 가루와 물감이 튄다. */
-function Studio({ year, onDone, onQuit }) {
-  const [phase, setPhase] = useState("sand");
-  const progress = useRef(0);
-  const phaseRef = useRef("sand");
-  const [particles, setParticles] = useState([]);
-  const [rubbing, setRubbing] = useState(false);
-  const [touched, setTouched] = useState(false);
-  const last = useRef(null);
-  const idRef = useRef(0);
-  const area = useRef(null);
-  const done = useRef(false);
-
-  const emit = (x, y, n) => {
-    const items = Array.from({ length: n }, () => {
-      const a = Math.random() * Math.PI * 2;
-      const r = 18 + Math.random() * 46;
-      const paint = phase === "paint";
-      return {
-        id: idRef.current++,
-        x,
-        y,
-        dx: Math.cos(a) * r,
-        dy: Math.sin(a) * r - (paint ? 0 : 18),
-        size: paint ? 10 + Math.random() * 16 : 3 + Math.random() * 5,
-        color: paint ? (Math.random() > 0.3 ? "#27d8cd" : "#1aa69e") : Math.random() > 0.5 ? "#f3f1ec" : "#cfcac1",
-        kind: paint ? "paint" : "dust",
-      };
-    });
-    setParticles((p) => [...p.slice(-60), ...items]);
-    window.setTimeout(() => setParticles((p) => p.filter((q) => !items.includes(q))), 900);
-  };
-
-  const advance = (amount) => {
-    if (done.current) return;
-    progress.current += amount;
-    if (progress.current < GOAL) return;
-    done.current = true;
-    window.setTimeout(() => {
-      if (phaseRef.current === "sand") {
-        phaseRef.current = "paint";
-        setPhase("paint");
-        progress.current = 0;
-        done.current = false;
-      } else {
-        onDone();
-      }
-    }, 380);
-  };
-
-  const point = (e) => {
-    const r = area.current.getBoundingClientRect();
-    const scale = r.width / 402;
-    return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale };
-  };
-  const down = (e) => {
-    e.target.setPointerCapture?.(e.pointerId);
-    const p = point(e);
-    last.current = p;
-    setRubbing(true);
-    setTouched(true);
-    emit(p.x, p.y, phase === "paint" ? 6 : 8);
-    advance(2);
-  };
-  const move = (e) => {
-    if (!last.current) return;
-    const p = point(e);
-    if (Math.hypot(p.x - last.current.x, p.y - last.current.y) > 16) {
-      last.current = p;
-      emit(p.x, p.y, phase === "paint" ? 3 : 4);
-      advance(1);
-    }
-  };
-  const up = () => {
-    last.current = null;
-    setRubbing(false);
-  };
-  // 키보드로도 할 수 있게: 스페이스나 엔터를 누를 때마다 한 번 문지른다.
-  const key = (e) => {
-    if (e.key !== " " && e.key !== "Enter") return;
-    e.preventDefault();
-    setTouched(true);
-    emit(201, 330, phase === "paint" ? 6 : 8);
-    advance(2);
-  };
-
-  // 화면이 낮으면 '그만하기'까지 다 보이도록 장면을 줄이고, 양옆에 남는 자리는 같은 그림을 흐리게 깔아 채운다.
-  return (
-    <div className="absolute inset-x-0 bottom-0 top-[112px] overflow-hidden bg-[#b3a28e]">
-      <img
-        src={phase === "paint" ? img.scenePaint : img.sceneSand}
-        alt=""
-        draggable={false}
-        className="absolute inset-0 h-full w-full scale-125 object-cover blur-[12px]"
-      />
-      <div
-        ref={area}
-        tabIndex={0}
-        role="application"
-        aria-label={`${year}학년 졸업작품 ${phase === "sand" ? "사포질하기" : "도색하기"}. 작품을 문지르거나 스페이스를 눌러요.`}
-        className="absolute left-0 top-0 h-[762px] w-[402px] origin-top touch-none select-none overflow-hidden outline-none"
-        style={{ scale: "min(1, (var(--vh) + var(--tt) - 112) / 734)" }}
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
-        onKeyDown={key}
-      >
-        {/* 장면 그림 아래쪽에 함께 그려진 기기 장식이 보이지 않도록 조금 키워서 잘라낸다. */}
-        <div className="absolute left-[-7px] top-0 h-[789px] w-[416px]" style={{ animation: rubbing ? "rub 0.14s linear infinite" : undefined }}>
-          <img src={img.sceneSand} alt="" draggable={false} className="absolute inset-0 h-full w-full" />
-          <img
-            src={img.scenePaint}
-            alt=""
-            draggable={false}
-            className="absolute inset-0 h-full w-full transition-opacity duration-700"
-            style={{ opacity: phase === "paint" ? 1 : 0 }}
-          />
-        </div>
-        <div className="pointer-events-none absolute left-[26px] top-[42px] h-[108px] w-[349px] rounded-[21px] bg-white">
-          <T y={31} size={18} center className="font-bold text-ink">
-            {year}학년 졸업작품
-          </T>
-          <T y={66} size={15} center className="text-gray">
-            {phase === "sand" ? "사포질하기" : "도색하기"}
-          </T>
-        </div>
-        {!touched && (
-          <span
-            className="loop pointer-events-none absolute left-[161px] top-[290px] h-[80px] w-[80px] rounded-full border-2 border-white/90"
-            style={{ animation: "ripple 1.6s ease-out infinite" }}
-          />
-        )}
-        {particles.map((p) => (
-          <span
-            key={p.id}
-            className="pointer-events-none absolute rounded-full"
-            style={{
-              left: p.x - p.size / 2,
-              top: p.y - p.size / 2,
-              width: p.size,
-              height: p.size,
-              background: p.color,
-              boxShadow: p.kind === "dust" ? "0 0 2px rgba(0,0,0,0.15)" : undefined,
-              animation: p.kind === "paint" ? "splat 0.8s ease-out both" : "particle 0.85s cubic-bezier(0.22,1,0.36,1) both",
-              "--dx": `${p.dx}px`,
-              "--dy": `${p.dy}px`,
-            }}
-          />
-        ))}
-        <button
-          onPointerDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          onClick={onQuit}
-          aria-label="그만하기"
-          className="absolute left-[14px] top-[676px] h-[46px] w-[375px] rounded-[12px] transition-colors active:bg-black/5"
-        />
-      </div>
-    </div>
-  );
-}
-
 const STEPS = ["배우기", "직접 해보기", "기록"];
 
 /** 수업 단계 칩. 지나온 단계는 ✓를 붙이고 눌러서 다시 볼 수 있다. */
@@ -1377,11 +1214,6 @@ function quizTask(game) {
   if (game.type === "match") return `서로 관련된 ${n}쌍의 짝을 맞춰요.`;
   return `${n}개를 알맞은 칸으로 나눠요.`;
 }
-const GAME_TASKS = {
-  stroop: "글자의 뜻이 아니라 글자가 쓰인 색을 최대한 빨리 골라요.",
-  sorting: "이웃한 두 카드만 바꾸면서 카드를 작은 수부터 차례로 놓아요.",
-  journal: "거래마다 무엇이 늘고 줄었는지 따져 차변과 대변으로 나눠 적어요.",
-};
 // 연습 문제가 없는 과목의 관찰 과제. 첫 학년은 관찰, 그다음 학년은 앞에서 찾은 질문을 적용해 본다.
 function basicTasks(subject, first) {
   return first
@@ -1432,7 +1264,8 @@ export function Lesson({ active, nav, state, setState }) {
     return (
       <Screen>
         <Header title={d.name} count={`${index + 1}/${total}`} onBack={nav.back} />
-        <Studio
+        <Rub
+          data={experiences.artwork}
           year={year}
           onQuit={nav.back}
           onDone={() => {
@@ -1450,7 +1283,7 @@ export function Lesson({ active, nav, state, setState }) {
   const plan = state.capstones[d.id];
   const tried = mode === "plan" ? planReady(plan) : mode === "game" || mode === "quiz" ? !!played : mode === "basic";
 
-  const headline = mode === "plan" ? final.name : mode === "game" ? games.find((g) => g.id === game).title : mode === "quiz" ? quiz.game.title : subject;
+  const headline = mode === "plan" ? final.name : mode === "game" ? experiences[game].title : mode === "quiz" ? quiz.game.title : subject;
   const warn = (message) => {
     setNotice(message);
     setShake((n) => n + 1);
@@ -1482,7 +1315,7 @@ export function Lesson({ active, nav, state, setState }) {
   if (step === 0) {
     const task =
       mode === "plan" ? final.intro
-      : mode === "game" ? GAME_TASKS[game]
+      : mode === "game" ? experiences[game].task
       : mode === "quiz" ? quizTask(quiz.game)
       : mode === "basic"
         ? index === 0
@@ -1523,8 +1356,8 @@ export function Lesson({ active, nav, state, setState }) {
     body = (
       <div className="a-up mt-[22px]">
         {mode === "plan" && (
-          <GraduationPlan
-            final={final}
+          <PlanTemplate
+            data={final}
             value={plan}
             onChange={(value) => {
               if (planReady(value)) setNotice("");
