@@ -1,13 +1,11 @@
-import React, { useLayoutEffect, useRef, useState } from "react";
+import React, { useState } from "react";
+import { OrderTemplate } from "./Templates.jsx";
 import {
   BLANK,
   answerOf,
   countCorrect,
   isAnswer,
-  moveStep,
   questionsOf,
-  rightPlaces,
-  scramble,
   shuffle,
 } from "./lessonGames.js";
 
@@ -136,104 +134,13 @@ function Sort(props) {
   );
 }
 
+// 순서 맞추기는 체험 틀 B(자리 옮기기)를 그대로 쓴다.
 function Order({ game, onComplete }) {
-  const size = game.items.length;
-  const [order, setOrder] = useState(() => scramble(size));
-  const [tries, setTries] = useState(0);
-  // null: 확인 전, 숫자: 제자리에 있는 단계 수, "shown": 정답을 보고 끝냄
-  const [result, setResult] = useState(null);
-  const list = useRef(null);
-  const focus = useRef(null);
-  const done = result === size || result === "shown";
-
-  // 단계를 옮긴 뒤에도 키보드 초점이 그 단계를 따라가게 한다.
-  useLayoutEffect(() => {
-    if (!focus.current) return;
-    const [row, delta] = focus.current;
-    focus.current = null;
-    const buttons = list.current?.querySelectorAll(`[data-row="${row}"]:not(:disabled)`) || [];
-    ([...buttons].find((button) => Number(button.dataset.delta) === delta) || buttons[0])?.focus();
-  }, [order]);
-
-  function move(index, delta) {
-    focus.current = [index + delta, delta];
-    setOrder(moveStep(order, index, delta));
-    setResult(null);
-  }
-  function check() {
-    const right = rightPlaces(order);
-    setTries(tries + 1);
-    setResult(right);
-    if (right === size) onComplete(`${size}단계 순서 맞추기 · ${tries + 1}번 만에 완성`);
-  }
-  function reveal() {
-    setOrder(order.map((_, i) => i));
-    setResult("shown");
-    onComplete(`${size}단계 순서 맞추기 · 정답을 보고 확인`);
-  }
-  function restart() {
-    setOrder(scramble(size));
-    setTries(0);
-    setResult(null);
-  }
-
   return (
-    <>
-      <p className="body-copy">
-        {game.prompt}
-        {!done && " 화살표 버튼으로 자리를 옮겨요."}
-      </p>
-      <ol className="order-list" ref={list}>
-        {order.map((step, index) => (
-          <li key={index}>
-            <span className="order-number">{index + 1}</span>
-            <span className="order-text">{game.items[step].text}</span>
-            {!done && (
-              <>
-                <button
-                  data-row={index}
-                  data-delta={-1}
-                  disabled={index === 0}
-                  aria-label={`‘${game.items[step].text}’ 위로 옮기기`}
-                  onClick={() => move(index, -1)}
-                >
-                  ↑
-                </button>
-                <button
-                  data-row={index}
-                  data-delta={1}
-                  disabled={index === size - 1}
-                  aria-label={`‘${game.items[step].text}’ 아래로 옮기기`}
-                  onClick={() => move(index, 1)}
-                >
-                  ↓
-                </button>
-              </>
-            )}
-          </li>
-        ))}
-      </ol>
-      {done ? (
-        <Closing explanation={game.explanation} onRestart={restart}>
-          {result === "shown" ? "올바른 순서예요." : `${tries}번 만에 순서를 맞혔어요.`}
-        </Closing>
-      ) : (
-        <>
-          <p className="game-feedback" role="status">
-            {result !== null &&
-              `아직 순서가 달라요. ${size}개 중 ${result}개가 제자리에 있어요.`}
-          </p>
-          <button className="button" onClick={check}>
-            순서 확인하기
-          </button>
-          {tries >= 3 && (
-            <button className="text-button" onClick={reveal}>
-              정답 보기 →
-            </button>
-          )}
-        </>
-      )}
-    </>
+    <OrderTemplate
+      data={{ swap: "move", prompt: game.prompt, items: game.items.map((item) => item.text), explanation: game.explanation }}
+      onComplete={onComplete}
+    />
   );
 }
 

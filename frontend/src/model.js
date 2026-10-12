@@ -1,5 +1,6 @@
 import { isGame, pickLessons } from "./games.js";
 import { cleanLessonGames } from "./lessonGames.js";
+import { experiences } from "./experiences.js";
 
 export const STORAGE_KEY = "hi-campus-v3";
 // 예전 저장 데이터: [저장 키, 그때의 체험 단계 수]
@@ -9,41 +10,12 @@ const LEGACY_KEYS = [
 ];
 // 마지막 학년의 졸업 과제. 도색 작업실은 조형·디자인 학과에만 맞으므로, 나머지 학과는 계열에 맞는 과제의 계획서를 쓴다.
 export const PLAN_FIELDS = ["topic", "reason", "method"];
+// 체험 데이터(experiences.js)의 졸업 과제를 그대로 쓴다. artwork는 틀 A, 나머지는 틀 F의 계획서다.
 export const finals = {
-  artwork: { kind: "artwork", name: "졸업작품" },
-  capstone: {
-    kind: "plan",
-    name: "캡스톤 디자인",
-    intro:
-      "공학 계열은 마지막 학년에 팀을 이뤄 실제 문제를 해결하는 결과물을 만드는 캡스톤 디자인을 하는 경우가 많아요. 나만의 계획서를 써봐요.",
-    prompts: [
-      { label: "해결하고 싶은 문제", placeholder: "주변에서 불편하다고 느낀 문제를 하나 골라 적어주세요." },
-      { label: "누구에게, 왜 필요한가요?", placeholder: "이 문제가 해결되면 누가 어떤 점에서 좋아질까요?" },
-      { label: "어떻게 만들어 볼 건가요?", placeholder: "무엇을 만들지, 앞 학년에서 체험한 내용을 어떻게 쓸지 적어주세요." },
-    ],
-  },
-  thesis: {
-    kind: "plan",
-    name: "졸업 연구",
-    intro:
-      "많은 학과가 마지막 학년에 스스로 정한 질문을 탐구하는 졸업 논문이나 졸업 연구로 배움을 마무리해요. 나만의 연구 계획서를 써봐요.",
-    prompts: [
-      { label: "탐구하고 싶은 질문", placeholder: "이 전공을 체험하며 가장 궁금해진 점을 질문으로 적어주세요." },
-      { label: "왜 궁금한가요?", placeholder: "이 질문이 나에게, 또는 다른 사람에게 왜 중요한가요?" },
-      { label: "어떻게 알아볼 건가요?", placeholder: "자료 조사, 관찰, 실험, 인터뷰 중 어떤 방법으로 답을 찾을지 적어주세요." },
-    ],
-  },
-  showcase: {
-    kind: "plan",
-    name: "졸업 발표",
-    intro:
-      "예술·체육 계열은 졸업 공연, 연주회, 발표회처럼 사람들 앞에서 배움을 보여주며 마무리하는 경우가 많아요. 나만의 발표 계획서를 써봐요.",
-    prompts: [
-      { label: "무대에 올리고 싶은 것", placeholder: "어떤 공연, 연주, 경기, 작품을 보여주고 싶은지 적어주세요." },
-      { label: "무엇을 전하고 싶나요?", placeholder: "보는 사람이 무엇을 느끼거나 알게 되면 좋을까요?" },
-      { label: "어떻게 준비할 건가요?", placeholder: "무엇을 연습하고 누구와 함께 준비할지 적어주세요." },
-    ],
-  },
+  artwork: { kind: "artwork", name: experiences.artwork.title },
+  capstone: { kind: "plan", name: experiences.capstone.title, ...experiences.capstone },
+  thesis: { kind: "plan", name: experiences.thesis.title, ...experiences.thesis },
+  showcase: { kind: "plan", name: experiences.showcase.title, ...experiences.showcase },
 };
 const ARTWORK_COURSE = /디자인|미술|조형|공예|회화|조소|도예/;
 export function finalFor(course, category) {
