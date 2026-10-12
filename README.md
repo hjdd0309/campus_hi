@@ -1,6 +1,106 @@
-# 캠퍼스하이
+<div align="center">
 
-관심 분야에서 출발해 대학 학과와 교육과정을 살펴보고, 학년별 체험으로 전공을 미리 경험하는 웹 서비스입니다. 체험은 학과의 수업연한에 맞춰 학년마다 하나씩 있고(4년제는 1~4학년, 2년제는 1~2학년), 마지막 학년은 학과에 맞는 졸업 과제입니다(조형·디자인 학과는 도색 졸업작품, 공학은 캡스톤 디자인 계획서, 그 밖의 예체능은 졸업 발표 계획서, 나머지는 졸업 연구 계획서).
+<img src="frontend/src/assets/mascot-splash.png" alt="캠퍼스하이 마스코트" width="140" />
+
+<br />
+
+<img src="frontend/src/assets/wordmark.png" alt="캠퍼스하이" width="220" />
+
+### 내가 만드는 더 높은 미래, 캠퍼스하이
+
+모르고 고르던 전공을, 해보고 고르는 전공으로
+
+<br />
+
+[![서비스 바로가기](https://img.shields.io/badge/서비스-campushi.vercel.app-27D8CB?style=for-the-badge)](https://campushi.vercel.app/)
+[![Notion](https://img.shields.io/badge/Notion-프로젝트_문서-000000?style=for-the-badge&logo=notion&logoColor=white)](https://app.notion.com/p/3f67558aa90480e49c1ce1c193cf696c)
+[![Figma Make 시연](https://img.shields.io/badge/Figma_Make-시연-F24E1E?style=for-the-badge&logo=figma&logoColor=white)](https://scrum-heave-00503286.figma.site/)
+
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+
+</div>
+
+---
+
+관심 분야에서 출발해 대학 학과와 교육과정을 살펴보고, 학년별 체험으로 전공을 미리 경험하는 웹 서비스입니다. 고등학생이 학과를 모르고 고르는 것이 아니라 체험해 보고 고르도록 돕습니다.
+
+체험은 학과의 수업연한에 맞춰 학년마다 하나씩 있고(4년제는 1~4학년, 2년제는 1~2학년), 마지막 학년은 학과에 맞는 졸업 과제입니다(조형·디자인 학과는 도색 졸업작품, 공학은 캡스톤 디자인 계획서, 그 밖의 예체능은 졸업 발표 계획서, 나머지는 졸업 연구 계획서).
+
+## 🔗 바로가기
+
+| | 링크 |
+| --- | --- |
+| 🎓 서비스 | https://campushi.vercel.app/ |
+| 📒 Notion 프로젝트 문서 | [캠퍼스하이](https://app.notion.com/p/3f67558aa90480e49c1ce1c193cf696c) |
+| 🖱️ Figma Make 시연 | https://scrum-heave-00503286.figma.site/ |
+| 🎨 Figma 디자인 파일 | [릿톤](https://www.figma.com/design/reLleJ2e3SR6iRYv31pwRc/%EB%A6%BF%ED%86%A4) |
+
+## 📊 숫자로 보는 캠퍼스하이
+
+| 학교 | 학과명 | 학교·학과 조합 | 공개된 연습 문제 |
+| :---: | :---: | :---: | :---: |
+| **390곳** | **7,112개** | **13,347개** | **495과목** |
+
+2026-10-10 기준입니다. 대학·학과 데이터 출처는 [dotorihanjum/litton](https://github.com/dotorihanjum/litton)이고, 제공 범위는 [`backend/SOURCE.md`](backend/SOURCE.md)에 있습니다.
+
+## 🗺️ 체험 여정
+
+입학부터 졸업까지, 대학 생활의 흐름을 그대로 따라가며 전공을 체험합니다.
+
+| 입학 | 전공 커리큘럼 | 전공 수업 체험 | 전공 성적표 | 졸업 |
+| :---: | :---: | :---: | :---: | :---: |
+| 체험 입학증 발급 | 학교별 실제 교과목 | 학년마다 수업 1개 | A+ 도장 성적표 | 졸업장 + 체험 리포트 |
+
+| 단계 | 화면 | 하는 일 |
+| --- | --- | --- |
+| 관심 찾기 | 시작 → 관심 질문 → 탐색(질문·키워드) → 탐색 중 → 결과 | 관심 분야 추천 |
+| 학과 알아보기 | 학교·학과 찾기 → 학과 상세 | 개설 학교와 교과목 보기 |
+| 입학 | 입학증 → 환영 | 체험 시작 |
+| 배우기 | 홈 → 수업 | 학년별 체험과 기록 |
+| 졸업 | 성적표 → 졸업증명서 → 졸업 | 체험 리포트 |
+| 기록 | 마이페이지 | 체험한 학과, 리포트 내려받기 |
+
+## 🛠️ 기술 구성
+
+| 영역 | 기술 | 비고 |
+| --- | --- | --- |
+| 프런트 | React 19 + Vite 8 + Tailwind CSS v4 | 402×874 아트보드, Figma Make 시안 디자인·모션 |
+| 백엔드 | FastAPI (`backend/main.py`) | CSV를 메모리에 올려 제공, DB 없음 |
+| 데이터 | dotorihanjum/litton CSV (gzip) | 학부 + 교과목 있는 행만 |
+| 수집 | `backend/pipeline.py`, Claude API | 학교 홈페이지에서 학년별 편성 추출 |
+| 배포 | Vercel 또는 Docker | |
+
+## 📚 문서
+
+자세한 기획과 디자인 문서는 Notion에 있습니다.
+
+| 문서 | 내용 |
+| --- | --- |
+| 📘 [서비스 기획서 v1.0](https://app.notion.com/p/v1-0-3f77558aa90481b5914fe9ce144742f9) | 문제 정의, 서비스 상세, 차별성, 사업성 |
+| 🎨 [디자인 시스템](https://app.notion.com/p/3f67558aa9048110b2e0cb427c76f18f) | 색, 글자, 부품 |
+| 🗺️ [서비스 플로우 & 화면](https://app.notion.com/p/3f67558aa90481fb888de2226a4d3224) | 체험 여정과 화면 목록 |
+| 🎤 [발표자료](https://app.notion.com/p/3f67558aa9048125b6c9effd3e8aedbc) | 발표 슬라이드 |
+| 🛠️ [개발](https://app.notion.com/p/3f67558aa9048129917fe6de5a5fa0c8) | 기술 구성, 구현 현황, 체험 구조 개편 |
+| ✅ [할 일](https://app.notion.com/p/7d0edefa98814c7ba54d00449b16411e) | 작업 목록 |
+
+저장소 안의 문서: [`TODO.md`](TODO.md)(작업 현황), [`개발기획서_체험구조.md`](개발기획서_체험구조.md)(체험 구조 개편), [`backend/SOURCE.md`](backend/SOURCE.md)(데이터 범위와 API 형식).
+
+## 👥 팀 한정선13알오너
+
+| 이름 | 학과 |
+| --- | --- |
+| 이원준 | 컴퓨터공학과 |
+| 한상연 | 컴퓨터공학과 |
+| 김현정 | 소프트웨어융합학과 |
+| 조민준 | 기계공학과 |
+| 김영웅 | 산업디자인학과 |
+| 김도희 | 산업디자인학과 |
+
+---
 
 ## 폴더 구조
 - `frontend/` : React + Vite + Tailwind CSS 화면. 디자인과 모션은 처음 만든 Figma Make 시안을 따릅니다(화면 `src/screens.jsx`, 공용 부품 `src/ui.jsx`, 화면 전환 `src/App.jsx`, 색·모션 `src/index.css`).
@@ -114,14 +214,17 @@ backend/.venv/Scripts/python -m backend.lesson_games status
 게임을 추가하려면 `games.js`의 `games`에 과목명 패턴을 넣고, `Games.jsx`에 화면을 만들어 `components`에 등록합니다.
 
 ## 보일러플레이트 출처
-- backend/main.py : FastAPI 공식 문서 예제
-(https://fastapi.tiangolo.com, MIT License)
+
+- `backend/main.py` : FastAPI 공식 문서 예제 (https://fastapi.tiangolo.com, MIT License)
 
 ## 사용 오픈소스
-프론트	React	19.3.0	화면 구성·상태 관리	MIT
-프론트	React DOM	19.3.0	브라우저에 화면 표시	MIT
-개발 도구	Vite	8.3.4	개발 서버·빌드	MIT
-백엔드	FastAPI	0.115.12	API 서버	MIT
-백엔드	Uvicorn	0.34.2	서버 실행	BSD-3-Clause
-백엔드	Pydantic	2.14.0*	요청 데이터 검증	MIT
-백엔드	Starlette	0.46.2*	FastAPI 내부 웹 처리
+
+| 구분 | 이름 | 버전 | 용도 | 라이선스 |
+| --- | --- | --- | --- | --- |
+| 프론트 | React | 19.3.0 | 화면 구성·상태 관리 | MIT |
+| 프론트 | React DOM | 19.3.0 | 브라우저에 화면 표시 | MIT |
+| 개발 도구 | Vite | 8.3.4 | 개발 서버·빌드 | MIT |
+| 백엔드 | FastAPI | 0.115.12 | API 서버 | MIT |
+| 백엔드 | Uvicorn | 0.34.2 | 서버 실행 | BSD-3-Clause |
+| 백엔드 | Pydantic | 2.14.0* | 요청 데이터 검증 | MIT |
+| 백엔드 | Starlette | 0.46.2* | FastAPI 내부 웹 처리 | BSD-3-Clause |
