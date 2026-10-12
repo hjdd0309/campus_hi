@@ -383,6 +383,9 @@ body {
   color: #302b27;
   outline: none;
 }
+.note-card textarea.compact {
+  min-height: 44px;
+}
 .note-card textarea::placeholder {
   color: #b3b9c2;
 }
