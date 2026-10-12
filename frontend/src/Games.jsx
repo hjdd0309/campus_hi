@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getLessonGame } from "./api.js";
-import { isLessonType } from "./lessonGames.js";
+import { lessonTypes } from "./lessonGames.js";
 import { typedComponents } from "./TypedGames.jsx";
 import {
   games,
@@ -315,88 +315,52 @@ function GameFrame({ title, played, note, children }) {
   );
 }
 
-// 미리 만들어 둔 연습 문제를 받아 유형에 맞는 화면으로 보여준다.
-// 문제가 없거나 쓸 수 없으면 기본 체험(basic)을 보여주고 onBasic으로 알린다.
-function GeneratedGame({ subject, played, onComplete, basic, onBasic }) {
-  const [load, setLoad] = useState({ status: "loading" });
+// 과목의 연습 문제를 받는다. status: idle(받을 문제 없음) | loading | ready | basic(문제가 없거나 쓸 수 없음) | error.
+// 수업 화면이 "배우기" 단계에서 문제 제목을 보여주고 "기록" 단계에서 해설을 보여주므로, 문제는 수업 화면이 받아서 넘긴다.
+export function useLessonGame(subject) {
+  const [load, setLoad] = useState({ status: subject ? "loading" : "idle" });
   const [attempt, setAttempt] = useState(0);
-  const basicRef = useRef(onBasic);
-  basicRef.current = onBasic;
 
   useEffect(() => {
+    if (!subject) return undefined;
     const controller = new AbortController();
     setLoad({ status: "loading" });
     getLessonGame(subject, controller.signal).then(
-      (game) => {
-        if (typedComponents[game.type]) return setLoad({ status: "ready", game });
-        setLoad({ status: "basic" });
-        basicRef.current();
-      },
+      (game) => setLoad(typedComponents[game.type] ? { status: "ready", game } : { status: "basic" }),
       (error) => {
         if (controller.signal.aborted) return;
         // 문제가 없어졌거나(404) 형식이 맞지 않으면(422) 다시 시도해도 같으므로 기본 체험으로 넘어간다.
-        if (error.status === 404 || error.status === 422) {
-          setLoad({ status: "basic" });
-          basicRef.current();
-        } else setLoad({ status: "error", message: error.message });
+        if (error.status === 404 || error.status === 422) setLoad({ status: "basic" });
+        else setLoad({ status: "error", message: error.message });
       },
     );
     return () => controller.abort();
   }, [subject, attempt]);
 
-  if (load.status === "basic") return basic;
-  if (load.status === "ready") {
-    const Component = typedComponents[load.game.type];
-    return (
-      <GameFrame
-        title={load.game.title}
-        played={played}
-        note="AI가 만든 연습 문제예요. 실제 수업 내용과 다를 수 있어요."
-      >
-        <Component game={load.game} onComplete={onComplete} />
-      </GameFrame>
-    );
-  }
-  return (
-    <GameFrame title="연습 문제" played={played}>
-      {load.status === "loading" ? (
-        <p className="game-progress" role="status">
-          연습 문제를 불러오는 중이에요…
-        </p>
-      ) : (
-        <div role="alert">
-          <p className="body-copy">{load.message}</p>
-          <button className="button" onClick={() => setAttempt(attempt + 1)}>
-            다시 시도
-          </button>
-          <button
-            className="text-button"
-            onClick={() => {
-              setLoad({ status: "basic" });
-              onBasic();
-            }}
-          >
-            연습 문제 없이 진행하기 →
-          </button>
-        </div>
-      )}
-    </GameFrame>
-  );
+  return {
+    ...load,
+    retry: () => setAttempt((n) => n + 1),
+    skip: () => setLoad({ status: "basic" }),
+  };
 }
 
-// game: 전용 미니게임의 id 또는 연습 문제의 유형. subject는 연습 문제를 찾을 과목명이다.
-export default function LessonGame({ game, subject, played, onComplete, basic, onBasic }) {
-  const Component = components[game];
-  const info = games.find((item) => item.id === game);
-  if (Component && info)
+// game: 전용 미니게임의 id, 또는 useLessonGame으로 받은 연습 문제.
+// 수업 화면의 큰 제목이 게임·문제 제목이므로, 틀에는 체험의 종류를 적는다.
+export default function LessonGame({ game, played, onComplete }) {
+  if (typeof game === "string") {
+    const Component = components[game];
+    if (!Component || !games.some((item) => item.id === game)) return null;
     return (
-      <GameFrame title={info.title} played={played}>
+      <GameFrame title="미니게임" played={played}>
         <Component onComplete={onComplete} />
       </GameFrame>
     );
-  if (isLessonType(game))
-    return (
-      <GeneratedGame subject={subject} played={played} onComplete={onComplete} basic={basic} onBasic={onBasic} />
-    );
-  return null;
+  }
+  const Component = game && typedComponents[game.type];
+  if (!Component) return null;
+  return (
+    <GameFrame title={lessonTypes[game.type].title} played={played} note="AI가 만든 연습 문제예요. 실제 수업 내용과 다를 수 있어요.">
+      <Component game={game} onComplete={onComplete} />
+    </GameFrame>
+  );
 }

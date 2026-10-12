@@ -5,6 +5,7 @@ import {
   Center,
   Confetti,
   delay,
+  FilledButton,
   Header,
   Mask,
   OutlineButton,
@@ -22,7 +23,6 @@ import {
   fields,
   fieldOf,
   finals,
-  finalReady,
   planReady,
   PLAN_FIELDS,
   createDepartment,
@@ -31,9 +31,9 @@ import {
   initialState,
 } from "./model.js";
 import { games } from "./games.js";
-import { lessonTypes } from "./lessonGames.js";
-import LessonGame from "./Games.jsx";
-import GraduationPlan from "./GraduationPlan.jsx";
+import { isLessonType, lessonTypes } from "./lessonGames.js";
+import LessonGame, { useLessonGame } from "./Games.jsx";
+import GraduationPlan, { PlanSummary } from "./GraduationPlan.jsx";
 
 /* ------------------------------------------------------------------ */
 /* 공통                                                                */
@@ -1031,20 +1031,27 @@ function taskKind(d, index) {
   return title || "직접 해보고 느낀 점 기록하기";
 }
 
-function TaskCard({ top, title, sub, d }) {
+/** 아직 열리지 않은 과제. 누르면 언제 열리는지 잠깐 알려준다. */
+function TaskCard({ top, title, sub, hint, onClick, d }) {
   return (
-    <div
-      className="a-up absolute left-[21px] h-[69px] w-[365px] rounded-[10px] border border-[#a4acb6] bg-chalk text-left"
+    <button
+      onClick={onClick}
+      aria-label={`${title}, ${sub}, 잠김`}
+      className="pressable a-up absolute left-[21px] h-[69px] w-[365px] rounded-[10px] border border-[#a4acb6] bg-chalk text-left"
       style={{ top, animationDelay: `${d}s` }}
     >
       <Mask src={icon.eye} w={19} h={19} color="#827d76" className="absolute left-[14px] top-[25px]" />
-      <T y={19} size={14} left={45} clip={305} className="font-semibold text-ink-2">
+      <T y={19} size={14} left={45} clip={280} className="font-semibold text-ink-2">
         {title}
       </T>
-      <T y={41.5} size={10.5} left={45.5} clip={305} className="text-ink-3">
-        {sub}
+      <T key={hint || "sub"} y={41.5} size={10.5} left={45.5} clip={280} className={hint ? "a-shake text-mint-deep" : "text-ink-3"}>
+        {hint || sub}
       </T>
-    </div>
+      <svg className="absolute right-[16px] top-[25px]" width="15" height="19" viewBox="0 0 15 19" fill="none" aria-hidden="true">
+        <rect x="1" y="8" width="13" height="10" rx="2.5" stroke="#a4acb6" strokeWidth="1.6" />
+        <path d="M4 8V5.5a3.5 3.5 0 0 1 7 0V8" stroke="#a4acb6" strokeWidth="1.6" />
+      </svg>
+    </button>
   );
 }
 
@@ -1052,9 +1059,19 @@ export function Home({ active, nav, state }) {
   const v = view(state);
   const percent = v?.journey ? Math.round((v.completed / v.total) * 100) : 0;
   const pct = useCountUp(percent);
+  // 잠긴 과제를 눌렀을 때 그 카드에 보여줄 안내.
+  const [hint, setHint] = useState(null);
+  const hintTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(hintTimer.current), []);
   useGuard(!!v?.journey, nav, active);
   if (!v?.journey) return null;
   const { d, total, completed, index, year, finished } = v;
+  const tellLocked = (i) => {
+    const before = d.yearNumbers[i - 1];
+    setHint({ i, text: i - 1 === index ? `지금 하는 ${before}학년 수업을 마치면 열려요` : `${before}학년 수업을 마치면 열려요` });
+    window.clearTimeout(hintTimer.current);
+    hintTimer.current = window.setTimeout(() => setHint(null), 2400);
+  };
   const open = () => (finished ? nav.push("graduation") : nav.push("lesson"));
   // 지금 과제 다음에 남은 과제(최대 2개).
   const upcoming = finished ? [] : d.lessons.map((lesson, i) => ({ lesson, i })).slice(index + 1, index + 3);
@@ -1122,8 +1139,11 @@ export function Home({ active, nav, state }) {
         졸업까지 남은 과제
       </T>
       {upcoming.map(({ lesson, i }, n) => (
-        <TaskCard key={i} top={565 + n * 84} d={0.42 + n * 0.06} title={lesson} sub={`${d.yearNumbers[i]}학년 실습 · ${taskKind(d, i)}`} />
+        <TaskCard key={i} top={565 + n * 84} d={0.42 + n * 0.06} title={lesson} sub={`${d.yearNumbers[i]}학년 실습 · ${taskKind(d, i)}`} hint={hint?.i === i ? hint.text : ""} onClick={() => tellLocked(i)} />
       ))}
+      <p className="sr-only" role="status">
+        {hint?.text}
+      </p>
       {upcoming.length === 0 && (
         <T y={585} size={13} left={21} className="a-up text-ink-3" style={delay(0.42)}>
           {finished ? "모든 과제를 마쳤어요." : "지금 하는 과제가 마지막이에요."}
@@ -1301,49 +1321,112 @@ function Studio({ year, onDone, onQuit }) {
   );
 }
 
+const STEPS = ["배우기", "직접 해보기", "기록"];
+
+/** 수업 단계 칩. 지나온 단계는 ✓를 붙이고 눌러서 다시 볼 수 있다. */
+function StepChips({ step, reached, onGo }) {
+  return (
+    <ol className="absolute left-[20px] top-[100px] flex gap-[8px]" aria-label="수업 단계">
+      {STEPS.map((label, i) => {
+        const done = i < reached || (i === reached && i < step);
+        const current = i === step;
+        return (
+          <li key={label}>
+            <button
+              onClick={() => onGo(i)}
+              disabled={current || i > reached}
+              aria-current={current ? "step" : undefined}
+              className={`pressable flex h-[34px] items-center gap-[4px] rounded-full border px-[13px] text-[13.5px] font-semibold transition-colors ${
+                current
+                  ? "border-mint bg-mint text-white"
+                  : done
+                    ? "border-mint bg-mint-soft text-mint-deep"
+                    : "border-line bg-white text-mute"
+              }`}
+            >
+              {label}
+              {done && !current && (
+                <svg width="11" height="9" viewBox="0 0 11 9" fill="none" aria-label="완료">
+                  <path d="M1.2 4.6 4 7.3 9.8 1.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** 연한 민트 카드(릿톤 시안의 "배운 내용" 카드). */
+function MintCard({ title, children, className = "" }) {
+  return (
+    <section className={`rounded-[20px] bg-mint-soft px-[18px] py-[16px] ${className}`}>
+      <h2 className="text-[15px] font-bold leading-[22px] text-ink-2">{title}</h2>
+      <div className="mt-[6px] text-[13.5px] leading-[22px] text-ink-3">{children}</div>
+    </section>
+  );
+}
+
+/** 연습 문제 유형별로 "이 수업에서 해볼 것". */
+function quizTask(game) {
+  const n = game.items.length;
+  if (game.type === "blank") return `문장 ${n}개의 빈칸에 알맞은 말을 골라요.`;
+  if (game.type === "ox") return `문장 ${n}개가 맞는지 O, X로 골라요.`;
+  if (game.type === "order") return `${n}단계를 올바른 순서로 놓아요.`;
+  if (game.type === "match") return `서로 관련된 ${n}쌍의 짝을 맞춰요.`;
+  return `${n}개를 알맞은 칸으로 나눠요.`;
+}
+const GAME_TASKS = {
+  stroop: "글자의 뜻이 아니라 글자가 쓰인 색을 최대한 빨리 골라요.",
+  sorting: "이웃한 두 카드만 바꾸면서 카드를 작은 수부터 차례로 놓아요.",
+  journal: "거래마다 무엇이 늘고 줄었는지 따져 차변과 대변으로 나눠 적어요.",
+};
+// 연습 문제가 없는 과목의 관찰 과제. 첫 학년은 관찰, 그다음 학년은 앞에서 찾은 질문을 적용해 본다.
+function basicTasks(subject, first) {
+  return first
+    ? [`‘${subject}’에서 다루는 주제와 관련된 일상 속 장면을 하나 찾아요.`, "무엇을 관찰했는지 적어요.", "관찰하며 궁금해진 점을 적어요."]
+    : ["앞 학년에서 발견한 질문을 하나 골라요.", "대상과 목적을 정해 작은 해결 방법으로 바꿔봐요.", "직접 해본 과정과 결과를 기록해요."];
+}
+
 export function Lesson({ active, nav, state, setState }) {
   // 이 화면은 들어올 때의 수업 하나를 끝까지 다룬다.
   const [v] = useState(() => view(state));
   const ok = !!v?.journey && !v.finished;
   const key = ok ? `${v.d.id}-${v.index}` : "";
+  const subject = ok ? v.d.lessons[v.index] : "";
+  const isFinal = ok && v.index === v.total - 1;
+  const game = ok && !isFinal ? v.d.games?.[v.index] || null : null;
+  const dedicated = games.some((item) => item.id === game);
+  const typed = !dedicated && isLessonType(game);
+  const quiz = useLessonGame(typed ? subject : null);
   const [draft, setDraft] = useState(() => (ok ? state.drafts[key] ?? state.notes[key] ?? "" : ""));
+  // 체험이나 기록을 이미 시작한 수업은 기록 단계부터 이어간다.
+  const [step, setStep] = useState(() => (ok && ((game && state.plays[key]) || state.drafts[key]) ? 2 : 0));
+  const [reached, setReached] = useState(step);
   const [notice, setNotice] = useState("");
   const [shake, setShake] = useState(0);
   const timer = useRef(0);
+  const scroller = useRef(null);
+  const heading = useRef(null);
+  const moved = useRef(false);
   useGuard(ok, nav, active);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  // 연습 문제를 받을 수 없으면 기본 체험으로 진행하고, 체험을 마친 것으로 기록해 수업을 끝낼 수 있게 한다.
+  useEffect(() => {
+    if (typed && quiz.status === "basic")
+      setState((s) => (s.plays[key]?.game === game ? s : { ...s, plays: { ...s.plays, [key]: { game, summary: "" } } }));
+  }, [typed, quiz.status, key, game, setState]);
+  // 단계를 옮기면 맨 위로 올리고 제목에 초점을 둔다(스크린 리더가 새 단계를 읽게).
+  useEffect(() => {
+    if (!moved.current) return;
+    if (scroller.current) scroller.current.scrollTop = 0;
+    heading.current?.focus({ preventScroll: true });
+  }, [step]);
   if (!ok) return null;
 
   const { d, index, total, year, final } = v;
-  const isFinal = index === total - 1;
-  const game = d.games?.[index] || null;
-  // 체험을 마친 기록. 연습 문제를 받지 못해 기본 체험으로 진행한 경우에는 결과(summary)가 비어 있다.
-  const play = game && state.plays[key]?.game === game ? state.plays[key] : null;
-  const played = play?.summary || "";
-  const basic = (
-    <div className="rounded-[16px] border border-cream-line bg-cream p-[16px]">
-      <strong className="text-[14px] font-semibold text-slate">
-        {index === 0 ? "관찰하고 이해하기" : "아이디어 적용하기"}
-      </strong>
-      <p className="mt-[6px] text-[13px] leading-[21px] text-ink-3">
-        {index === 0
-          ? `‘${d.lessons[index]}’에서 다루는 주제와 관련된 일상 속 장면을 하나 찾아보세요. 무엇을 관찰했고 어떤 점이 궁금했나요?`
-          : "앞 학년에서 발견한 질문을 작은 해결 방법으로 바꿔보세요. 대상과 목적을 정하고, 직접 해본 과정과 결과를 기록해요."}
-      </p>
-    </div>
-  );
-  const plan = state.capstones[d.id];
-
-  // 입력할 때마다 전체 상태를 저장하지 않도록 잠시 모았다가 저장한다.
-  const edit = (text) => {
-    setDraft(text);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setState((s) => ({ ...s, drafts: { ...s.drafts, [key]: text } })), 400);
-  };
-  const warn = (message) => {
-    setNotice(message);
-    setShake((n) => n + 1);
-  };
+  const header = <Header title={`${year}학년 · ${subject}`} count={`${index + 1}/${total}`} onBack={nav.back} />;
 
   if (isFinal && final.kind === "artwork")
     return (
@@ -1360,59 +1443,154 @@ export function Lesson({ active, nav, state, setState }) {
       </Screen>
     );
 
+  // 수업의 종류: 졸업 계획서, 전용 미니게임, 연습 문제(불러오는 중·오류 포함), 기본 체험.
+  const mode = isFinal ? "plan" : dedicated ? "game" : typed && quiz.status !== "basic" ? quiz.status === "ready" ? "quiz" : quiz.status : "basic";
+  const play = game && state.plays[key]?.game === game ? state.plays[key] : null;
+  const played = play?.summary || "";
+  const plan = state.capstones[d.id];
+  const tried = mode === "plan" ? planReady(plan) : mode === "game" || mode === "quiz" ? !!played : mode === "basic";
+
+  const headline = mode === "plan" ? final.name : mode === "game" ? games.find((g) => g.id === game).title : mode === "quiz" ? quiz.game.title : subject;
+  const warn = (message) => {
+    setNotice(message);
+    setShake((n) => n + 1);
+  };
+  const go = (next) => {
+    moved.current = true;
+    setNotice("");
+    setStep(next);
+    setReached((r) => Math.max(r, next));
+  };
+  // 입력할 때마다 전체 상태를 저장하지 않도록 잠시 모았다가 저장한다.
+  const edit = (text) => {
+    setDraft(text);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState((s) => ({ ...s, drafts: { ...s.drafts, [key]: text } })), 400);
+  };
   const finish = () => {
-    if (game && !play) return warn("먼저 위의 체험을 끝까지 해보세요.");
-    if (isFinal && !finalReady(state, d)) return warn("계획서의 세 칸을 모두 채워주세요.");
+    if (!tried) return warn(mode === "plan" ? "계획서의 세 칸을 모두 채워주세요." : "먼저 직접 해보기를 끝까지 해보세요.");
     if (!draft.trim()) return warn("느낀 점을 한 줄 이상 적어주세요.");
     window.clearTimeout(timer.current);
     setState((s) => completeLesson(s, d.id, index, draft));
     if (isFinal) nav.replace("grades", undefined, "fade");
     else nav.reset(["home"]);
   };
+  const next = d.lessons[index + 1];
 
-  return (
-    <Screen footer={<OutlineButton onClick={finish}>{isFinal ? `${final.name} 제출하고 졸업하기` : "기록하고 마치기"}</OutlineButton>}>
-      <Header title={d.name} count={`${index + 1}/${total}`} onBack={nav.back} />
-      <ProgressBar value={Math.max(0.04, index / total)} />
-      <div
-        className="flow no-scrollbar absolute left-0 top-[124px] w-full overflow-y-auto px-[20px] pb-[20px] pt-[24px]"
-        style={{ bottom: "calc(130px - var(--bt) * 1px)" }}
-      >
-        <h1 className="a-up text-[20px] font-semibold leading-[28px] text-mint">{d.lessons[index]}</h1>
-        <p className="a-up mt-[4px] text-[14px] leading-[22px] text-gray" style={delay(0.06)}>
-          {isFinal ? `${year}학년 · 마지막 과제예요` : `${year}학년 수업 · 직접 해보고 느낀 점을 남겨요`}
-        </p>
-        <div className="a-up mt-[18px]" style={delay(0.14)}>
-          {isFinal ? (
-            <GraduationPlan
-              final={final}
-              value={plan}
-              onChange={(next) => setState((s) => ({ ...s, capstones: { ...s.capstones, [d.id]: next } }))}
-            />
-          ) : game ? (
-            <LessonGame
-              game={game}
-              subject={d.lessons[index]}
-              played={played}
-              onComplete={(summary) => setState((s) => ({ ...s, plays: { ...s.plays, [key]: { game, summary } } }))}
-              basic={basic}
-              onBasic={() => setState((s) => (s.plays[key]?.game === game ? s : { ...s, plays: { ...s.plays, [key]: { game, summary: "" } } }))}
-            />
-          ) : (
-            basic
-          )}
-        </div>
-        <label className="note-card a-up mt-[14px]" style={delay(0.22)}>
-          <span>
-            <strong>{isFinal ? "체험을 마치며 남기는 생각" : "나의 관찰 노트"}</strong>
-          </span>
+  let body;
+  let action;
+  if (step === 0) {
+    const task =
+      mode === "plan" ? final.intro
+      : mode === "game" ? GAME_TASKS[game]
+      : mode === "quiz" ? quizTask(quiz.game)
+      : mode === "basic"
+        ? index === 0
+          ? "일상에서 이 과목의 주제를 찾아 관찰하고, 느낀 점을 한 줄로 남겨요."
+          : "앞 학년에서 찾은 질문을 작은 해결 방법으로 바꿔보고, 느낀 점을 한 줄로 남겨요."
+      : null;
+    body = (
+      <>
+        {mode === "loading" && (
+          <p className="a-up mt-[22px] text-[13.5px] text-ink-3" role="status">
+            연습 문제를 불러오는 중이에요…
+          </p>
+        )}
+        {mode === "error" && (
+          <div className="a-up mt-[22px]" role="alert">
+            <p className="body-copy">{quiz.message}</p>
+            <button className="button" onClick={quiz.retry}>
+              다시 시도
+            </button>
+            <button className="text-button ml-[14px]" onClick={quiz.skip}>
+              연습 문제 없이 진행하기 →
+            </button>
+          </div>
+        )}
+        {task && (
+          <MintCard title="이 수업에서 해볼 것" className="a-up mt-[22px]">
+            <p style={delay(0.12)}>{task}</p>
+          </MintCard>
+        )}
+      </>
+    );
+    action = (
+      <FilledButton onClick={() => go(1)} disabled={mode === "loading" || mode === "error"}>
+        직접 해보기
+      </FilledButton>
+    );
+  } else if (step === 1) {
+    body = (
+      <div className="a-up mt-[22px]">
+        {mode === "plan" && (
+          <GraduationPlan
+            final={final}
+            value={plan}
+            onChange={(value) => {
+              if (planReady(value)) setNotice("");
+              setState((s) => ({ ...s, capstones: { ...s.capstones, [d.id]: value } }));
+            }}
+          />
+        )}
+        {(mode === "game" || mode === "quiz") && (
+          <LessonGame
+            game={mode === "game" ? game : quiz.game}
+            played={played}
+            onComplete={(summary) => {
+              setNotice("");
+              setState((s) => ({ ...s, plays: { ...s.plays, [key]: { game, summary } } }));
+            }}
+          />
+        )}
+        {mode === "basic" && (
+          <section>
+            <h2 className="text-[16px] font-bold leading-[24px] text-ink-2">오늘의 직접 적용 과제</h2>
+            <ol className="mt-[8px] grid gap-[4px] text-[13.5px] leading-[22px] text-ink-3">
+              {basicTasks(subject, index === 0).map((item, i) => (
+                <li key={i}>
+                  {"①②③"[i]} {item}
+                </li>
+              ))}
+            </ol>
+            <p className="footnote">과제를 해본 뒤 다음 단계에서 한 줄로 기록해요.</p>
+          </section>
+        )}
+      </div>
+    );
+    action = (
+      <FilledButton onClick={() => (tried ? go(2) : warn(mode === "plan" ? "계획서의 세 칸을 모두 채워주세요." : "먼저 끝까지 해보세요."))}>
+        기록하러 가기
+      </FilledButton>
+    );
+  } else {
+    body = (
+      <>
+        {mode === "quiz" && (
+          <MintCard title="배운 내용" className="a-up mt-[22px]">
+            <p>{quiz.game.explanation}</p>
+          </MintCard>
+        )}
+        {mode === "plan" && planReady(plan) && (
+          <MintCard title={`나의 ${final.name} 계획서`} className="a-up mt-[22px]">
+            <PlanSummary final={final} plan={plan} />
+          </MintCard>
+        )}
+        {played && (
+          <p className="a-up mt-[14px] text-[13px] leading-[20px] text-mint-deep" style={delay(0.06)}>
+            오늘 해본 것 · {played}
+          </p>
+        )}
+        <label className="note-card a-up mt-[16px] block" style={delay(0.12)}>
+          <strong>{isFinal ? "체험을 마치며 남기는 생각" : "한 줄 기록"}</strong>
           <textarea
+            className="compact"
+            rows={2}
             placeholder={
               isFinal
-                ? "이 전공을 체험하며 알게 된 점과 달라진 생각을 적어주세요."
-                : game
-                  ? "직접 해보니 어땠나요? 느낀 점과 궁금해진 점을 적어주세요."
-                  : "어떤 장면을 발견했나요? 나의 생각을 자유롭게 적어주세요."
+                ? "이 전공을 체험하며 알게 된 점이나 달라진 생각을 남겨요."
+                : mode === "basic"
+                  ? "어떤 장면을 발견했나요? 한 줄로 남겨요."
+                  : "직접 해보니 어땠나요? 느낀 점을 한 줄로 남겨요."
             }
             value={draft}
             maxLength={3000}
@@ -1420,9 +1598,44 @@ export function Lesson({ active, nav, state, setState }) {
           />
           <small>{draft.length.toLocaleString()} / 3,000자</small>
         </label>
-        <p key={shake} role="status" className={`mt-[10px] min-h-[20px] text-center text-[13px] leading-[20px] text-mint-deep ${notice ? "a-shake" : ""}`}>
-          {notice}
-        </p>
+      </>
+    );
+    action = <FilledButton onClick={finish}>{isFinal ? `${final.name} 제출하고 졸업하기` : "기록 저장하고 완료하기"}</FilledButton>;
+  }
+
+  // 아래 안내: 경고가 있으면 경고를, 기록 단계에서는 저장하면 어떻게 되는지를 보여준다.
+  const guide = notice || (step === 2 ? (isFinal ? "저장하면 졸업이에요" : `저장하면 ${index + 1} / ${total} 완료 · 다음은 ${d.yearNumbers[index + 1]}학년 ${next}`) : "");
+  return (
+    <Screen
+      footer={
+        <>
+          {action}
+          <p
+            key={shake}
+            role="status"
+            className={`absolute inset-x-[20px] top-[818px] overflow-hidden text-ellipsis whitespace-nowrap text-center text-[12.5px] leading-[20px] ${notice ? "a-shake text-mint-deep" : "text-gray"}`}
+          >
+            {guide}
+          </p>
+        </>
+      }
+    >
+      {header}
+      <StepChips step={step} reached={reached} onGo={go} />
+      <div
+        ref={scroller}
+        className="flow no-scrollbar absolute left-0 top-[146px] w-full overflow-y-auto px-[20px] pb-[20px] pt-[18px]"
+        style={{ bottom: "calc(134px - var(--bt) * 1px)" }}
+      >
+        <div key={step}>
+          <h1 ref={heading} tabIndex={-1} className="a-up text-[26px] font-bold leading-[36px] text-navy outline-none">
+            {headline}
+          </h1>
+          <p className="a-up mt-[6px] text-[14px] leading-[22px] text-gray" style={delay(0.06)}>
+            {isFinal ? `${year}학년 · 마지막 과제예요` : `${year}학년 수업 · ${subject}`}
+          </p>
+          {body}
+        </div>
       </div>
     </Screen>
   );
