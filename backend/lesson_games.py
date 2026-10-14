@@ -28,8 +28,6 @@ from functools import lru_cache
 from backend.main import GAMES_PATH, catalog, compact
 
 BLANK = "___"
-# 전용 미니게임이 붙는 과목(`frontend/src/games.js`의 pattern과 같아야 한다). 연습 문제를 만들지 않는다.
-DEDICATED = re.compile(r"심리학\s*(개론|입문|의\s*이해)|인지\s*심리|실험\s*심리|자료\s*구조|알고리즘|회계\s*원리|회계학\s*원론|재무\s*회계|회계\s*입문|기초\s*회계")
 # 다시 만들 대상에서 빼고, 그 학과의 다음 과목으로 자리를 채우는 상태.
 EXCLUDED = ("unsuitable", "failed")
 
@@ -180,10 +178,12 @@ def quiz_of(game):
 
 # ---- 대상 과목
 def slots(duration):
-    """그 학과에서 과목 체험이 들어갈 학년 수(`frontend/src/model.js`의 stageYears에서 졸업 과제 학년을 뺀 수)."""
+    """그 학과에서 이론 수업(과목 하나의 연습 문제)이 들어갈 학년 수.
+    `frontend/src/model.js`의 createDepartment와 같다: 체험할 학년(stageYears) 중 마지막 학년은 졸업 과제,
+    그 바로 앞 학년은 학과군 실습이라 둘을 뺀다. 4년제 2, 3년제 1, 2년제 0."""
     number = re.match(r"[\d.]+", duration or "")
     years = math.ceil(float(number.group())) if number else 4
-    return min(6, max(1, years)) - 1
+    return max(0, min(6, max(1, years)) - 2)
 
 
 @lru_cache(maxsize=1)
@@ -204,12 +204,11 @@ def subjects():
 
 
 def targets(records):
-    """모든 학과의 체험 자리를 채우는 데 필요한 과목 키. 학과마다 가장 흔한 과목부터 고르고, 많이 쓰이는 순서로 돌려준다."""
+    """모든 학과의 이론 수업 자리를 채우는 데 필요한 과목 키. 학과마다 가장 흔한 과목부터 고르고, 많이 쓰이는 순서로 돌려준다."""
     info = subjects()
     needed = set()
     for program in catalog().programs.values():
-        # 띄어쓰기만 다른 표기가 한 과목으로 묶이므로, 묶인 뒤의 키로 전용 게임 과목을 가려낸다.
-        keys = {key for key in map(compact, program["curriculum"]) if not DEDICATED.search(key)}
+        keys = set(map(compact, program["curriculum"]))
         usable = [key for key in keys if records.get(key, {}).get("status") not in EXCLUDED]
         needed.update(sorted(usable, key=lambda key: (-info[key]["programs"], key))[:slots(program["duration"])])
     return sorted(needed, key=lambda key: (-info[key]["programs"], key))
