@@ -59,6 +59,14 @@ class CourseRequest(RequestBody):
     limit: int = Field(default=30, ge=1, le=100)
 
 
+class ProgramRequest(RequestBody):
+    interests: str = Field(min_length=1, max_length=100)
+    school: str = Field(default="", max_length=100)
+    course: str = Field(default="", max_length=100)
+    offset: int = Field(default=0, ge=0, le=100000)
+    limit: int = Field(default=30, ge=1, le=100)
+
+
 class SchoolRequest(RequestBody):
     course: str = Field(min_length=1, max_length=200)
 
@@ -111,6 +119,20 @@ def compact(text):
     return re.sub(r"\s+", "", text).lower()
 
 
+# 검색에서는 띄어쓰기와 이름 속 구두점(·, ., -, 괄호 등)을 무시한다. "전기전자"로 "전기·전자공학부"를 찾을 수 있게.
+# 검색어에서는 구두점도 낱말을 나누는 자리로 본다.
+SEARCH_IGNORED = re.compile(r"[\s·・‧.,\-_/()\[\]&]+")
+
+
+def searchable(text):
+    return SEARCH_IGNORED.sub("", text).lower()
+
+
+def search_words(query):
+    """검색어를 띄어쓰기와 구두점으로 나눈 낱말들. "전기·전자"는 "전기", "전자" 두 낱말이 된다."""
+    return [word.lower() for word in SEARCH_IGNORED.split(query) if word]
+
+
 # 학년별 전공 체험을 만들 수 없는 과정: 입학 뒤에 전공을 정하는 자유·자율전공, 교양 과정, 학년이 하나뿐인 1년 과정.
 # 무전공은 이름 맨 앞이나 띄어쓰기·괄호 뒤에서만 본다("사무전공", "법무전공"은 실제 전공). 문화교양학과는 실제 전공이다.
 UNDECIDED = re.compile(r"자유전공|자율전공|(?:^|[\s(])무전공|자유학부|자율학부|학생설계|(?<!문화)교양")
@@ -149,7 +171,7 @@ class Catalog:
         # 개설 대학이 많은 학과부터 보여준다.
         self.courses = [(course, compact(course), self.categories[course]) for course in sorted(schools, key=lambda name: (-len(schools[name]), name))]
         # 학교·학과 조합 목록. 개설 대학이 많은 학과부터, 같은 학과 안에서는 학교 이름순.
-        self.pairs = [(school, course, compact(school + course), key, category) for course, key, category in self.courses for school in self.schools[course]]
+        self.pairs = [(school, course, searchable(school), searchable(course), key, category) for course, key, category in self.courses for school in self.schools[course]]
 
 
 @lru_cache(maxsize=1)
@@ -204,17 +226,24 @@ def matcher(keyword):
 
 
 @app.post("/api/program_list")
-def program_list(body: CourseRequest):
-    """학교·학과 조합을 검색한다. 검색어의 낱말이 학교명이나 학과명에 모두 들어 있어야 한다."""
+def program_list(body: ProgramRequest):
+    """학교·학과 조합을 검색한다. 학교 검색어의 낱말은 모두 학교명에, 학과 검색어의 낱말은 모두 학과명에 들어 있어야 한다.
+    띄어쓰기와 구두점은 무시하므로 "서울대"는 "서울대학교"를, "전기 전자"나 "전기·전자"는 "전자·전기공학부"도 찾는다."""
     data = catalog()
     matches = matcher(body.interests)
-    words = [compact(word) for word in body.query.split()]
-    found = [(school, course, key) for school, course, text, key, category in data.pairs if matches(key, category) and all(word in text for word in words)]
-    query = compact(body.query)
-    if query:
-        found.sort(key=lambda item: (item[2] != query, not item[2].startswith(query)))
+    school_words, course_words = search_words(body.school), search_words(body.course)
+    found = [(school, course, school_text, course_text) for school, course, school_text, course_text, key, category in data.pairs
+             if matches(key, category) and all(word in school_text for word in school_words) and all(word in course_text for word in course_words)]
+    school_query, course_query = "".join(school_words), "".join(course_words)
+    # 검색어와 이름이 같은 것, 검색어로 시작하는 것을 먼저 보여준다(학교가 먼저, 그 안에서 학과). 나머지는 원래 순서를 지킨다.
+    found.sort(key=lambda item: (
+        bool(school_query) and item[2] != school_query,
+        bool(school_query) and not item[2].startswith(school_query),
+        bool(course_query) and item[3] != course_query,
+        bool(course_query) and not item[3].startswith(course_query),
+    ))
     page = found[body.offset:body.offset + body.limit]
-    programs = [{"school": school, "course": course, "category": data.categories[course], "duration": data.programs[(school, course)]["duration"], "region": data.programs[(school, course)]["region"]} for school, course, key in page]
+    programs = [{"school": school, "course": course, "category": data.categories[course], "duration": data.programs[(school, course)]["duration"], "region": data.programs[(school, course)]["region"]} for school, course, _, _ in page]
     return {"programs": programs, "total": len(found)}
 
 

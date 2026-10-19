@@ -86,18 +86,37 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(everything["total"], 12732)
         self.assertEqual(len(everything["programs"]), 30)
         self.assertEqual(set(everything["programs"][0]), {"school", "course", "category", "duration", "region"})
-        both = self.client.post("/api/program_list", json={"interests": "전체", "query": "경희대 산업디자인"}).json()["programs"]
+        both = self.client.post("/api/program_list", json={"interests": "전체", "school": "경희대", "course": "산업디자인"}).json()["programs"]
         self.assertEqual(both[0], {"school": "경희대학교", "course": "산업디자인학과", "category": "예체능", "duration": "4년", "region": "경기도"})
-        exact = self.client.post("/api/program_list", json={"interests": "전체", "query": "심리학과", "limit": 100}).json()["programs"]
+        exact = self.client.post("/api/program_list", json={"interests": "전체", "course": "심리학과", "limit": 100}).json()["programs"]
         self.assertTrue(all(item["course"] == "심리학과" for item in exact[:27]))
-        school = self.client.post("/api/program_list", json={"interests": "공학", "query": "가천대학교", "limit": 100}).json()
+        school = self.client.post("/api/program_list", json={"interests": "공학", "school": "가천대학교", "limit": 100}).json()
         self.assertGreater(school["total"], 5)
         self.assertTrue(all(item["school"] == "가천대학교" and (item["category"] == "공학" or "공학" in item["course"]) for item in school["programs"]))
         self.assertFalse(any("대학원" in item["school"] for item in everything["programs"] + school["programs"]))
         first = self.client.post("/api/program_list", json={"interests": "예체능", "limit": 5}).json()["programs"]
         second = self.client.post("/api/program_list", json={"interests": "예체능", "limit": 5, "offset": 5}).json()["programs"]
         self.assertFalse({(item["school"], item["course"]) for item in first} & {(item["school"], item["course"]) for item in second})
-        self.assertEqual(self.client.post("/api/program_list", json={"interests": "전체", "query": "없는학교 없는학과"}).json(), {"programs": [], "total": 0})
+        self.assertEqual(self.client.post("/api/program_list", json={"interests": "전체", "school": "없는학교", "course": "없는학과"}).json(), {"programs": [], "total": 0})
+        # 학교 검색어는 학교명에서만, 학과 검색어는 학과명에서만 찾는다.
+        self.assertEqual(self.client.post("/api/program_list", json={"interests": "전체", "school": "산업디자인"}).json()["total"], 0)
+        # 예전 한 칸 검색(query)은 받지 않는다.
+        self.assertEqual(self.client.post("/api/program_list", json={"interests": "전체", "query": "경희대"}).status_code, 400)
+
+    def test_program_list_matches_words_inside_names(self):
+        search = lambda **body: self.client.post("/api/program_list", json={"interests": "전체", "limit": 100, **body}).json()
+        # 줄임말처럼 이름 일부만 써도 찾고, 검색어로 시작하는 학교를 먼저 보여준다.
+        seoul = search(school="서울대", course="전기")["programs"]
+        self.assertIn({"school": "서울대학교", "course": "전기·정보공학부"}, [{"school": p["school"], "course": p["course"]} for p in seoul])
+        self.assertEqual(seoul[0]["school"], "서울대학교")
+        self.assertTrue(all("서울대" in p["school"] and "전기" in p["course"] for p in seoul))
+        # 띄어쓰기와 구두점(·)을 무시하고, 낱말은 순서와 상관없이 모두 들어 있으면 찾는다.
+        for course in ("전기 전자", "전자 전기", "전기·전자"):
+            names = {p["course"] for p in search(school="홍익대", course=course)["programs"]}
+            self.assertIn("전자·전기공학부", names, course)
+        self.assertEqual(search(school="홍익대", course="전자전기")["programs"][0]["course"], "전자·전기공학부")
+        # 구두점만 쓴 검색어는 없는 것으로 본다.
+        self.assertEqual(search(school="·", course="  ")["total"], 12732)
         self.assertEqual(self.client.post("/api/program_list", json={"interests": ""}).status_code, 400)
 
     def test_course_names_with_commas_stay_intact(self):

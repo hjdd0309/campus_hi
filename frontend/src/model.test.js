@@ -161,12 +161,16 @@ test("관심 분야와 활동에 따라 추천 계열이 바뀐다", () => {
   );
   assert.deepEqual(restored.answers, { 1: ["친구와 이야기 나누기"] });
 });
-test("실습 완료는 한 학년씩 진행되며 빈 기록, 중복, 휴학 중 진행을 막는다", () => {
+test("실습 완료는 한 학년씩 진행되며 중복, 휴학 중 진행을 막는다", () => {
   const state = {
     ...structuredClone(initialState),
     journeys: { design: { completed: 0, paused: false } },
   };
-  assert.equal(completeLesson(state, "design", 0, " "), state);
+  // 느낀 점을 적지 않으면 기록 없이 완료된다(건너뛰기). 쓰던 임시 글은 지운다.
+  const skipped = completeLesson({ ...state, drafts: { "design-0": " " } }, "design", 0, " ");
+  assert.equal(skipped.journeys.design.completed, 1);
+  assert.equal(skipped.notes["design-0"], undefined);
+  assert.deepEqual(skipped.drafts, {});
   const next = completeLesson(state, "design", 0, "  첫 관찰  ");
   assert.equal(next.journeys.design.completed, 1);
   assert.equal(next.notes["design-0"], "첫 관찰");

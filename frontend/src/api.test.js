@@ -86,15 +86,15 @@ test("학교·학과 목록은 형식이 맞을 때만 받아들인다", async (
     requests.push([url, JSON.parse(options.body)]);
     return new Response(JSON.stringify({ programs: [program, { school: "가천대학교", course: "심리학과" }], total: 2 }), { status: 200 });
   });
-  assert.deepEqual(await getProgramList("전체", "디자인", 30), {
+  assert.deepEqual(await getProgramList("전체", { school: "경희대", course: "디자인" }, 30), {
     programs: [program, { school: "가천대학교", course: "심리학과", category: "", duration: "", region: "" }],
     total: 2,
   });
-  assert.deepEqual(requests, [["/api/program_list", { interests: "전체", query: "디자인", offset: 30, limit: 30 }]]);
+  assert.deepEqual(requests, [["/api/program_list", { interests: "전체", school: "경희대", course: "디자인", offset: 30, limit: 30 }]]);
   for (const body of [{ programs: [{ school: "", course: "학과" }], total: 1 }, { programs: "x", total: 1 }, { programs: [] }]) {
     t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(body), { status: 200 }));
     await assert.rejects(
-      getProgramList("전체", "", 0),
+      getProgramList("전체", { school: "", course: "" }, 0),
       (error) => error instanceof ApiError && error.status === 502,
     );
   }

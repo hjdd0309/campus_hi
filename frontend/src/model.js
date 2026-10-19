@@ -548,9 +548,7 @@ export function completeLesson(state, id, index, note) {
     index >= total
   )
     return state;
-  // 졸업작품은 만드는 것으로 완료된다. 그 밖의 수업은 느낀 점을 적어야 한다.
-  const artworkFinal = index === total - 1 && finalOf(department).kind === "artwork";
-  if (!note.trim() && !artworkFinal) return state;
+  // 느낀 점은 적지 않아도 완료할 수 있다(건너뛰기). 적었으면 기록으로 남긴다.
   const { [`${id}-${index}`]: finished, ...drafts } = state.drafts || {};
   return {
     ...state,
