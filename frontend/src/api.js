@@ -66,11 +66,11 @@ export async function getCourseList(interests, query, offset, signal) {
     total: data.total,
   };
 }
-// 학교·학과 조합을 검색한다. 한 번에 30개씩 받는다.
-export async function getProgramList(interests, query, offset, signal) {
+// 학교·학과 조합을 검색한다. search는 { school, course } 검색어이고, 한 번에 30개씩 받는다.
+export async function getProgramList(interests, search, offset, signal) {
   const data = await post(
     "/program_list",
-    { interests, query, offset, limit: 30 },
+    { interests, school: search.school, course: search.course, offset, limit: 30 },
     signal,
   );
   const text = (value) => (typeof value === "string" ? value : "");

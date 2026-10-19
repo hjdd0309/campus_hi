@@ -443,8 +443,9 @@ const keyOf = (p) => `${p.school}|${p.course}`;
 
 export function Schools({ nav, route, setState }) {
   const [filter, setFilter] = useState(route.params?.field ?? "전체");
-  const [query, setQuery] = useState("");
-  const [search, setSearch] = useState("");
+  // 학교와 학과를 따로 검색한다. 입력은 바로 보여주고, 검색은 입력이 멈춘 뒤에 한다.
+  const [query, setQuery] = useState({ school: "", course: "" });
+  const [search, setSearch] = useState({ school: "", course: "" });
   const [list, setList] = useState([]);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState("loading");
@@ -455,9 +456,12 @@ export function Schools({ nav, route, setState }) {
   const request = useRef(0);
   const filters = FILTERS.includes(filter) ? FILTERS : [FILTERS[0], filter, ...FILTERS.slice(1)];
 
-  // 입력이 멈춘 뒤에 검색한다.
   useEffect(() => {
-    const timer = window.setTimeout(() => setSearch(query.trim()), 250);
+    const next = { school: query.school.trim(), course: query.course.trim() };
+    const timer = window.setTimeout(
+      () => setSearch((current) => (current.school === next.school && current.course === next.course ? current : next)),
+      250,
+    );
     return () => window.clearTimeout(timer);
   }, [query]);
   useEffect(() => {
@@ -527,20 +531,31 @@ export function Schools({ nav, route, setState }) {
       <T y={126} size={20} lh={25} left={29.5} className="a-up font-semibold text-mint">
         {"궁금했던 학과와 학교\n저와 함께 체험해볼까요?"}
       </T>
-      <label
-        className="a-up absolute left-[20px] top-[208px] flex h-[40px] w-[362px] items-center rounded-[12px] border border-faint bg-white transition-colors focus-within:border-mint"
-        style={delay(0.08)}
-      >
-        <Mask src={icon.search} w={24} h={25} color="#d1d5da" className="ml-[11px]" />
-        <input
-          value={query}
-          maxLength={100}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="학교나 학과 이름을 검색해보세요"
-          aria-label="학교나 학과 검색"
-          className="ml-[18px] h-full min-w-0 flex-1 bg-transparent text-[11px] tracking-[0.1em] text-slate outline-none placeholder:text-faint"
-        />
-      </label>
+      <div className="a-up absolute left-[20px] top-[208px] flex w-[362px] gap-[8px]" style={delay(0.08)}>
+        {[
+          { field: "school", label: "학교 검색", placeholder: "학교 (예: 서울대)", width: 150 },
+          { field: "course", label: "학과 검색", placeholder: "학과 (예: 전자, 디자인)", width: 204 },
+        ].map(({ field, label, placeholder, width }) => (
+          <label
+            key={field}
+            className="flex h-[40px] shrink-0 items-center rounded-[12px] border border-faint bg-white transition-colors focus-within:border-mint"
+            style={{ width }}
+          >
+            <Mask src={icon.search} w={20} h={21} color="#d1d5da" className="ml-[10px] shrink-0" />
+            <input
+              value={query[field]}
+              maxLength={100}
+              onChange={(e) => {
+                const value = e.target.value;
+                setQuery((q) => ({ ...q, [field]: value }));
+              }}
+              placeholder={placeholder}
+              aria-label={label}
+              className="ml-[8px] mr-[10px] h-full min-w-0 flex-1 bg-transparent text-[11px] tracking-[0.05em] text-slate outline-none placeholder:text-faint"
+            />
+          </label>
+        ))}
+      </div>
       <div className="no-scrollbar a-up absolute left-0 top-[264px] flex w-full gap-[8px] overflow-x-auto px-[22px]" style={delay(0.14)}>
         {filters.map((f) => (
           <button
@@ -570,7 +585,7 @@ export function Schools({ nav, route, setState }) {
           maskImage: "linear-gradient(180deg, #000 0%, #000 50%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.12) 96%, transparent 100%)",
         }}
       >
-        <div key={filter + search + retry} className="relative" style={{ height: Math.max(110, 5 + list.length * 91 + 90) }}>
+        <div key={`${filter}|${search.school}|${search.course}|${retry}`} className="relative" style={{ height: Math.max(110, 5 + list.length * 91 + 90) }}>
           {list.map((p, i) => {
             const key = keyOf(p);
             return (
@@ -1303,13 +1318,14 @@ export function Lesson({ active, nav, state, setState }) {
   };
   const finish = () => {
     if (!tried) return warn(mode === "plan" ? "계획서의 세 칸을 모두 채워주세요." : "먼저 직접 해보기를 끝까지 해보세요.");
-    if (!draft.trim()) return warn("느낀 점을 한 줄 이상 적어주세요.");
+    // 느낀 점은 적지 않아도 된다. 비어 있으면 기록 없이 완료한다(건너뛰기).
     window.clearTimeout(timer.current);
     setState((s) => completeLesson(s, d.id, index, draft));
     if (isFinal) nav.replace("grades", undefined, "fade");
     else nav.reset(["home"]);
   };
   const next = d.lessons[index + 1];
+  const written = !!draft.trim();
 
   let body;
   let action;
@@ -1439,11 +1455,16 @@ export function Lesson({ active, nav, state, setState }) {
         </label>
       </>
     );
-    action = <FilledButton onClick={finish}>{isFinal ? `${final.name} 제출하고 졸업하기` : "기록 저장하고 완료하기"}</FilledButton>;
+    // 적은 내용이 있으면 저장, 없으면 건너뛰기로 버튼이 바뀐다.
+    const label = isFinal
+      ? written ? `${final.name} 제출하고 졸업하기` : `생각은 건너뛰고 ${final.name} 제출하기`
+      : written ? "기록 저장하고 완료하기" : "기록 건너뛰고 완료하기";
+    action = <FilledButton onClick={finish}>{label}</FilledButton>;
   }
 
   // 아래 안내: 경고가 있으면 경고를, 기록 단계에서는 저장하면 어떻게 되는지를 보여준다.
-  const guide = notice || (step === 2 ? (isFinal ? "저장하면 졸업이에요" : `저장하면 ${index + 1} / ${total} 완료 · 다음은 ${d.yearNumbers[index + 1]}학년 ${next}`) : "");
+  const verb = written ? "저장하면" : "건너뛰면";
+  const guide = notice || (step === 2 ? (isFinal ? `${verb} 졸업이에요` : `${verb} ${index + 1} / ${total} 완료 · 다음은 ${d.yearNumbers[index + 1]}학년 ${next}`) : "");
   return (
     <Screen
       footer={

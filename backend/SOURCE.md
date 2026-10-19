@@ -24,12 +24,15 @@
 | 메서드 | 경로 | 요청 | 응답 |
 | --- | --- | --- | --- |
 | POST | `/api/course_list` | `{"interests":"공학","query":"컴퓨터","offset":0,"limit":30}` | `{"course_list":["컴퓨터공학과","..."],"total":33}` |
+| POST | `/api/program_list` | `{"interests":"전체","school":"서울대","course":"전기","offset":0,"limit":30}` | `{"programs":[{"school":"서울대학교","course":"전기·정보공학부","category":"공학","duration":"4년","region":"서울특별시"}],"total":2}` |
 | POST | `/api/school_list` | `{"course":"산업디자인학과"}` | `{"school_list":["경희대학교","..."]}` |
 | POST | `/api/curriculum_list` | `{"school":"경희대학교","course":"산업디자인학과"}` | `{"curriculum_list":["3D Design 1","..."],"category":"예체능","duration":"4년","region":"경기도","years":null,"games":{"과목명":"ox"}}` |
 | POST | `/api/lesson_game` | `{"subject":"데이터베이스"}` | `{"game":{"type":"blank","course_name":"데이터베이스","...":"..."}}` |
 | GET | `/api/health` | 없음 | `{"status":"ok","source":"litton","records":13347}` |
 
 `interests`는 `전체`, 계열명(`인문사회`, `공학`, `자연과학`, `예체능`, `의학`) 또는 학과명에 포함될 키워드입니다. `query`, `offset`, `limit`은 생략할 수 있고, 목록은 개설 대학이 많은 학과부터 정렬됩니다.
+
+`/api/program_list`는 학교·학과 조합을 찾습니다. `school`의 낱말은 모두 학교명에, `course`의 낱말은 모두 학과명에 들어 있어야 하고(띄어쓰기와 `·` `.` `-` 괄호 같은 구두점은 무시하고, 구두점도 낱말을 나누는 자리로 봄), 둘 다 생략할 수 있습니다. 검색어와 이름이 같거나 검색어로 시작하는 학교, 그다음 학과를 먼저 보여줍니다.
 
 `games`는 그 학과의 교과목 중 공개된 연습 문제가 있는 과목과 그 유형입니다. `/api/lesson_game`은 과목명(띄어쓰기·대소문자 무시)으로 연습 문제를 찾고, 없으면 404를 반환합니다.
 
