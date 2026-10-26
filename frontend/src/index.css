@@ -653,6 +653,10 @@ body {
   gap: 8px;
   margin-top: 10px;
 }
+/* 칸이 하나인 분류하기는 보기를 화면 폭 가득 늘어놓는다. */
+.journal-entry.single {
+  grid-template-columns: 1fr;
+}
 .journal-side {
   display: grid;
   gap: 6px;
@@ -677,24 +681,50 @@ body {
   display: grid;
   gap: 12px;
 }
-.studio-heading {
-  border: 1px solid #fee99a;
-  border-radius: 16px;
-  background: #fffaea;
-  padding: 16px;
-}
-.studio-heading h2 {
-  margin: 8px 0 4px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #637083;
-}
-.studio-heading p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 19px;
-  color: #827d76;
-}
 .plan-field textarea {
   min-height: 64px;
 }
+.plan-field strong {
+  display: block;
+}
+/* 계획 조립: 칸마다 고를 수 있는 보기 카드 */
+.plan-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.plan-options button {
+  min-height: 32px;
+  border: 1px solid #d1d5da;
+  border-radius: 999px;
+  background: #fff;
+  padding: 4px 11px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: #637083;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.plan-options button[aria-pressed="true"] {
+  border-color: #27d8cd;
+  background: #e8faf7;
+  color: #087f77;
+  font-weight: 600;
+}
+/* 기록 단계의 계획서 요약 */
+.plan-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.plan-summary dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: #087f77;
+}
+.plan-summary dd {
+  margin: 2px 0 0;
+  color: #302b27;
+}
+

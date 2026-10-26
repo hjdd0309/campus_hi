@@ -22,7 +22,7 @@ import {
   departments,
   fields,
   fieldOf,
-  finals,
+  finalOf,
   planReady,
   PLAN_FIELDS,
   createDepartment,
@@ -30,10 +30,11 @@ import {
   completeLesson,
   initialState,
 } from "./model.js";
-import { games } from "./games.js";
 import { isLessonType, lessonTypes } from "./lessonGames.js";
 import LessonGame, { useLessonGame } from "./Games.jsx";
-import GraduationPlan, { PlanSummary } from "./GraduationPlan.jsx";
+import { PlanSummary, PlanTemplate, Rub } from "./Templates.jsx";
+import { templates } from "./experiences.js";
+import { groupName } from "./groups.js";
 
 /* ------------------------------------------------------------------ */
 /* 공통                                                                */
@@ -57,7 +58,7 @@ function view(state) {
     index,
     year: d.yearNumbers[index],
     lastYear: d.yearNumbers[total - 1],
-    final: finals[d.final] || finals.artwork,
+    final: finalOf(d),
     finished: !!journey && completed === total,
   };
 }
@@ -442,10 +443,13 @@ const keyOf = (p) => `${p.school}|${p.course}`;
 
 export function Schools({ nav, route, setState }) {
   const [filter, setFilter] = useState(route.params?.field ?? "전체");
-  const [query, setQuery] = useState("");
-  const [search, setSearch] = useState("");
+  // 학교와 학과를 따로 검색한다. 입력은 바로 보여주고, 검색은 입력이 멈춘 뒤에 한다.
+  const [query, setQuery] = useState({ school: "", course: "" });
+  const [search, setSearch] = useState({ school: "", course: "" });
   const [list, setList] = useState([]);
   const [total, setTotal] = useState(0);
+  // 찾는 학과가 없을 때 서버가 보내주는 비슷한 학과(학교·학과 조합)와 비슷한 학과명.
+  const [similar, setSimilar] = useState({ programs: [], courses: [] });
   const [status, setStatus] = useState("loading");
   const [retry, setRetry] = useState(0);
   const [opening, setOpening] = useState(null);
@@ -454,9 +458,12 @@ export function Schools({ nav, route, setState }) {
   const request = useRef(0);
   const filters = FILTERS.includes(filter) ? FILTERS : [FILTERS[0], filter, ...FILTERS.slice(1)];
 
-  // 입력이 멈춘 뒤에 검색한다.
   useEffect(() => {
-    const timer = window.setTimeout(() => setSearch(query.trim()), 250);
+    const next = { school: query.school.trim(), course: query.course.trim() };
+    const timer = window.setTimeout(
+      () => setSearch((current) => (current.school === next.school && current.course === next.course ? current : next)),
+      250,
+    );
     return () => window.clearTimeout(timer);
   }, [query]);
   useEffect(() => {
@@ -464,12 +471,14 @@ export function Schools({ nav, route, setState }) {
     setStatus("loading");
     setList([]);
     setTotal(0);
+    setSimilar({ programs: [], courses: [] });
     loadingMore.current = false;
     request.current += 1;
     getProgramList(filter, search, 0, controller.signal)
       .then((result) => {
         setList(result.programs);
         setTotal(result.total);
+        setSimilar({ programs: result.similarPrograms, courses: result.similarCourses });
         setStatus("ready");
       })
       .catch(() => {
@@ -520,26 +529,71 @@ export function Schools({ nav, route, setState }) {
       .finally(() => setOpening(null));
   };
 
+  const card = (p, top, i) => {
+    const key = keyOf(p);
+    return (
+      <YellowCard
+        key={key}
+        top={top}
+        title={`${p.school} ${p.course}`}
+        sub={
+          opening === key
+            ? "불러오는 중이에요…"
+            : failed === key
+              ? "불러오지 못했어요. 다시 눌러주세요"
+              : [p.category, p.duration, p.region].filter(Boolean).join(" · ")
+        }
+        onClick={() => open(p)}
+        className={`a-up ${failed === key ? "a-shake" : ""}`}
+        style={delay(i < 30 ? 0.24 + Math.min(i, 6) * 0.06 : 0)}
+      />
+    );
+  };
+  // 비슷한 학과 카드는 목록 맨 위에 두고, 다른 학교 검색 결과가 있으면 그 아래에 이어 붙인다.
+  const suggested = similar.programs.length > 0;
+  const suggestedSchool = similar.programs.every((p) => p.school === similar.programs[0]?.school) ? similar.programs[0]?.school : "";
+  const lead = suggested ? 52 + similar.programs.length * 91 + (list.length ? 32 : 0) : 0;
+  // "다음"은 맨 위에 보이는 카드를 연다.
+  const top = similar.programs[0] || list[0];
+  // 비슷한 학과명을 누르면 그 이름으로 바로 다시 찾는다. 분야 필터와 상관없이 고른 것이므로 필터도 푼다.
+  const pickCourse = (name) => {
+    const next = { school: query.school.trim(), course: name };
+    setQuery((q) => ({ ...q, course: name }));
+    setSearch(next);
+    setFilter("전체");
+  };
+
   return (
-    <Screen footer={<OutlineButton onClick={() => (list[0] ? open(list[0]) : undefined)}>다음</OutlineButton>}>
+    <Screen footer={<OutlineButton onClick={() => (top ? open(top) : undefined)}>다음</OutlineButton>}>
       <BackButton onClick={nav.back} />
       <T y={126} size={20} lh={25} left={29.5} className="a-up font-semibold text-mint">
         {"궁금했던 학과와 학교\n저와 함께 체험해볼까요?"}
       </T>
-      <label
-        className="a-up absolute left-[20px] top-[208px] flex h-[40px] w-[362px] items-center rounded-[12px] border border-faint bg-white transition-colors focus-within:border-mint"
-        style={delay(0.08)}
-      >
-        <Mask src={icon.search} w={24} h={25} color="#d1d5da" className="ml-[11px]" />
-        <input
-          value={query}
-          maxLength={100}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="학교나 학과 이름을 검색해보세요"
-          aria-label="학교나 학과 검색"
-          className="ml-[18px] h-full min-w-0 flex-1 bg-transparent text-[11px] tracking-[0.1em] text-slate outline-none placeholder:text-faint"
-        />
-      </label>
+      <div className="a-up absolute left-[20px] top-[208px] flex w-[362px] gap-[8px]" style={delay(0.08)}>
+        {[
+          { field: "school", label: "학교 검색", placeholder: "학교 (예: 서울대)", width: 150 },
+          { field: "course", label: "학과 검색", placeholder: "학과 (예: 전자, 디자인)", width: 204 },
+        ].map(({ field, label, placeholder, width }) => (
+          <label
+            key={field}
+            className="flex h-[40px] shrink-0 items-center rounded-[12px] border border-faint bg-white transition-colors focus-within:border-mint"
+            style={{ width }}
+          >
+            <Mask src={icon.search} w={20} h={21} color="#d1d5da" className="ml-[10px] shrink-0" />
+            <input
+              value={query[field]}
+              maxLength={100}
+              onChange={(e) => {
+                const value = e.target.value;
+                setQuery((q) => ({ ...q, [field]: value }));
+              }}
+              placeholder={placeholder}
+              aria-label={label}
+              className="ml-[8px] mr-[10px] h-full min-w-0 flex-1 bg-transparent text-[11px] tracking-[0.05em] text-slate outline-none placeholder:text-faint"
+            />
+          </label>
+        ))}
+      </div>
       <div className="no-scrollbar a-up absolute left-0 top-[264px] flex w-full gap-[8px] overflow-x-auto px-[22px]" style={delay(0.14)}>
         {filters.map((f) => (
           <button
@@ -569,27 +623,21 @@ export function Schools({ nav, route, setState }) {
           maskImage: "linear-gradient(180deg, #000 0%, #000 50%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.12) 96%, transparent 100%)",
         }}
       >
-        <div key={filter + search + retry} className="relative" style={{ height: Math.max(110, 5 + list.length * 91 + 90) }}>
-          {list.map((p, i) => {
-            const key = keyOf(p);
-            return (
-              <YellowCard
-                key={key}
-                top={5 + i * 91}
-                title={`${p.school} ${p.course}`}
-                sub={
-                  opening === key
-                    ? "불러오는 중이에요…"
-                    : failed === key
-                      ? "불러오지 못했어요. 다시 눌러주세요"
-                      : [p.category, p.duration, p.region].filter(Boolean).join(" · ")
-                }
-                onClick={() => open(p)}
-                className={`a-up ${failed === key ? "a-shake" : ""}`}
-                style={delay(i < 30 ? 0.24 + Math.min(i, 6) * 0.06 : 0)}
-              />
-            );
-          })}
+        <div key={`${filter}|${search.school}|${search.course}|${retry}`} className="relative" style={{ height: Math.max(similar.courses.length ? 300 : 110, lead + 5 + list.length * 91 + 90) }}>
+          {suggested && (
+            <>
+              <T y={4} size={14} lh={20} left={29} clip={344} className="a-fade text-mute">
+                {`${suggestedSchool ? `${suggestedSchool}에는` : "찾는 학교에"} ‘${search.course}’ 학과가 없어요\n이 학과를 찾으시나요?`}
+              </T>
+              {similar.programs.map((p, i) => card(p, 52 + i * 91, i))}
+              {list.length > 0 && (
+                <T y={lead - 26} size={14} left={29} className="a-fade text-mute">
+                  다른 학교 검색 결과
+                </T>
+              )}
+            </>
+          )}
+          {list.map((p, i) => card(p, lead + 5 + i * 91, i))}
           {status === "loading" && (
             <T y={40} size={14} center className="a-fade text-mute">
               학교와 학과를 찾고 있어요…
@@ -597,16 +645,35 @@ export function Schools({ nav, route, setState }) {
           )}
           {status === "ready" && list.length === 0 && (
             <>
-              <T y={40} size={14} center className="a-fade text-mute">
-                검색 결과가 없어요
-              </T>
+              {!suggested && (
+                <T y={40} size={14} center className="a-fade text-mute">
+                  검색 결과가 없어요
+                </T>
+              )}
               {filter !== "전체" && (
                 <button
                   onClick={() => setFilter("전체")}
-                  className="a-fade absolute left-0 right-0 top-[70px] text-center text-[14px] leading-[22px] text-mint underline"
+                  className="a-fade absolute left-0 right-0 text-center text-[14px] leading-[22px] text-mint underline"
+                  style={{ top: suggested ? lead + 10 : 70 }}
                 >
                   전체 분야에서 찾아보기
                 </button>
+              )}
+              {similar.courses.length > 0 && (
+                <div className="a-fade absolute left-[20px] w-[362px]" style={{ top: filter !== "전체" ? 108 : 78 }}>
+                  <p className="text-center text-[14px] leading-[22px] text-mute">이 학과를 찾으시나요?</p>
+                  <div className="mt-[10px] flex flex-wrap justify-center gap-[8px]">
+                    {similar.courses.map((name) => (
+                      <button
+                        key={name}
+                        onClick={() => pickCourse(name)}
+                        className="pressable h-[32px] max-w-full truncate rounded-full border border-mint bg-white px-[14px] text-[13px] text-mint"
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </>
           )}
@@ -1027,8 +1094,8 @@ function TabBar({ active, nav }) {
 function taskKind(d, index) {
   if (index === d.lessons.length - 1) return "졸업 과제";
   const id = d.games?.[index];
-  const title = games.find((item) => item.id === id)?.title || lessonTypes[id]?.title;
-  return title || "직접 해보고 느낀 점 기록하기";
+  if (typeof id === "string" && id.startsWith("group:") && d.practice) return `전공 실습(${templates[d.practice.template].title})`;
+  return lessonTypes[id]?.title || "직접 해보고 느낀 점 기록하기";
 }
 
 /** 아직 열리지 않은 과제. 누르면 언제 열리는지 잠깐 알려준다. */
@@ -1139,7 +1206,7 @@ export function Home({ active, nav, state }) {
         졸업까지 남은 과제
       </T>
       {upcoming.map(({ lesson, i }, n) => (
-        <TaskCard key={i} top={565 + n * 84} d={0.42 + n * 0.06} title={lesson} sub={`${d.yearNumbers[i]}학년 실습 · ${taskKind(d, i)}`} hint={hint?.i === i ? hint.text : ""} onClick={() => tellLocked(i)} />
+        <TaskCard key={i} top={565 + n * 84} d={0.42 + n * 0.06} title={lesson} sub={`${d.yearNumbers[i]}학년 · ${taskKind(d, i)}`} hint={hint?.i === i ? hint.text : ""} onClick={() => tellLocked(i)} />
       ))}
       <p className="sr-only" role="status">
         {hint?.text}
@@ -1156,170 +1223,6 @@ export function Home({ active, nav, state }) {
 /* ------------------------------------------------------------------ */
 /* 12 · 학년별 수업                                                    */
 /* ------------------------------------------------------------------ */
-
-const GOAL = 26;
-
-/** 졸업작품: 사포질 → 도색. 문지르면 가루와 물감이 튄다. */
-function Studio({ year, onDone, onQuit }) {
-  const [phase, setPhase] = useState("sand");
-  const progress = useRef(0);
-  const phaseRef = useRef("sand");
-  const [particles, setParticles] = useState([]);
-  const [rubbing, setRubbing] = useState(false);
-  const [touched, setTouched] = useState(false);
-  const last = useRef(null);
-  const idRef = useRef(0);
-  const area = useRef(null);
-  const done = useRef(false);
-
-  const emit = (x, y, n) => {
-    const items = Array.from({ length: n }, () => {
-      const a = Math.random() * Math.PI * 2;
-      const r = 18 + Math.random() * 46;
-      const paint = phase === "paint";
-      return {
-        id: idRef.current++,
-        x,
-        y,
-        dx: Math.cos(a) * r,
-        dy: Math.sin(a) * r - (paint ? 0 : 18),
-        size: paint ? 10 + Math.random() * 16 : 3 + Math.random() * 5,
-        color: paint ? (Math.random() > 0.3 ? "#27d8cd" : "#1aa69e") : Math.random() > 0.5 ? "#f3f1ec" : "#cfcac1",
-        kind: paint ? "paint" : "dust",
-      };
-    });
-    setParticles((p) => [...p.slice(-60), ...items]);
-    window.setTimeout(() => setParticles((p) => p.filter((q) => !items.includes(q))), 900);
-  };
-
-  const advance = (amount) => {
-    if (done.current) return;
-    progress.current += amount;
-    if (progress.current < GOAL) return;
-    done.current = true;
-    window.setTimeout(() => {
-      if (phaseRef.current === "sand") {
-        phaseRef.current = "paint";
-        setPhase("paint");
-        progress.current = 0;
-        done.current = false;
-      } else {
-        onDone();
-      }
-    }, 380);
-  };
-
-  const point = (e) => {
-    const r = area.current.getBoundingClientRect();
-    const scale = r.width / 402;
-    return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale };
-  };
-  const down = (e) => {
-    e.target.setPointerCapture?.(e.pointerId);
-    const p = point(e);
-    last.current = p;
-    setRubbing(true);
-    setTouched(true);
-    emit(p.x, p.y, phase === "paint" ? 6 : 8);
-    advance(2);
-  };
-  const move = (e) => {
-    if (!last.current) return;
-    const p = point(e);
-    if (Math.hypot(p.x - last.current.x, p.y - last.current.y) > 16) {
-      last.current = p;
-      emit(p.x, p.y, phase === "paint" ? 3 : 4);
-      advance(1);
-    }
-  };
-  const up = () => {
-    last.current = null;
-    setRubbing(false);
-  };
-  // 키보드로도 할 수 있게: 스페이스나 엔터를 누를 때마다 한 번 문지른다.
-  const key = (e) => {
-    if (e.key !== " " && e.key !== "Enter") return;
-    e.preventDefault();
-    setTouched(true);
-    emit(201, 330, phase === "paint" ? 6 : 8);
-    advance(2);
-  };
-
-  // 화면이 낮으면 '그만하기'까지 다 보이도록 장면을 줄이고, 양옆에 남는 자리는 같은 그림을 흐리게 깔아 채운다.
-  return (
-    <div className="absolute inset-x-0 bottom-0 top-[112px] overflow-hidden bg-[#b3a28e]">
-      <img
-        src={phase === "paint" ? img.scenePaint : img.sceneSand}
-        alt=""
-        draggable={false}
-        className="absolute inset-0 h-full w-full scale-125 object-cover blur-[12px]"
-      />
-      <div
-        ref={area}
-        tabIndex={0}
-        role="application"
-        aria-label={`${year}학년 졸업작품 ${phase === "sand" ? "사포질하기" : "도색하기"}. 작품을 문지르거나 스페이스를 눌러요.`}
-        className="absolute left-0 top-0 h-[762px] w-[402px] origin-top touch-none select-none overflow-hidden outline-none"
-        style={{ scale: "min(1, (var(--vh) + var(--tt) - 112) / 734)" }}
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
-        onKeyDown={key}
-      >
-        {/* 장면 그림 아래쪽에 함께 그려진 기기 장식이 보이지 않도록 조금 키워서 잘라낸다. */}
-        <div className="absolute left-[-7px] top-0 h-[789px] w-[416px]" style={{ animation: rubbing ? "rub 0.14s linear infinite" : undefined }}>
-          <img src={img.sceneSand} alt="" draggable={false} className="absolute inset-0 h-full w-full" />
-          <img
-            src={img.scenePaint}
-            alt=""
-            draggable={false}
-            className="absolute inset-0 h-full w-full transition-opacity duration-700"
-            style={{ opacity: phase === "paint" ? 1 : 0 }}
-          />
-        </div>
-        <div className="pointer-events-none absolute left-[26px] top-[42px] h-[108px] w-[349px] rounded-[21px] bg-white">
-          <T y={31} size={18} center className="font-bold text-ink">
-            {year}학년 졸업작품
-          </T>
-          <T y={66} size={15} center className="text-gray">
-            {phase === "sand" ? "사포질하기" : "도색하기"}
-          </T>
-        </div>
-        {!touched && (
-          <span
-            className="loop pointer-events-none absolute left-[161px] top-[290px] h-[80px] w-[80px] rounded-full border-2 border-white/90"
-            style={{ animation: "ripple 1.6s ease-out infinite" }}
-          />
-        )}
-        {particles.map((p) => (
-          <span
-            key={p.id}
-            className="pointer-events-none absolute rounded-full"
-            style={{
-              left: p.x - p.size / 2,
-              top: p.y - p.size / 2,
-              width: p.size,
-              height: p.size,
-              background: p.color,
-              boxShadow: p.kind === "dust" ? "0 0 2px rgba(0,0,0,0.15)" : undefined,
-              animation: p.kind === "paint" ? "splat 0.8s ease-out both" : "particle 0.85s cubic-bezier(0.22,1,0.36,1) both",
-              "--dx": `${p.dx}px`,
-              "--dy": `${p.dy}px`,
-            }}
-          />
-        ))}
-        <button
-          onPointerDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          onClick={onQuit}
-          aria-label="그만하기"
-          className="absolute left-[14px] top-[676px] h-[46px] w-[375px] rounded-[12px] transition-colors active:bg-black/5"
-        />
-      </div>
-    </div>
-  );
-}
 
 const STEPS = ["배우기", "직접 해보기", "기록"];
 
@@ -1377,11 +1280,6 @@ function quizTask(game) {
   if (game.type === "match") return `서로 관련된 ${n}쌍의 짝을 맞춰요.`;
   return `${n}개를 알맞은 칸으로 나눠요.`;
 }
-const GAME_TASKS = {
-  stroop: "글자의 뜻이 아니라 글자가 쓰인 색을 최대한 빨리 골라요.",
-  sorting: "이웃한 두 카드만 바꾸면서 카드를 작은 수부터 차례로 놓아요.",
-  journal: "거래마다 무엇이 늘고 줄었는지 따져 차변과 대변으로 나눠 적어요.",
-};
 // 연습 문제가 없는 과목의 관찰 과제. 첫 학년은 관찰, 그다음 학년은 앞에서 찾은 질문을 적용해 본다.
 function basicTasks(subject, first) {
   return first
@@ -1397,8 +1295,9 @@ export function Lesson({ active, nav, state, setState }) {
   const subject = ok ? v.d.lessons[v.index] : "";
   const isFinal = ok && v.index === v.total - 1;
   const game = ok && !isFinal ? v.d.games?.[v.index] || null : null;
-  const dedicated = games.some((item) => item.id === game);
-  const typed = !dedicated && isLessonType(game);
+  // 학과군 전공 실습이면 그 체험 데이터. 아니면 연습 문제 유형(이론 수업)이거나 null(기본 체험).
+  const practice = typeof game === "string" && game.startsWith("group:") ? v.d.practice : null;
+  const typed = !practice && isLessonType(game);
   const quiz = useLessonGame(typed ? subject : null);
   const [draft, setDraft] = useState(() => (ok ? state.drafts[key] ?? state.notes[key] ?? "" : ""));
   // 체험이나 기록을 이미 시작한 수업은 기록 단계부터 이어간다.
@@ -1432,7 +1331,8 @@ export function Lesson({ active, nav, state, setState }) {
     return (
       <Screen>
         <Header title={d.name} count={`${index + 1}/${total}`} onBack={nav.back} />
-        <Studio
+        <Rub
+          data={final}
           year={year}
           onQuit={nav.back}
           onDone={() => {
@@ -1443,14 +1343,14 @@ export function Lesson({ active, nav, state, setState }) {
       </Screen>
     );
 
-  // 수업의 종류: 졸업 계획서, 전용 미니게임, 연습 문제(불러오는 중·오류 포함), 기본 체험.
-  const mode = isFinal ? "plan" : dedicated ? "game" : typed && quiz.status !== "basic" ? quiz.status === "ready" ? "quiz" : quiz.status : "basic";
+  // 수업의 종류: 졸업 계획서, 학과군 전공 실습, 연습 문제(불러오는 중·오류 포함), 기본 체험.
+  const mode = isFinal ? "plan" : practice ? "practice" : typed && quiz.status !== "basic" ? quiz.status === "ready" ? "quiz" : quiz.status : "basic";
   const play = game && state.plays[key]?.game === game ? state.plays[key] : null;
   const played = play?.summary || "";
   const plan = state.capstones[d.id];
-  const tried = mode === "plan" ? planReady(plan) : mode === "game" || mode === "quiz" ? !!played : mode === "basic";
+  const tried = mode === "plan" ? planReady(plan) : mode === "practice" || mode === "quiz" ? !!played : mode === "basic";
 
-  const headline = mode === "plan" ? final.name : mode === "game" ? games.find((g) => g.id === game).title : mode === "quiz" ? quiz.game.title : subject;
+  const headline = mode === "plan" ? final.name : mode === "practice" ? practice.title : mode === "quiz" ? quiz.game.title : subject;
   const warn = (message) => {
     setNotice(message);
     setShake((n) => n + 1);
@@ -1469,20 +1369,21 @@ export function Lesson({ active, nav, state, setState }) {
   };
   const finish = () => {
     if (!tried) return warn(mode === "plan" ? "계획서의 세 칸을 모두 채워주세요." : "먼저 직접 해보기를 끝까지 해보세요.");
-    if (!draft.trim()) return warn("느낀 점을 한 줄 이상 적어주세요.");
+    // 느낀 점은 적지 않아도 된다. 비어 있으면 기록 없이 완료한다(건너뛰기).
     window.clearTimeout(timer.current);
     setState((s) => completeLesson(s, d.id, index, draft));
     if (isFinal) nav.replace("grades", undefined, "fade");
     else nav.reset(["home"]);
   };
   const next = d.lessons[index + 1];
+  const written = !!draft.trim();
 
   let body;
   let action;
   if (step === 0) {
     const task =
       mode === "plan" ? final.intro
-      : mode === "game" ? GAME_TASKS[game]
+      : mode === "practice" ? practice.task
       : mode === "quiz" ? quizTask(quiz.game)
       : mode === "basic"
         ? index === 0
@@ -1507,8 +1408,13 @@ export function Lesson({ active, nav, state, setState }) {
             </button>
           </div>
         )}
+        {mode === "practice" && practice.learn && (
+          <MintCard title="알아두기" className="a-up mt-[22px]">
+            <p style={delay(0.1)}>{practice.learn}</p>
+          </MintCard>
+        )}
         {task && (
-          <MintCard title="이 수업에서 해볼 것" className="a-up mt-[22px]">
+          <MintCard title="이 수업에서 해볼 것" className={`a-up ${mode === "practice" && practice.learn ? "mt-[12px]" : "mt-[22px]"}`}>
             <p style={delay(0.12)}>{task}</p>
           </MintCard>
         )}
@@ -1523,8 +1429,8 @@ export function Lesson({ active, nav, state, setState }) {
     body = (
       <div className="a-up mt-[22px]">
         {mode === "plan" && (
-          <GraduationPlan
-            final={final}
+          <PlanTemplate
+            data={final}
             value={plan}
             onChange={(value) => {
               if (planReady(value)) setNotice("");
@@ -1532,9 +1438,9 @@ export function Lesson({ active, nav, state, setState }) {
             }}
           />
         )}
-        {(mode === "game" || mode === "quiz") && (
+        {(mode === "practice" || mode === "quiz") && (
           <LessonGame
-            game={mode === "game" ? game : quiz.game}
+            game={mode === "practice" ? practice : quiz.game}
             played={played}
             onComplete={(summary) => {
               setNotice("");
@@ -1565,9 +1471,9 @@ export function Lesson({ active, nav, state, setState }) {
   } else {
     body = (
       <>
-        {mode === "quiz" && (
+        {(mode === "quiz" || (mode === "practice" && practice.learn)) && (
           <MintCard title="배운 내용" className="a-up mt-[22px]">
-            <p>{quiz.game.explanation}</p>
+            <p>{mode === "quiz" ? quiz.game.explanation : practice.learn}</p>
           </MintCard>
         )}
         {mode === "plan" && planReady(plan) && (
@@ -1600,11 +1506,16 @@ export function Lesson({ active, nav, state, setState }) {
         </label>
       </>
     );
-    action = <FilledButton onClick={finish}>{isFinal ? `${final.name} 제출하고 졸업하기` : "기록 저장하고 완료하기"}</FilledButton>;
+    // 적은 내용이 있으면 저장, 없으면 건너뛰기로 버튼이 바뀐다.
+    const label = isFinal
+      ? written ? `${final.name} 제출하고 졸업하기` : `생각은 건너뛰고 ${final.name} 제출하기`
+      : written ? "기록 저장하고 완료하기" : "기록 건너뛰고 완료하기";
+    action = <FilledButton onClick={finish}>{label}</FilledButton>;
   }
 
   // 아래 안내: 경고가 있으면 경고를, 기록 단계에서는 저장하면 어떻게 되는지를 보여준다.
-  const guide = notice || (step === 2 ? (isFinal ? "저장하면 졸업이에요" : `저장하면 ${index + 1} / ${total} 완료 · 다음은 ${d.yearNumbers[index + 1]}학년 ${next}`) : "");
+  const verb = written ? "저장하면" : "건너뛰면";
+  const guide = notice || (step === 2 ? (isFinal ? `${verb} 졸업이에요` : `${verb} ${index + 1} / ${total} 완료 · 다음은 ${d.yearNumbers[index + 1]}학년 ${next}`) : "");
   return (
     <Screen
       footer={
@@ -1632,7 +1543,7 @@ export function Lesson({ active, nav, state, setState }) {
             {headline}
           </h1>
           <p className="a-up mt-[6px] text-[14px] leading-[22px] text-gray" style={delay(0.06)}>
-            {isFinal ? `${year}학년 · 마지막 과제예요` : `${year}학년 수업 · ${subject}`}
+            {isFinal ? `${year}학년 · 마지막 과제예요` : practice ? `${year}학년 전공 실습 · ${groupName(d.studyGroup)}` : `${year}학년 수업 · ${subject}`}
           </p>
           {body}
         </div>
@@ -1734,12 +1645,18 @@ export function Graduation({ active, nav, state }) {
 function reportText(state, d) {
   const notes = d.lessons.map((lesson, i) => `${d.yearNumbers[i]}학년. ${lesson}\n${state.notes[`${d.id}-${i}`] || "기록 없음"}`).join("\n\n");
   const plan = state.capstones[d.id];
-  const final = finals[d.final];
+  const final = finalOf(d);
   const planText =
     final?.kind === "plan" && planReady(plan)
       ? `\n\n${final.name} 계획\n${final.prompts.map((prompt, i) => `- ${prompt.label}: ${plan[PLAN_FIELDS[i]]}`).join("\n")}`
       : "";
-  return `${d.school} ${d.name} 체험 리포트\n\n${d.lessons.length} / ${d.lessons.length} 실습 완료\n\n${notes}${planText}`;
+  // 체험 구조가 바뀌기 전에 남긴 기록(학년 자리의 수업이 바뀌어 옮겨 둔 것).
+  const archived = (state.archive || []).filter((item) => item.id === d.id);
+  const archiveText = archived.length
+    ? `\n\n이전 체험 기록 (체험 구조가 바뀌기 전에 남긴 기록이에요)\n${archived.map((item) => `- ${item.title}\n${item.note}`).join("\n\n")}`
+    : "";
+  const completed = Math.min(state.journeys[d.id]?.completed || 0, d.lessons.length);
+  return `${d.school} ${d.name} 체험 리포트\n\n${completed} / ${d.lessons.length} 완료\n\n${notes}${planText}${archiveText}`;
 }
 
 function download(name, text) {
@@ -1779,6 +1696,7 @@ export function My({ nav, state, setState }) {
           const total = d.lessons.length;
           const completed = Math.min(journey.completed, total);
           const finished = completed === total;
+          const archived = (state.archive || []).filter((item) => item.id === d.id).length;
           return (
             <div key={d.id} className="a-up mt-[14px] rounded-[16px] border border-cream-line bg-cream p-[16px]" style={delay(0.12 + Math.min(i, 6) * 0.06)}>
               <strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-[16px] font-semibold text-slate">
@@ -1787,11 +1705,16 @@ export function My({ nav, state, setState }) {
               <p className="mt-[4px] text-[12px] leading-[18px] text-gray">
                 {finished ? `졸업 · 학습과 실습 ${total}개 완료` : `${d.yearNumbers[Math.min(completed, total - 1)]}학년 · ${completed} / ${total} 완료`}
               </p>
+              {archived > 0 && (
+                <p className="mt-[4px] text-[12px] leading-[18px] text-mint-deep">
+                  체험 구조가 바뀌기 전에 남긴 기록 {archived}개를 리포트에 함께 담았어요.
+                </p>
+              )}
               <div className="mt-[12px] flex gap-[8px]">
                 <button className="button" onClick={() => choose(d, finished ? "graduation" : "home")}>
                   {finished ? "졸업 리포트 보기" : "이어서 체험하기"}
                 </button>
-                {finished && (
+                {(finished || archived > 0) && (
                   <button className="button ghost" onClick={() => download(`${d.school}-${d.name}-체험-리포트.txt`, reportText(state, d))}>
                     리포트 내려받기
                   </button>

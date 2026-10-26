@@ -2,6 +2,7 @@ import csv
 import gzip
 import json
 import logging
+import math
 import re
 from collections import Counter, defaultdict
 from contextlib import asynccontextmanager
@@ -58,6 +59,14 @@ class CourseRequest(RequestBody):
     limit: int = Field(default=30, ge=1, le=100)
 
 
+class ProgramRequest(RequestBody):
+    interests: str = Field(min_length=1, max_length=100)
+    school: str = Field(default="", max_length=100)
+    course: str = Field(default="", max_length=100)
+    offset: int = Field(default=0, ge=0, le=100000)
+    limit: int = Field(default=30, ge=1, le=100)
+
+
 class SchoolRequest(RequestBody):
     course: str = Field(min_length=1, max_length=200)
 
@@ -110,8 +119,72 @@ def compact(text):
     return re.sub(r"\s+", "", text).lower()
 
 
+# 검색에서는 띄어쓰기와 이름 속 구두점(·, ., -, 괄호 등)을 무시한다. "전기전자"로 "전기·전자공학부"를 찾을 수 있게.
+# 검색어에서는 구두점도 낱말을 나누는 자리로 본다.
+SEARCH_IGNORED = re.compile(r"[\s·・‧.,\-_/()\[\]&]+")
+
+
+def searchable(text):
+    return SEARCH_IGNORED.sub("", text).lower()
+
+
+def search_words(query):
+    """검색어를 띄어쓰기와 구두점으로 나눈 낱말들. "전기·전자"는 "전기", "전자" 두 낱말이 된다."""
+    return [word.lower() for word in SEARCH_IGNORED.split(query) if word]
+
+
+INITIALS = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
+VOWELS = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+FINALS = " ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"
+
+
+def jamo(text):
+    """한글을 자모로 푼다. "전자"는 "ㅈㅓㄴㅈㅏ"가 되어, 한 글자 오타("전지")도 자모 하나 차이로 본다."""
+    letters = []
+    for char in text:
+        code = ord(char) - 0xAC00
+        if 0 <= code < 11172:
+            letters += [INITIALS[code // 588], VOWELS[code % 588 // 28], FINALS[code % 28].strip()]
+        else:
+            letters.append(char)
+    return "".join(letters)
+
+
+def letter_pairs(text):
+    return {text[i:i + 2] for i in range(len(text) - 1)}
+
+
+def infix_distance(query, text):
+    """query를 text 안의 어느 자리에 맞추든 가장 적게 고치는 횟수(넣기·빼기·바꾸기)."""
+    previous = list(range(len(query) + 1))
+    best = previous[-1]
+    for char in text:
+        current = [0]
+        for i, letter in enumerate(query, 1):
+            current.append(min(previous[i] + 1, current[i - 1] + 1, previous[i - 1] + (letter != char)))
+        best = min(best, current[-1])
+        previous = current
+    return best
+
+
+# 학년별 전공 체험을 만들 수 없는 과정: 입학 뒤에 전공을 정하는 자유·자율전공, 교양 과정, 학년이 하나뿐인 1년 과정.
+# 무전공은 이름 맨 앞이나 띄어쓰기·괄호 뒤에서만 본다("사무전공", "법무전공"은 실제 전공). 문화교양학과는 실제 전공이다.
+UNDECIDED = re.compile(r"자유전공|자율전공|(?:^|[\s(])무전공|자유학부|자율학부|학생설계|(?<!문화)교양")
+
+
+def study_years(duration):
+    """수업연한("4년", "2.5년", "1년(전공심화)")을 학년 수로 바꾼다. 읽을 수 없으면 None."""
+    match = re.match(r"\d+(\.\d+)?", duration)
+    return math.ceil(float(match.group())) if match else None
+
+
+def excluded(course, duration):
+    years = study_years(duration)
+    return bool(UNDECIDED.search(course)) or (years is not None and years < 2)
+
+
 class Catalog:
-    """학부 과정 중 교과목이 등록된 학교·학과만 담는다(대학원, 폐과, 교과목 없는 학과 제외)."""
+    """학부 과정 중 교과목이 등록된 학교·학과만 담는다(대학원, 폐과, 교과목 없는 학과, 학년별 체험을 만들 수 없는 과정 제외)."""
 
     def __init__(self, records):
         self.programs = {}
@@ -120,7 +193,7 @@ class Catalog:
         for row in records:
             school, course = row["학교명"].strip(), row["학과명"].strip()
             subjects = [subject.strip() for subject in row["주요교과목명"].split("+") if subject.strip()]
-            if row["학과상태명"] == "폐과" or "대학원" in school or not school or not course or not subjects:
+            if row["학과상태명"] == "폐과" or "대학원" in school or not school or not course or not subjects or excluded(course, row["수업연한"].strip()):
                 continue
             program = self.programs.setdefault((school, course), {"curriculum": {}, "duration": row["수업연한"].strip(), "region": row["시도명"].strip()})
             program["curriculum"].update(dict.fromkeys(subjects))
@@ -132,7 +205,17 @@ class Catalog:
         # 개설 대학이 많은 학과부터 보여준다.
         self.courses = [(course, compact(course), self.categories[course]) for course in sorted(schools, key=lambda name: (-len(schools[name]), name))]
         # 학교·학과 조합 목록. 개설 대학이 많은 학과부터, 같은 학과 안에서는 학교 이름순.
-        self.pairs = [(school, course, compact(school + course), key, category) for course, key, category in self.courses for school in self.schools[course]]
+        self.pairs = [(school, course, searchable(school), searchable(course), key, category) for course, key, category in self.courses for school in self.schools[course]]
+        # 비슷한 학과 찾기에 쓴다. 학과명은 검색용 글자와 자모로, 과목은 띄어쓰기·구두점을 뺀 이름으로 비교한다.
+        self.names = [(course, searchable(course), spelling, letter_pairs(spelling)) for course, _, _ in self.courses for spelling in [jamo(searchable(course))]]
+        self.school_names = [(school, searchable(school)) for school in sorted({school for school, _ in self.programs})]
+        self.courses_at = defaultdict(list)
+        for school, course in self.programs:
+            self.courses_at[school].append(course)
+        self.subjects = {pair:{searchable(subject) for subject in program["curriculum"]} for pair, program in self.programs.items()}
+        # 여러 학과에서 두루 가르치는 과목(교양영어 등)일수록 낮게 친다.
+        spread = Counter(subject for subjects in self.subjects.values() for subject in subjects)
+        self.weights = {subject: math.log(len(self.subjects) / count) for subject, count in spread.items()}
 
 
 @lru_cache(maxsize=1)
@@ -186,19 +269,95 @@ def matcher(keyword):
     return lambda key, category: keyword == "전체" or keyword == category or any(term in key for term in terms)
 
 
+def similar_courses(data, words, limit=5):
+    """오타가 있어도 이름이 가까운 학과들. 검색어를 자모로 풀어 학과명 안 어딘가에 맞추고, 자모 네 개에 하나까지 틀려도 찾는다.
+    "전지공학"은 "전기공학과"·"전자공학과"를, "견축"은 "건축학과"를 찾는다. 같은 거리 안에서는 개설 대학이 많은 순서다."""
+    query = jamo("".join(words))
+    allowed = len(query) // 4
+    if not allowed:
+        return []
+    pairs = letter_pairs(query)
+    found = []
+    for course, _, spelling, spelling_pairs in data.names:
+        # 자모 두 개씩 묶은 조각이 절반도 겹치지 않으면 거리를 재지 않는다(대부분의 학과가 여기서 걸러진다).
+        if len(pairs & spelling_pairs) * 2 < len(pairs):
+            continue
+        distance = infix_distance(query, spelling)
+        if distance <= allowed:
+            found.append((distance, course))
+    return [course for _, course in sorted(found, key=lambda item: item[0])[:limit]]
+
+
+def wanted_schools(data, school_words):
+    """학교 검색어에 걸린 학교 중 사용자가 찾는 학교. "서울대학교"는 남서울대학교에도 걸리므로,
+    이름이 같은 학교가 있으면 그 학교를, 검색어로 시작하는 학교가 있으면 그 학교들을, 아니면 걸린 학교 전부를 본다."""
+    query = "".join(school_words)
+    matched = [(school, text) for school, text in data.school_names if all(word in text for word in school_words)]
+    return ({school for school, text in matched if text == query}
+            or {school for school, text in matched if text.startswith(query)}
+            or {school for school, _ in matched})
+
+
+def similar_programs(data, schools, words, limit=3):
+    """찾는 학교에 검색한 이름의 학과가 없을 때, 그 학교에서 비슷한 것을 배우는 학과.
+    전국에서 검색어가 이름에 들어간 학과(없으면 오타를 고친 학과)가 가르치는 과목을 모으고,
+    학교의 학과마다 그 과목을 얼마나 가르치는지 점수를 매긴다. 서울대 "전자"는 "전기·정보공학부"를 찾는다."""
+    names = [course for course, text, _, _ in data.names if all(word in text for word in words)] or similar_courses(data, words)
+    reference = [(school, course) for course in names for school in data.schools[course]]
+    if not reference:
+        return []
+    share = Counter(subject for pair in reference for subject in data.subjects[pair])
+    scored = []
+    for school in schools:
+        for course in data.courses_at[school]:
+            subjects = data.subjects[(school, course)]
+            score = sum(share[subject] * data.weights[subject] for subject in subjects) / len(reference) / math.sqrt(len(subjects))
+            scored.append((score, school, course))
+    scored.sort(key=lambda item: -item[0])
+    # 점수가 낮거나 가장 비슷한 학과보다 크게 떨어지는 학과는 엉뚱한 추천이 되므로 뺀다.
+    cutoff = max(0.3, scored[0][0] * 0.4) if scored else 0
+    return [(school, course) for score, school, course in scored[:limit] if score >= cutoff]
+
+
+def describe(data, school, course):
+    program = data.programs[(school, course)]
+    return {"school": school, "course": course, "category": data.categories[course], "duration": program["duration"], "region": program["region"]}
+
+
 @app.post("/api/program_list")
-def program_list(body: CourseRequest):
-    """학교·학과 조합을 검색한다. 검색어의 낱말이 학교명이나 학과명에 모두 들어 있어야 한다."""
+def program_list(body: ProgramRequest):
+    """학교·학과 조합을 검색한다. 학교 검색어의 낱말은 모두 학교명에, 학과 검색어의 낱말은 모두 학과명에 들어 있어야 한다.
+    띄어쓰기와 구두점은 무시하므로 "서울대"는 "서울대학교"를, "전기 전자"나 "전기·전자"는 "전자·전기공학부"도 찾는다."""
     data = catalog()
     matches = matcher(body.interests)
-    words = [compact(word) for word in body.query.split()]
-    found = [(school, course, key) for school, course, text, key, category in data.pairs if matches(key, category) and all(word in text for word in words)]
-    query = compact(body.query)
-    if query:
-        found.sort(key=lambda item: (item[2] != query, not item[2].startswith(query)))
+    school_words, course_words = search_words(body.school), search_words(body.course)
+    found = [(school, course, school_text, course_text) for school, course, school_text, course_text, key, category in data.pairs
+             if matches(key, category) and all(word in school_text for word in school_words) and all(word in course_text for word in course_words)]
+    school_query, course_query = "".join(school_words), "".join(course_words)
+    # 검색어와 이름이 같은 것, 검색어로 시작하는 것을 먼저 보여준다(학교가 먼저, 그 안에서 학과). 나머지는 원래 순서를 지킨다.
+    found.sort(key=lambda item: (
+        bool(school_query) and item[2] != school_query,
+        bool(school_query) and not item[2].startswith(school_query),
+        bool(course_query) and item[3] != course_query,
+        bool(course_query) and not item[3].startswith(course_query),
+    ))
     page = found[body.offset:body.offset + body.limit]
-    programs = [{"school": school, "course": course, "category": data.categories[course], "duration": data.programs[(school, course)]["duration"], "region": data.programs[(school, course)]["region"]} for school, course, key in page]
-    return {"programs": programs, "total": len(found)}
+    # 찾는 학과가 없으면 비슷한 학과를 함께 보낸다. 관심 분야 필터와는 상관없이 찾는다.
+    # 학교를 골랐으면 찾는 학교에서 나온 결과가 없을 때 그 학교의 비슷한 학과를(다른 학교 결과만 있어도 보낸다),
+    # 학교 없이 찾았으면 결과가 없을 때 이름이 비슷한 학과명(오타 고침)을 보낸다.
+    suggested_programs, suggested_courses = [], []
+    if course_words and school_words:
+        schools = wanted_schools(data, school_words)
+        if not any(school in schools for school, *_ in found):
+            suggested_programs = [describe(data, school, course) for school, course in similar_programs(data, schools, course_words)]
+    elif course_words and not found:
+        suggested_courses = similar_courses(data, course_words)
+    return {
+        "programs": [describe(data, school, course) for school, course, _, _ in page],
+        "total": len(found),
+        "similar_programs": suggested_programs,
+        "similar_courses": suggested_courses,
+    }
 
 
 @app.post("/api/course_list")

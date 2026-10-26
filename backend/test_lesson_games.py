@@ -178,15 +178,16 @@ class StoreTests(unittest.TestCase):
     def test_targets_cover_every_program_and_replace_excluded_subjects(self):
         info = lesson_games.subjects()
         needed = lesson_games.targets({})
-        self.assertGreater(len(needed), 3000)
-        self.assertLess(len(needed), 10000)
+        self.assertGreater(len(needed), 2000)
+        self.assertLess(len(needed), 6000)
         self.assertEqual(needed, sorted(needed, key=lambda key: (-info[key]["programs"], key)))
-        self.assertFalse(any(lesson_games.DEDICATED.search(key) for key in needed))
+        # 예전에 미니게임이 붙던 과목도 이제 이론 수업 과목이라 연습 문제를 만든다.
+        self.assertIn(main.compact("회계원리"), needed)
         first = needed[0]
         self.assertEqual(set(info[first]), {"subject", "course", "category", "programs"})
         chosen = set(needed)
         for program in main.catalog().programs.values():
-            keys = {key for key in map(main.compact, program["curriculum"]) if not lesson_games.DEDICATED.search(key)}
+            keys = set(map(main.compact, program["curriculum"]))
             self.assertGreaterEqual(len(keys & chosen), min(len(keys), lesson_games.slots(program["duration"])))
         for status in ("unsuitable", "failed"):
             self.assertNotIn(first, lesson_games.targets({first: {"status": status}}))
@@ -198,7 +199,8 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(result["remaining"], result["targets"] - 1)
 
     def test_slots_follow_course_length(self):
-        self.assertEqual([lesson_games.slots(duration) for duration in ("4년", "2년", "2.5년", "1년(전공심화)", "6년", "9년", "")], [3, 1, 2, 0, 5, 5, 3])
+        # 마지막 학년은 졸업 과제, 그 앞 학년은 학과군 실습이라 둘을 뺀 학년이 이론 수업이다.
+        self.assertEqual([lesson_games.slots(duration) for duration in ("4년", "3년", "2년", "2.5년", "2년(전공심화)", "1년(전공심화)", "6년", "9년", "")], [2, 1, 0, 1, 0, 0, 4, 4, 2])
 
     def test_save_and_load_round_trip(self):
         records = {}
