@@ -448,6 +448,8 @@ export function Schools({ nav, route, setState }) {
   const [search, setSearch] = useState({ school: "", course: "" });
   const [list, setList] = useState([]);
   const [total, setTotal] = useState(0);
+  // 찾는 학과가 없을 때 서버가 보내주는 비슷한 학과(학교·학과 조합)와 비슷한 학과명.
+  const [similar, setSimilar] = useState({ programs: [], courses: [] });
   const [status, setStatus] = useState("loading");
   const [retry, setRetry] = useState(0);
   const [opening, setOpening] = useState(null);
@@ -469,12 +471,14 @@ export function Schools({ nav, route, setState }) {
     setStatus("loading");
     setList([]);
     setTotal(0);
+    setSimilar({ programs: [], courses: [] });
     loadingMore.current = false;
     request.current += 1;
     getProgramList(filter, search, 0, controller.signal)
       .then((result) => {
         setList(result.programs);
         setTotal(result.total);
+        setSimilar({ programs: result.similarPrograms, courses: result.similarCourses });
         setStatus("ready");
       })
       .catch(() => {
@@ -525,8 +529,42 @@ export function Schools({ nav, route, setState }) {
       .finally(() => setOpening(null));
   };
 
+  const card = (p, top, i) => {
+    const key = keyOf(p);
+    return (
+      <YellowCard
+        key={key}
+        top={top}
+        title={`${p.school} ${p.course}`}
+        sub={
+          opening === key
+            ? "불러오는 중이에요…"
+            : failed === key
+              ? "불러오지 못했어요. 다시 눌러주세요"
+              : [p.category, p.duration, p.region].filter(Boolean).join(" · ")
+        }
+        onClick={() => open(p)}
+        className={`a-up ${failed === key ? "a-shake" : ""}`}
+        style={delay(i < 30 ? 0.24 + Math.min(i, 6) * 0.06 : 0)}
+      />
+    );
+  };
+  // 비슷한 학과 카드는 목록 맨 위에 두고, 다른 학교 검색 결과가 있으면 그 아래에 이어 붙인다.
+  const suggested = similar.programs.length > 0;
+  const suggestedSchool = similar.programs.every((p) => p.school === similar.programs[0]?.school) ? similar.programs[0]?.school : "";
+  const lead = suggested ? 52 + similar.programs.length * 91 + (list.length ? 32 : 0) : 0;
+  // "다음"은 맨 위에 보이는 카드를 연다.
+  const top = similar.programs[0] || list[0];
+  // 비슷한 학과명을 누르면 그 이름으로 바로 다시 찾는다. 분야 필터와 상관없이 고른 것이므로 필터도 푼다.
+  const pickCourse = (name) => {
+    const next = { school: query.school.trim(), course: name };
+    setQuery((q) => ({ ...q, course: name }));
+    setSearch(next);
+    setFilter("전체");
+  };
+
   return (
-    <Screen footer={<OutlineButton onClick={() => (list[0] ? open(list[0]) : undefined)}>다음</OutlineButton>}>
+    <Screen footer={<OutlineButton onClick={() => (top ? open(top) : undefined)}>다음</OutlineButton>}>
       <BackButton onClick={nav.back} />
       <T y={126} size={20} lh={25} left={29.5} className="a-up font-semibold text-mint">
         {"궁금했던 학과와 학교\n저와 함께 체험해볼까요?"}
@@ -585,27 +623,21 @@ export function Schools({ nav, route, setState }) {
           maskImage: "linear-gradient(180deg, #000 0%, #000 50%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.12) 96%, transparent 100%)",
         }}
       >
-        <div key={`${filter}|${search.school}|${search.course}|${retry}`} className="relative" style={{ height: Math.max(110, 5 + list.length * 91 + 90) }}>
-          {list.map((p, i) => {
-            const key = keyOf(p);
-            return (
-              <YellowCard
-                key={key}
-                top={5 + i * 91}
-                title={`${p.school} ${p.course}`}
-                sub={
-                  opening === key
-                    ? "불러오는 중이에요…"
-                    : failed === key
-                      ? "불러오지 못했어요. 다시 눌러주세요"
-                      : [p.category, p.duration, p.region].filter(Boolean).join(" · ")
-                }
-                onClick={() => open(p)}
-                className={`a-up ${failed === key ? "a-shake" : ""}`}
-                style={delay(i < 30 ? 0.24 + Math.min(i, 6) * 0.06 : 0)}
-              />
-            );
-          })}
+        <div key={`${filter}|${search.school}|${search.course}|${retry}`} className="relative" style={{ height: Math.max(similar.courses.length ? 300 : 110, lead + 5 + list.length * 91 + 90) }}>
+          {suggested && (
+            <>
+              <T y={4} size={14} lh={20} left={29} clip={344} className="a-fade text-mute">
+                {`${suggestedSchool ? `${suggestedSchool}에는` : "찾는 학교에"} ‘${search.course}’ 학과가 없어요\n이 학과를 찾으시나요?`}
+              </T>
+              {similar.programs.map((p, i) => card(p, 52 + i * 91, i))}
+              {list.length > 0 && (
+                <T y={lead - 26} size={14} left={29} className="a-fade text-mute">
+                  다른 학교 검색 결과
+                </T>
+              )}
+            </>
+          )}
+          {list.map((p, i) => card(p, lead + 5 + i * 91, i))}
           {status === "loading" && (
             <T y={40} size={14} center className="a-fade text-mute">
               학교와 학과를 찾고 있어요…
@@ -613,16 +645,35 @@ export function Schools({ nav, route, setState }) {
           )}
           {status === "ready" && list.length === 0 && (
             <>
-              <T y={40} size={14} center className="a-fade text-mute">
-                검색 결과가 없어요
-              </T>
+              {!suggested && (
+                <T y={40} size={14} center className="a-fade text-mute">
+                  검색 결과가 없어요
+                </T>
+              )}
               {filter !== "전체" && (
                 <button
                   onClick={() => setFilter("전체")}
-                  className="a-fade absolute left-0 right-0 top-[70px] text-center text-[14px] leading-[22px] text-mint underline"
+                  className="a-fade absolute left-0 right-0 text-center text-[14px] leading-[22px] text-mint underline"
+                  style={{ top: suggested ? lead + 10 : 70 }}
                 >
                   전체 분야에서 찾아보기
                 </button>
+              )}
+              {similar.courses.length > 0 && (
+                <div className="a-fade absolute left-[20px] w-[362px]" style={{ top: filter !== "전체" ? 108 : 78 }}>
+                  <p className="text-center text-[14px] leading-[22px] text-mute">이 학과를 찾으시나요?</p>
+                  <div className="mt-[10px] flex flex-wrap justify-center gap-[8px]">
+                    {similar.courses.map((name) => (
+                      <button
+                        key={name}
+                        onClick={() => pickCourse(name)}
+                        className="pressable h-[32px] max-w-full truncate rounded-full border border-mint bg-white px-[14px] text-[13px] text-mint"
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </>
           )}

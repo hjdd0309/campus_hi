@@ -84,14 +84,27 @@ test("학교·학과 목록은 형식이 맞을 때만 받아들인다", async (
   const program = { school: "경희대학교", course: "산업디자인학과", category: "예체능", duration: "4년", region: "경기도" };
   t.mock.method(globalThis, "fetch", async (url, options) => {
     requests.push([url, JSON.parse(options.body)]);
-    return new Response(JSON.stringify({ programs: [program, { school: "가천대학교", course: "심리학과" }], total: 2 }), { status: 200 });
+    return new Response(
+      JSON.stringify({ programs: [program, { school: "가천대학교", course: "심리학과" }], total: 2, similar_programs: [{ school: "경희대학교", course: "시각디자인학과" }], similar_courses: [] }),
+      { status: 200 },
+    );
   });
   assert.deepEqual(await getProgramList("전체", { school: "경희대", course: "디자인" }, 30), {
     programs: [program, { school: "가천대학교", course: "심리학과", category: "", duration: "", region: "" }],
     total: 2,
+    similarPrograms: [{ school: "경희대학교", course: "시각디자인학과", category: "", duration: "", region: "" }],
+    similarCourses: [],
   });
   assert.deepEqual(requests, [["/api/program_list", { interests: "전체", school: "경희대", course: "디자인", offset: 30, limit: 30 }]]);
-  for (const body of [{ programs: [{ school: "", course: "학과" }], total: 1 }, { programs: "x", total: 1 }, { programs: [] }]) {
+  const empty = { programs: [], total: 0, similar_programs: [], similar_courses: [] };
+  for (const body of [
+    { ...empty, programs: [{ school: "", course: "학과" }], total: 1 },
+    { ...empty, programs: "x", total: 1 },
+    { programs: [] },
+    { ...empty, similar_programs: [{ school: "경희대학교" }] },
+    { ...empty, similar_courses: [3] },
+    { programs: [], total: 0, similar_programs: [] },
+  ]) {
     t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(body), { status: 200 }));
     await assert.rejects(
       getProgramList("전체", { school: "", course: "" }, 0),

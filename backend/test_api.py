@@ -81,6 +81,42 @@ class ApiTests(unittest.TestCase):
             self.assertGreater(self.client.post("/api/course_list", json={"interests": keyword}).json()["total"], 0, keyword)
             self.assertGreater(self.client.post("/api/program_list", json={"interests": keyword}).json()["total"], 0, keyword)
 
+    def similar(self, school, course, interests="전체"):
+        return self.client.post("/api/program_list", json={"interests": interests, "school": school, "course": course}).json()
+
+    def test_program_list_suggests_similar_programs_at_the_wanted_school(self):
+        # 서울대학교에는 "전자"가 들어간 학과가 없지만(남서울대·동서울대 결과만 있다), 전기·정보공학부가 같은 과목을 가르친다.
+        result = self.similar("서울대학교", "전자")
+        self.assertGreater(result["total"], 0)
+        self.assertNotIn("서울대학교", {item["school"] for item in result["programs"]})
+        self.assertEqual(result["similar_programs"][0], {"school": "서울대학교", "course": "전기·정보공학부", "category": "공학", "duration": "4년", "region": "서울특별시"})
+        self.assertEqual(self.similar("서울대", "전자")["similar_programs"], result["similar_programs"])
+        self.assertEqual(result["similar_courses"], [])
+        software = [item["course"] for item in self.similar("고려대학교", "소프트웨어")["similar_programs"]]
+        self.assertEqual(software[0], "컴퓨터학과")
+        self.assertLessEqual(len(software), 3)
+        # 검색어가 이름에 들어간 학과가 전국에 없으면 오타를 고친 학과의 과목으로 찾는다.
+        self.assertTrue(all(item["school"] == "서울대학교" and "건축" in item["course"] for item in self.similar("서울대", "견축")["similar_programs"]))
+        # 관심 분야 필터와 상관없이 추천한다.
+        self.assertEqual(self.similar("서울대학교", "전기", "인문사회")["similar_programs"][0]["course"], "전기·정보공학부")
+        # 찾는 학교에서 결과가 나왔거나, 비슷한 학과가 없거나, 학교가 없으면 추천하지 않는다.
+        self.assertEqual(self.similar("연세대학교", "전자")["similar_programs"], [])
+        self.assertEqual(self.similar("서울대학교", "호텔")["similar_programs"], [])
+        self.assertEqual(self.similar("없는학교", "전자")["similar_programs"], [])
+        self.assertEqual(self.similar("서울대학교", "")["similar_programs"], [])
+
+    def test_program_list_suggests_course_names_for_typos(self):
+        self.assertEqual(self.similar("", "견축")["similar_courses"][:2], ["건축학과", "건축공학과"])
+        self.assertEqual(self.similar("", "컴퓨타")["similar_courses"][0], "컴퓨터공학과")
+        self.assertEqual(self.similar("", "기게공학")["similar_courses"][0], "기계공학과")
+        self.assertEqual(self.similar("", "간오", "공학")["similar_courses"][0], "간호학과")
+        for course in ("ㅁㄴㅇ", "x" * 100, "블록체인의미래"):
+            self.assertEqual(self.similar("", course)["similar_courses"], [], course)
+        self.assertEqual(self.similar("", "")["similar_courses"], [])
+        # 결과가 있으면 보내지 않는다.
+        self.assertEqual(self.similar("", "건축")["similar_courses"], [])
+        self.assertTrue(all(len(self.similar("", word)["similar_courses"]) <= 5 for word in ("견축", "경엉")))
+
     def test_program_list_searches_school_and_course(self):
         everything = self.client.post("/api/program_list", json={"interests": "전체"}).json()
         self.assertEqual(everything["total"], 12732)
@@ -97,9 +133,13 @@ class ApiTests(unittest.TestCase):
         first = self.client.post("/api/program_list", json={"interests": "예체능", "limit": 5}).json()["programs"]
         second = self.client.post("/api/program_list", json={"interests": "예체능", "limit": 5, "offset": 5}).json()["programs"]
         self.assertFalse({(item["school"], item["course"]) for item in first} & {(item["school"], item["course"]) for item in second})
-        self.assertEqual(self.client.post("/api/program_list", json={"interests": "전체", "school": "없는학교", "course": "없는학과"}).json(), {"programs": [], "total": 0})
+        self.assertEqual(self.client.post("/api/program_list", json={"interests": "전체", "school": "없는학교", "course": "없는학과"}).json(), {"programs": [], "total": 0, "similar_programs": [], "similar_courses": []})
         # 학교 검색어는 학교명에서만, 학과 검색어는 학과명에서만 찾는다.
         self.assertEqual(self.client.post("/api/program_list", json={"interests": "전체", "school": "산업디자인"}).json()["total"], 0)
+        # 찾는 학과가 있으면 비슷한 학과는 보내지 않는다.
+        self.assertEqual(everything["similar_programs"] + everything["similar_courses"], [])
+        found = self.client.post("/api/program_list", json={"interests": "전체", "school": "경희대학교", "course": "산업디자인"}).json()
+        self.assertEqual(found["similar_programs"] + found["similar_courses"], [])
         # 예전 한 칸 검색(query)은 받지 않는다.
         self.assertEqual(self.client.post("/api/program_list", json={"interests": "전체", "query": "경희대"}).status_code, 400)
 
