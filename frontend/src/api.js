@@ -67,6 +67,7 @@ export async function getCourseList(interests, query, offset, signal) {
   };
 }
 // 학교·학과 조합을 검색한다. search는 { school, course } 검색어이고, 한 번에 30개씩 받는다.
+// 찾는 학과가 없으면 similarPrograms(찾는 학교의 비슷한 학과)나 similarCourses(이름이 비슷한 학과명)가 함께 온다.
 export async function getProgramList(interests, search, offset, signal) {
   const data = await post(
     "/program_list",
@@ -74,21 +75,22 @@ export async function getProgramList(interests, search, offset, signal) {
     signal,
   );
   const text = (value) => (typeof value === "string" ? value : "");
-  if (
-    !Number.isInteger(data.total) ||
-    !Array.isArray(data.programs) ||
-    !data.programs.every((item) => text(item?.school) && text(item?.course))
-  )
-    throw new ApiError(502, "목록 형식이 올바르지 않아요. 다시 시도해주세요.");
+  const programList = (value) => Array.isArray(value) && value.every((item) => text(item?.school) && text(item?.course));
+  const message = "목록 형식이 올바르지 않아요. 다시 시도해주세요.";
+  if (!Number.isInteger(data.total) || !programList(data.programs) || !programList(data.similar_programs))
+    throw new ApiError(502, message);
+  const program = (item) => ({
+    school: item.school,
+    course: item.course,
+    category: text(item.category),
+    duration: text(item.duration),
+    region: text(item.region),
+  });
   return {
-    programs: data.programs.map((item) => ({
-      school: item.school,
-      course: item.course,
-      category: text(item.category),
-      duration: text(item.duration),
-      region: text(item.region),
-    })),
+    programs: data.programs.map(program),
     total: data.total,
+    similarPrograms: data.similar_programs.map(program),
+    similarCourses: stringList(data.similar_courses, message).filter(Boolean),
   };
 }
 export async function getSchoolList(course, signal) {
