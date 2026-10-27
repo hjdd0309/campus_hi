@@ -45,5 +45,37 @@ class SubjectLevelTests(unittest.TestCase):
         self.assertEqual(levels, {first: [1, 1]})
 
 
+class LessonPickTests(unittest.TestCase):
+    def test_source_typo_is_fixed_so_games_connect(self):
+        curriculum = main.catalog().programs[("경희대학교", "컴퓨터공학부")]["curriculum"]
+        self.assertIn("객체지향프로그래밍", curriculum)
+        self.assertNotIn("객체지항프로그래밍", curriculum)
+
+    def test_curriculum_list_sends_picks_that_exist_in_the_curriculum(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "picks.json"
+            path.write_text(json.dumps([
+                {"school": "경희대학교", "course": "컴퓨터공학부 컴퓨터공학과", "years": {"1": ["없는과목", "객체지향프로그래밍"], "2": ["없는과목"], "9": ["데이터베이스"], "3": "데이터베이스"}},
+                {"school": "경희대학교", "course": "컴퓨터공학부 인공지능학과", "years": {"1": [3]}},
+                {"school": 1, "course": "컴퓨터공학부", "years": {"1": ["데이터베이스"]}},
+            ], ensure_ascii=False), encoding="utf-8")
+            main.lesson_picks.cache_clear()
+            try:
+                with mock.patch.object(main, "PICKS_PATH", path):
+                    client = TestClient(main.app)
+                    picks = {course: client.post("/api/curriculum_list", json={"school": "경희대학교", "course": course}).json()["picks"]
+                             for course in ("컴퓨터공학부 컴퓨터공학과", "컴퓨터공학부 인공지능학과", "컴퓨터공학부")}
+            finally:
+                main.lesson_picks.cache_clear()
+        self.assertEqual(picks, {"컴퓨터공학부 컴퓨터공학과": {"1": ["객체지향프로그래밍"]}, "컴퓨터공학부 인공지능학과": {}, "컴퓨터공학부": {}})
+
+    def test_kyung_hee_computer_departments_start_with_object_oriented_programming(self):
+        client = TestClient(main.app)
+        for course in ("컴퓨터공학부 컴퓨터공학과", "컴퓨터공학부", "컴퓨터공학부 인공지능학과"):
+            picks = client.post("/api/curriculum_list", json={"school": "경희대학교", "course": course}).json()["picks"]
+            self.assertEqual(picks["1"], ["객체지향프로그래밍"], course)
+            self.assertIn(picks["2"][0], ("데이터베이스", "컴퓨터구조"), course)
+
+
 if __name__ == "__main__":
     unittest.main()
