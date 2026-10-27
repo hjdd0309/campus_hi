@@ -94,14 +94,15 @@ test("검증된 학년별 편성이 있으면 그 학년의 과목으로 체험�
   const curriculum = ["알고리즘", "프로그래밍기초", "자료구조", "운영체제"];
   const d = createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", years, "4년");
   assert.equal(d.lessonsFromYears, true);
-  // 이론 학년(1·2학년)은 그 학년의 과목으로, 3학년은 학과군 실습이다.
-  assert.deepEqual(d.lessons, ["프로그래밍기초", "컴퓨터구조", "버블 정렬 직접 해보기", "캡스톤 디자인"]);
+  // 이론 학년(1·2학년)은 그 학년의 과목으로, 3학년은 학과군 실습이다(이름은 실습과 이어지는 과목인 알고리즘).
+  assert.deepEqual(d.lessons, ["프로그래밍기초", "컴퓨터구조", "알고리즘", "캡스톤 디자인"]);
   assert.deepEqual(d.games, [null, null, "group:computing", null]);
   // 이론 학년 중 하나라도 편성이 비어 있으면 학년을 지어내지 않고 교과목 목록에서 고른다.
   const partial = { ...years, terms: years.terms.filter((term) => term.year !== 2) };
   const fallback = createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", partial, "4년");
   assert.equal(fallback.lessonsFromYears, false);
-  assert.deepEqual(fallback.lessons, ["알고리즘", "프로그래밍기초", "버블 정렬 직접 해보기", "캡스톤 디자인"]);
+  // 알고리즘은 이론 수업에 썼으므로 실습 학년은 다음 후보인 자료구조다.
+  assert.deepEqual(fallback.lessons, ["알고리즘", "프로그래밍기초", "자료구조", "캡스톤 디자인"]);
   // 실습 학년의 편성은 없어도 된다.
   const noThird = { ...years, terms: years.terms.filter((term) => term.year !== 3) };
   assert.equal(createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", noThird, "4년").lessonsFromYears, true);
@@ -349,6 +350,16 @@ test("v3 기록은 학년 자리의 수업이 바뀌었으면 버리지 않고 �
     }),
   );
   assert.deepEqual(again.archive, migrated.archive);
+});
+test("v3의 과목 자리가 지금은 같은 이름의 학과군 실습이어도 바뀐 자리로 보고 이전 기록으로 옮긴다", () => {
+  const id = "api:가천대학교:컴퓨터공학과";
+  const old = { id, name: "컴퓨터공학과", school: "가천대학교", curriculum: ["C언어", "운영체제", "알고리즘"], category: "공학", duration: "4년", lessons: ["C언어", "운영체제", "알고리즘", "캡스톤 디자인"] };
+  const migrated = loadState(only("hi-campus-v3", { catalog: [old], journeys: { [id]: { completed: 3 } }, notes: { [`${id}-2`]: "알고리즘 기록" } }));
+  // 3학년 이름은 그대로 알고리즘이지만 하는 활동은 학과군 실습으로 바뀌었다.
+  assert.equal(migrated.catalog[0].lessons[2], "알고리즘");
+  assert.equal(migrated.catalog[0].games[2], "group:computing");
+  assert.deepEqual(migrated.notes, {});
+  assert.deepEqual(migrated.archive, [{ id, title: "알고리즘", note: "알고리즘 기록" }]);
 });
 test("8단계였던 기록을 삭제하지 않고 학년별 구조로 옮긴다", () => {
   const migrated = loadState(

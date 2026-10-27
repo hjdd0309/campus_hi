@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanLevels, cleanPicks, gameFor, pickLessons } from "./games.js";
+import { cleanLevels, cleanPicks, gameFor, pickLessons, pickPracticeSubject } from "./games.js";
 import {
   createDepartment,
   completeLesson,
@@ -39,7 +39,8 @@ test("이론 수업 과목은 서로 다른 유형의 연습 문제가 있는 �
 });
 test("학과군 실습은 체험을 마쳐야 완료된다", () => {
   const d = createDepartment("컴퓨터공학과", "가천대학교", ["C언어", "자료구조"], "공학", null, "3년");
-  assert.deepEqual(d.lessons, ["C언어", "버블 정렬 직접 해보기", "캡스톤 디자인"]);
+  // 실습 학년은 교과목의 이어지는 과목(자료구조) 이름으로 보여주고, 하는 활동은 학과군 실습이다.
+  assert.deepEqual(d.lessons, ["C언어", "자료구조", "캡스톤 디자인"]);
   assert.deepEqual(d.games, [null, "group:computing", null]);
   const state = {
     ...structuredClone(initialState),
@@ -115,4 +116,28 @@ test("사람이 정해 둔 학년별 과목이 교과목에 있으면 규칙보�
 test("학년별 과목 후보는 형식이 맞는 것만 받는다", () => {
   assert.deepEqual(cleanPicks({ 1: ["가", 3, ""], 2: [], 7: ["나"], x: ["다"], 3: "라" }), { 1: ["가"] });
   assert.deepEqual(cleanPicks(null), {});
+});
+test("학과군 실습 학년은 실습과 이어지는 과목 중 그 학년에 맞는 과목 이름으로 보여준다", () => {
+  const patterns = [/^재무회계/, /^중급회계/, /^회계원리/];
+  const levels = { 회계원리: [1, 1], 재무회계: [2, 2], 중급회계: [2, 3] };
+  const curriculum = ["회계원리", "마케팅원론", "재무회계", "중급회계1"];
+  // 3학년이면 범위가 맞는 중급회계1, 1학년(2년제)이면 회계원리.
+  assert.equal(pickPracticeSubject(curriculum, patterns, 3, { ...levels, 중급회계1: [2, 3] }), "중급회계1");
+  assert.equal(pickPracticeSubject(curriculum, patterns, 1, levels), "회계원리");
+  // 범위가 딱 맞는 과목이 없으면 앞쪽 패턴(범위를 모르는 과목도 한 학년 어긋나는 과목과 같이 본다).
+  assert.equal(pickPracticeSubject(["자료구조", "알고리즘분석"], [/^알고리즘/, /^자료구조/], 3, { 자료구조: [1, 2] }), "알고리즘분석");
+  // 범위가 크게 어긋나는 과목은 뒤로 간다.
+  assert.equal(pickPracticeSubject(["알고리즘", "자료구조"], [/^알고리즘/, /^자료구조/], 1, { 알고리즘: [3, 4], 자료구조: [1, 2] }), "자료구조");
+  // 범위가 같으면 앞쪽 패턴, 이론 수업에 쓴 과목은 빼고, 맞는 과목이 없으면 null.
+  assert.equal(pickPracticeSubject(curriculum, patterns, 2, levels), "재무회계");
+  assert.equal(pickPracticeSubject(curriculum, patterns, 2, levels, new Set(["재무회계"])), "중급회계1");
+  assert.equal(pickPracticeSubject(["마케팅원론"], patterns, 3, levels), null);
+  assert.equal(pickPracticeSubject(curriculum, undefined, 3, levels), null);
+  // 학과의 3학년 이름이 과목으로 바뀌어도 하는 활동은 학과군 실습이다.
+  const d = createDepartment("경영학과", "가천대학교", curriculum, "인문사회", null, "4년", "", null, { 회계원리: [1, 1], 재무회계: [2, 2] });
+  // 이론 학년(1·2학년)이 회계원리·재무회계를 먼저 쓰므로 3학년은 남은 중급회계1이다.
+  assert.deepEqual(d.lessons.slice(0, 3), ["회계원리", "재무회계", "중급회계1"]);
+  assert.equal(d.games[2], "group:business");
+  // 맞는 과목이 없으면 실습 이름 그대로다.
+  assert.equal(createDepartment("경영학과", "가천대학교", ["마케팅원론", "경영전략"], "인문사회", null, "4년").lessons[2], "분개 연습");
 });

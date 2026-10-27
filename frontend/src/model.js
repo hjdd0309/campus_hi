@@ -1,7 +1,7 @@
-import { cleanLevels, cleanPicks, isGame, pickLessons } from "./games.js";
+import { cleanLevels, cleanPicks, isGame, pickLessons, pickPracticeSubject } from "./games.js";
 import { cleanLessonGames } from "./lessonGames.js";
 import { experiences } from "./experiences.js";
-import { groupExperience, groupOf } from "./groups.js";
+import { groupExperience, groupOf, PRACTICE_SUBJECTS } from "./groups.js";
 
 export const STORAGE_KEY = "hi-campus-v4";
 // 예전 저장 데이터: [저장 키, 그때의 체험 단계 수]. 0이면 학년별 구조다.
@@ -307,6 +307,10 @@ export function createDepartment(
   const picked = lessonsFromYears
     ? theoryYears.map((year) => pickLessons(subjectsOf(year), [year], lessonGames, subjectLevels, lessonPicks)[0])
     : pickLessons(curriculum, theoryYears, lessonGames, subjectLevels, lessonPicks);
+  // 학과군 실습 학년은 교과목에 실습과 이어지는 과목이 있으면 그 과목 이름으로 보여준다(하는 활동은 실습 그대로).
+  const practiceSubject = practice
+    ? pickPracticeSubject(curriculum, PRACTICE_SUBJECTS[group], yearNumbers[yearNumbers.length - 2], subjectLevels, new Set(picked.map((item) => item?.subject)))
+    : null;
   const template = departments.find((d) => d.name === course) || {
     category: field.id,
     group: field.group,
@@ -335,7 +339,7 @@ export function createDepartment(
     picks: lessonPicks,
     lessons: [
       ...theoryYears.map((year, i) => picked[i]?.subject || `${year}학년 전공 탐색`),
-      ...(practice ? [practice.title] : []),
+      ...(practice ? [practiceSubject || practice.title] : []),
       final.name,
     ],
     // 학년마다의 체험: 연습 문제의 유형, 학과군 실습(group:학과군), 없으면 null.
@@ -386,6 +390,7 @@ export function loadState(storage) {
     );
     // v3에서 옮길 때: 학년 자리의 수업 이름이 바뀌었으면(학과군 실습이 들어오는 등) 그 자리의 기록은 archive로 옮긴다.
     const lessonsOf = new Map([...departments, ...catalog].map((d) => [d.id, d.lessons]));
+    const gamesOf = new Map([...departments, ...catalog].map((d) => [d.id, d.games || []]));
     const oldLessons = new Map(
       from === "hi-campus-v3" && Array.isArray(value.catalog)
         ? value.catalog
@@ -400,7 +405,9 @@ export function loadState(storage) {
       if (!match || !oldLessons.has(match[1])) return null;
       const before = oldLessons.get(match[1])[Number(match[2])];
       const now = lessonsOf.get(match[1])?.[Number(match[2])];
-      return typeof before === "string" && before !== now ? before : null;
+      // 학과군 실습 자리는 v3에 없던 활동이라, 이름이 예전 과목과 같아도(실습 학년을 과목 이름으로 보여줄 때) 바뀐 자리로 본다.
+      const practiceNow = String(gamesOf.get(match[1])?.[Number(match[2])] || "").startsWith("group:");
+      return typeof before === "string" && (before !== now || practiceNow) ? before : null;
     };
     const keep = (key, text) => {
       const before = replaced(key);
