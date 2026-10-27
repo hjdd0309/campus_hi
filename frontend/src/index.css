@@ -540,12 +540,6 @@ body {
 .match-board button[aria-disabled="true"] {
   cursor: default;
 }
-.game-note {
-  margin: -2px 0 10px;
-  font-size: 11px;
-  line-height: 17px;
-  color: #827d76;
-}
 .lesson-game .text-button {
   display: block;
   margin: 12px auto 0;
