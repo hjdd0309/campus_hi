@@ -1,4 +1,4 @@
-import { isGame, pickLessons } from "./games.js";
+import { cleanLevels, isGame, pickLessons } from "./games.js";
 import { cleanLessonGames } from "./lessonGames.js";
 import { experiences } from "./experiences.js";
 import { groupExperience, groupOf } from "./groups.js";
@@ -278,10 +278,13 @@ export function createDepartment(
   duration = "",
   region = "",
   games = null,
+  levels = null,
 ) {
   const yearly = cleanYears(years);
   // 미리 만들어 둔 연습 문제가 있는 과목과 그 유형.
   const lessonGames = cleanLessonGames(games);
+  // 과목을 보통 듣는 학년 범위. 학년마다 맞는 과목을 고르는 데 쓴다.
+  const subjectLevels = cleanLevels(levels);
   const yearNumbers = stageYears(duration);
   const field = fields.find((item) => item.id === category) || fallbackField;
   const group = groupOf(course, field.id);
@@ -297,8 +300,8 @@ export function createDepartment(
     theoryYears.length > 0 &&
     theoryYears.every((year) => subjectsOf(year).length > 0);
   const picked = lessonsFromYears
-    ? theoryYears.map((year) => pickLessons(subjectsOf(year), 1, lessonGames)[0])
-    : pickLessons(curriculum, theoryYears.length, lessonGames);
+    ? theoryYears.map((year) => pickLessons(subjectsOf(year), [year], lessonGames, subjectLevels)[0])
+    : pickLessons(curriculum, theoryYears, lessonGames, subjectLevels);
   const template = departments.find((d) => d.name === course) || {
     category: field.id,
     group: field.group,
@@ -323,6 +326,7 @@ export function createDepartment(
     final,
     lessonsFromYears,
     lessonGames,
+    levels: subjectLevels,
     lessons: [
       ...theoryYears.map((year, i) => picked[i]?.subject || `${year}학년 전공 탐색`),
       ...(practice ? [practice.title] : []),
@@ -366,6 +370,7 @@ export function loadState(storage) {
               typeof d.duration === "string" ? d.duration : "",
               typeof d.region === "string" ? d.region : "",
               d.lessonGames,
+              d.levels,
             ),
           )
       : [];

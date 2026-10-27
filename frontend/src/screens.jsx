@@ -521,11 +521,12 @@ export function Schools({ nav, route, setState }) {
     setFailed(null);
     getCurriculum(p.school, p.course)
       .then((result) => {
-        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games);
+        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games, result.levels);
+        // 이미 입학한 학과는 입학할 때 정한 학년별 수업을 그대로 둔다. 새로 받은 데이터로 바꾸면 진행 중인 학년의 수업이 바뀐다.
         setState((s) => ({
           ...s,
           current: dept.id,
-          catalog: [...s.catalog.filter((item) => item.id !== dept.id), dept],
+          catalog: s.journeys[dept.id] && s.catalog.some((item) => item.id === dept.id) ? s.catalog : [...s.catalog.filter((item) => item.id !== dept.id), dept],
         }));
         nav.push("detail");
       })

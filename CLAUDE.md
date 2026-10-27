@@ -56,7 +56,7 @@
 
 서비스 이름은 캠퍼스하이다. 대학 학과·학교·교과과정을 탐색하고 학년별 체험으로 전공을 미리 경험하는 웹 서비스다.
 
-체험은 학과의 수업연한만큼 학년마다 하나씩 있다(4년제 1~4학년, 2년제 1~2학년, 전공심화는 4학년에서 끝남). 마지막 학년은 졸업 과제, 그 바로 앞 학년은 학과군 전공 실습, 나머지 학년은 이론 수업(과목 하나)이다(`frontend/src/model.js`의 `createDepartment`). 학과는 학과명 규칙으로 16개 학과군에 들어가고(`groups.js`), 실습과 졸업 과제는 학과군 데이터(`groupData.js`)로 정한다. 학과군 데이터가 공개(verified)되지 않았으면 실습 자리도 이론 수업으로, 졸업 과제는 계열에 맞는 기본 과제(`finals`)로 채운다. 이론 수업은 검증된 학년별 편성이 있으면 그 학년의 과목을, 없으면 교과목 목록에서 연습 문제가 있는 과목부터 고르고 화면에 실제 학년과 다를 수 있다고 알린다.
+체험은 학과의 수업연한만큼 학년마다 하나씩 있다(4년제 1~4학년, 2년제 1~2학년, 전공심화는 4학년에서 끝남). 마지막 학년은 졸업 과제, 그 바로 앞 학년은 학과군 전공 실습, 나머지 학년은 이론 수업(과목 하나)이다(`frontend/src/model.js`의 `createDepartment`). 학과는 학과명 규칙으로 16개 학과군에 들어가고(`groups.js`), 실습과 졸업 과제는 학과군 데이터(`groupData.js`)로 정한다. 학과군 데이터가 공개(verified)되지 않았으면 실습 자리도 이론 수업으로, 졸업 과제는 계열에 맞는 기본 과제(`finals`)로 채운다. 이론 수업은 검증된 학년별 편성이 있으면 그 학년의 과목을, 없으면 교과목 목록에서 연습 문제가 있는 과목 중 그 학년에 보통 듣는 과목(`data/subject_levels.json`의 학년 범위)부터 고르고 화면에 실제 학년과 다를 수 있다고 알린다. 이미 입학한 학과는 입학할 때 정한 수업을 바꾸지 않는다.
 
 대상은 전국 학부 과정 전체다(대학원 제외, 교과목이 등록된 학교·학과만. 자유·자율전공, 교양 과정, 1년 과정은 학년별 체험을 만들 수 없어 제외). 데이터에는 학년 정보가 없으므로, 학년별 수업은 실제 학년 편성 데이터를 확보한 학교·학과에만 표시하고 추정으로 채우지 않는다. 데이터 범위와 API 형식은 `backend/SOURCE.md`에 있다.
 
@@ -78,9 +78,10 @@
 | 개발 서버 실행(백엔드 + 프론트) | `npm start` |
 | 환경 준비만 | `npm run setup` |
 | 프론트 테스트 | `npm test` |
-| 백엔드 테스트 | `backend/.venv/Scripts/python -m unittest backend.test_api backend.test_pipeline backend.test_lesson_games` (`backend/requirements-test.txt`, `backend/requirements-pipeline.txt` 설치 필요) |
+| 백엔드 테스트 | `backend/.venv/Scripts/python -m unittest backend.test_api backend.test_pipeline backend.test_lesson_games backend.test_subject_levels` (`backend/requirements-test.txt`, `backend/requirements-pipeline.txt` 설치 필요) |
 | 학년별 교육과정 수집 | `backend/.venv/Scripts/python -m backend.pipeline collect` (`ANTHROPIC_API_KEY` 필요, 사용법은 `README.md`) |
 | 연습 문제 현황 | `backend/.venv/Scripts/python -m backend.lesson_games status` |
+| 과목 학년 범위 현황 | `backend/.venv/Scripts/python -m backend.subject_levels status` (사용법은 파일 맨 위 설명) |
 | 프로덕션 빌드 | `npm run build` |
 | 빌드 결과 미리보기 | `npm run preview` |
 
@@ -96,7 +97,8 @@
 4. `ingest 파일 --model 실제_모델명`으로 넣고, 실패한 줄은 고쳐서 다시 넣는다.
 5. `quiz --out ...`으로 정답을 가린 문제를 내보내고, 문제를 쓰지 않은 별도 서브에이전트에게 풀게 한다. 서브에이전트에게는 그 파일만 읽게 하고 정답이 든 파일은 열지 못하게 한다. 네가 쓴 문제를 네가 승인하지 않는다.
 6. `verify-ingest 풀이파일`로 반영하고 `status`로 확인한다.
-7. `TODO.md`의 생성 진행 상황(완료·남은 과목 수)을 고친다. 커밋은 요청받았을 때만 한다.
+7. 새로 공개된 과목의 학년 범위를 매긴다: `python -m backend.subject_levels todo --out ...`로 과목을 받아 `과목명<TAB>시작-끝`으로 쓰고 `ingest`한 뒤, `blind`로 범위를 가린 목록을 내보내 쓰지 않은 별도 서브에이전트가 따로 매기게 하고 `verify`로 반영한다. 서브에이전트에게는 그 목록만 읽게 한다.
+8. `TODO.md`의 생성 진행 상황(완료·남은 과목 수)을 고친다. 커밋은 요청받았을 때만 한다.
 
 작업 폴더 `backend/.cache/lesson_games/`에는 지난 작업에서 만든 도우미가 있다(저장소에는 올라가지 않으니, 없으면 같은 역할로 다시 만든다).
 

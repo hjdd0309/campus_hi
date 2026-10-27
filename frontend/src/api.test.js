@@ -16,7 +16,7 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
       ? { course_list: ["산업디자인학과", "PEP(정치학,경제학,철학)연계전공"], total: 41 }
       : url.endsWith("school_list")
         ? { school_list: ["경희대학교"] }
-        : { curriculum_list: ["기초설계", "제품설계"], category: "예체능", duration: "4년" };
+        : { curriculum_list: ["기초설계", "제품설계"], category: "예체능", duration: "4년", levels: { 기초설계: [1, 2], 제품설계: [3, 2], 없는값: [0, 5], 문자: "2-3" } };
     return new Response(JSON.stringify(data), { status: 200 });
   });
   assert.deepEqual(await getCourseList("디자인", "산업", 30), {
@@ -31,6 +31,8 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     duration: "4년",
     region: "",
     games: {},
+    // 학년 범위는 1~4학년, 시작 ≤ 끝인 것만 받는다.
+    levels: { 기초설계: [1, 2] },
   });
   assert.deepEqual(requests, [
     ["/api/course_list", { interests: "디자인", query: "산업", offset: 30, limit: 30 }],
