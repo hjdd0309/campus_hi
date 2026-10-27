@@ -7,12 +7,14 @@ import {
   inversions,
   isSorted,
   makeTrials,
+  predict,
   startOrder,
   summarizeReaction,
   swapAdjacent,
   templates,
+  trainStump,
 } from "./experiences.js";
-import { finals } from "./model.js";
+import { createDepartment, finalReady, finals } from "./model.js";
 import { groupData } from "./groupData.js";
 
 // 테스트가 매번 같은 결과를 내도록 고정된 난수를 쓴다.
@@ -28,7 +30,7 @@ test("지금 쓰는 체험 데이터는 모두 형식 검사를 통과한다", (
   for (const [id, data] of Object.entries(experiences)) assert.ok(data, `${id} 형식이 틀림`);
   assert.deepEqual(
     Object.fromEntries(Object.entries(experiences).map(([id, data]) => [id, data.template])),
-    { sorting: "B", journal: "C", artwork: "A", capstone: "F", thesis: "F", showcase: "F" },
+    { sorting: "B", journal: "C", artwork: "A", capstone: "F", petClassifier: "G", thesis: "F", showcase: "F" },
   );
   // 졸업 과제와, 학과군 데이터가 바탕으로 쓰는 체험은 모두 데이터가 있다.
   for (const final of Object.values(finals)) assert.ok(final.name);
@@ -161,4 +163,56 @@ test("졸업 계획서는 칸마다 고를 수 있는 보기가 있다", () => {
     for (const prompt of final.prompts) assert.ok(prompt.options.length >= 2);
   }
   assert.equal(finals.artwork.kind, "artwork");
+});
+
+test("AI 가르치기: 사용자가 붙인 이름표로 실제로 학습하고, 결과는 미리 정해 두지 않는다", () => {
+  const data = experiences.petClassifier;
+  const teach = (labels) => trainStump(data, data.train.map((card, i) => ({ picture: card.picture, label: labels[i] })));
+  const passes = (model) => data.test.every((card) => predict(model, card.picture).label === card.answer);
+  const right = data.train.map((card) => card.answer);
+  // 맞게 가르치면 귀 모양을 배우고 시험을 다 맞히지만, 머리띠를 한 강아지는 고양이라고 한다(확신도는 계산값).
+  const model = teach(right);
+  assert.equal(model.feature, "ears");
+  assert.ok(passes(model));
+  assert.deepEqual(predict(model, data.surprise.picture), { label: "cat", confidence: 80 });
+  // 귀 모양만 학습 사진을 완벽하게 나눈다. 주둥이나 털 색을 배운 AI는 시험에서 틀린다.
+  for (const feature of ["nose", "fur"]) {
+    const rule = (value) => {
+      const same = data.train.filter((card) => card.picture[feature] === value);
+      const cats = same.filter((card) => card.answer === "cat").length;
+      return cats * 2 >= same.length ? "cat" : "dog";
+    };
+    const forced = { feature, rule: Object.fromEntries(data.features.find((f) => f.id === feature).values.map((v) => [v.id, rule(v.id)])), counts: Object.fromEntries(data.features.find((f) => f.id === feature).values.map((v) => [v.id, { total: 1, hits: 1 }])) };
+    assert.ok(!passes(forced), feature);
+  }
+  // 두 장을 잘못 가르치면 주둥이를 배워 시험에서 틀린다. 모두 반대로 가르치면 하나도 못 맞힌다.
+  const twoWrong = teach(["cat", "dog", "dog", "dog", "cat", "cat"]);
+  assert.equal(twoWrong.feature, "nose");
+  assert.ok(!passes(twoWrong));
+  const flipped = teach(right.map((label) => (label === "cat" ? "dog" : "cat")));
+  assert.equal(data.test.filter((card) => predict(flipped, card.picture).label === card.answer).length, 0);
+  // 한 장만 잘못 가르치면 확신도가 낮아진다(3장 중 2장이 고양이 → (2+1)/(3+2)).
+  assert.equal(predict(teach(["cat", "dog", "dog", "dog", "cat", "dog"]), data.surprise.picture).confidence, 60);
+});
+test("AI 가르치기 데이터는 형식이 맞는 것만 받는다", () => {
+  const base = { ...experiences.petClassifier, caption: experiences.petClassifier.surprise.caption };
+  assert.ok(cleanExperience(base));
+  const broken = [
+    { ...base, labels: [base.labels[0]] },
+    { ...base, train: base.train.slice(0, 3) },
+    { ...base, test: [{ picture: { ears: "pointy", nose: "small" }, answer: "cat" }, ...base.test] },
+    { ...base, surprise: { ...base.surprise, answer: "bird" } },
+    { ...base, reviews: { ...base.reviews, wrong: { text: "별로", stars: 0 } } },
+    { ...base, features: [base.features[0], { ...base.features[1], values: [base.features[1].values[0]] }] },
+    { ...base, test: [{ picture: { ...base.test[0].picture, look: "hat" }, answer: "dog" }, ...base.test.slice(1)] },
+  ];
+  for (const raw of broken) assert.equal(cleanExperience(raw), null);
+  // 검사를 통과한 데이터를 다시 검사해도 같다(학과군 데이터가 base로 쓸 때).
+  assert.deepEqual(cleanExperience(experiences.petClassifier), experiences.petClassifier);
+});
+test("프로젝트형 졸업 과제는 끝까지 해봐야 완료할 수 있다", () => {
+  const d = createDepartment("컴퓨터공학과", "가천대학교", ["C언어"], "공학", null, "4년");
+  const project = { ...d, final: { kind: "project", name: "캡스톤 디자인" } };
+  assert.equal(finalReady({ artworks: {}, capstones: {} }, project), false);
+  assert.equal(finalReady({ artworks: { [d.id]: true }, capstones: {} }, project), true);
 });

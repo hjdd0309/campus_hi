@@ -1363,14 +1363,16 @@ export function Lesson({ active, nav, state, setState }) {
       </Screen>
     );
 
-  // 수업의 종류: 졸업 계획서, 학과군 전공 실습, 연습 문제(불러오는 중·오류 포함), 기본 체험.
-  const mode = isFinal ? "plan" : practice ? "practice" : typed && quiz.status !== "basic" ? quiz.status === "ready" ? "quiz" : quiz.status : "basic";
+  // 수업의 종류: 졸업 계획서, 졸업 프로젝트(AI 가르치기 등), 학과군 전공 실습, 연습 문제(불러오는 중·오류 포함), 기본 체험.
+  const mode = isFinal ? (final.kind === "project" ? "project" : "plan") : practice ? "practice" : typed && quiz.status !== "basic" ? quiz.status === "ready" ? "quiz" : quiz.status : "basic";
   const play = game && state.plays[key]?.game === game ? state.plays[key] : null;
   const played = play?.summary || "";
   const plan = state.capstones[d.id];
-  const tried = mode === "plan" ? planReady(plan) : mode === "practice" || mode === "quiz" ? !!played : mode === "basic";
+  const projectDone = !!state.artworks[d.id];
+  const tried =
+    mode === "plan" ? planReady(plan) : mode === "project" ? projectDone : mode === "practice" || mode === "quiz" ? !!played : mode === "basic";
 
-  const headline = mode === "plan" ? final.name : mode === "practice" ? practice.title : mode === "quiz" ? quiz.game.title : subject;
+  const headline = mode === "plan" || mode === "project" ? final.name : mode === "practice" ? practice.title : mode === "quiz" ? quiz.game.title : subject;
   const warn = (message) => {
     setNotice(message);
     setShake((n) => n + 1);
@@ -1403,6 +1405,7 @@ export function Lesson({ active, nav, state, setState }) {
   if (step === 0) {
     const task =
       mode === "plan" ? final.intro
+      : mode === "project" ? final.task
       : mode === "practice" ? practice.task
       : mode === "quiz" ? quizTask(quiz.game)
       : mode === "basic"
@@ -1428,13 +1431,16 @@ export function Lesson({ active, nav, state, setState }) {
             </button>
           </div>
         )}
-        {mode === "practice" && practice.learn && (
+        {(mode === "practice" || mode === "project") && (mode === "practice" ? practice : final).learn && (
           <MintCard title="알아두기" className="a-up mt-[22px]">
-            <p style={delay(0.1)}>{practice.learn}</p>
+            <p style={delay(0.1)}>{(mode === "practice" ? practice : final).learn}</p>
           </MintCard>
         )}
         {task && (
-          <MintCard title="이 수업에서 해볼 것" className={`a-up ${mode === "practice" && practice.learn ? "mt-[12px]" : "mt-[22px]"}`}>
+          <MintCard
+            title="이 수업에서 해볼 것"
+            className={`a-up ${(mode === "practice" || mode === "project") && (mode === "practice" ? practice : final).learn ? "mt-[12px]" : "mt-[22px]"}`}
+          >
             <p style={delay(0.12)}>{task}</p>
           </MintCard>
         )}
@@ -1455,6 +1461,16 @@ export function Lesson({ active, nav, state, setState }) {
             onChange={(value) => {
               if (planReady(value)) setNotice("");
               setState((s) => ({ ...s, capstones: { ...s.capstones, [d.id]: value } }));
+            }}
+          />
+        )}
+        {mode === "project" && (
+          <LessonGame
+            game={final}
+            played={projectDone ? "졸업 과제를 끝까지 해봤어요" : ""}
+            onComplete={() => {
+              setNotice("");
+              setState((s) => ({ ...s, artworks: { ...s.artworks, [d.id]: true } }));
             }}
           />
         )}
@@ -1491,9 +1507,9 @@ export function Lesson({ active, nav, state, setState }) {
   } else {
     body = (
       <>
-        {(mode === "quiz" || (mode === "practice" && practice.learn)) && (
+        {(mode === "quiz" || mode === "project" || (mode === "practice" && practice.learn)) && (
           <MintCard title="배운 내용" className="a-up mt-[22px]">
-            <p>{mode === "quiz" ? quiz.game.explanation : practice.learn}</p>
+            <p>{mode === "quiz" ? quiz.game.explanation : mode === "project" ? final.explanation : practice.learn}</p>
           </MintCard>
         )}
         {mode === "plan" && planReady(plan) && (

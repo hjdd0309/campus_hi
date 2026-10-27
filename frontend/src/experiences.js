@@ -1,6 +1,7 @@
-// 체험 틀(A·B·C·D·F)의 데이터 형식 검사와 채점, 그리고 지금 쓰는 체험 데이터. 화면은 Templates.jsx에 있다.
+// 체험 틀(A·B·C·D·F·G)의 데이터 형식 검사와 채점, 그리고 지금 쓰는 체험 데이터. 화면은 Templates.jsx에 있다.
 // 틀(코드)은 그대로 두고 데이터만 더해 체험을 늘린다(개발기획서_체험구조.md 2-3).
-//   A 문지르기·칠하기 / B 순서 맞추기 / C 분류하기 / D 반응 실험 / F 계획 조립 (E 장면에서 찾기는 그림이 준비된 뒤에 만든다)
+//   A 문지르기·칠하기 / B 순서 맞추기 / C 분류하기 / D 반응 실험 / F 계획 조립 / G AI 가르치기
+//   (E 장면에서 찾기는 그림이 준비된 뒤에 만든다)
 import { scramble, shuffle } from "./lessonGames.js";
 
 const text = (value, max) =>
@@ -126,12 +127,75 @@ function cleanPlan(raw) {
   return prompts && text(raw.intro, 140) ? { intro: raw.intro, prompts } : null;
 }
 
+// AI 가르치기. 그림 카드를 두 이름표(labels)로 나눠 AI를 학습시키고(train), 처음 보는 카드로 시험하고(test),
+// 출시 뒤 예상 못 한 카드(surprise)를 만난다. 카드(picture)는 특징(features)마다 값 하나를 갖고, 화면은 이 값으로 그림을 그린다.
+// AI는 trainStump가 사용자가 붙인 이름표로 실제로 학습한다(결과를 미리 정해 두지 않는다).
+// look(목걸이·무늬 등)은 그림에만 쓰는 꾸밈이라 AI가 보지 않는다. 같은 특징의 다른 사진임을 보여 준다.
+const LOOKS = ["plain", "collar", "spot"];
+function cleanTrain(raw) {
+  const labels = all(list(raw.labels, 2, 2)?.map((label) => (text(label?.id, 20) && text(label.label, 6) ? { id: label.id, label: label.label } : null)));
+  const features = all(
+    list(raw.features, 2, 4)?.map((feature) => {
+      const values = all(list(feature?.values, 2, 2)?.map((value) => (text(value?.id, 20) && text(value.label, 10) ? { id: value.id, label: value.label } : null)));
+      return text(feature?.id, 20) && text(feature.label, 8) && values && distinct(values.map((v) => v.id)) ? { id: feature.id, label: feature.label, values } : null;
+    }),
+  );
+  if (!labels || !distinct(labels.map((l) => l.id)) || !features || !distinct(features.map((f) => f.id))) return null;
+  const picture = (value) =>
+    value &&
+    typeof value === "object" &&
+    features.every((f) => f.values.some((v) => v.id === value[f.id])) &&
+    (value.headband === undefined || typeof value.headband === "boolean") &&
+    (value.look === undefined || LOOKS.includes(value.look))
+      ? { ...Object.fromEntries(features.map((f) => [f.id, value[f.id]])), headband: !!value.headband, look: LOOKS.includes(value.look) ? value.look : "plain" }
+      : null;
+  const card = (item) => {
+    const shown = picture(item?.picture);
+    return shown && labels.some((l) => l.id === item.answer) ? { picture: shown, answer: item.answer } : null;
+  };
+  const train = all(list(raw.train, 4, 8)?.map(card));
+  const test = all(list(raw.test, 2, 4)?.map(card));
+  const surprise = card(raw.surprise);
+  // 검사를 통과한 데이터는 caption이 surprise 안에 있다. 다시 검사해도(학과군 데이터의 base) 같은 결과가 나오게 둘 다 받는다.
+  const caption = raw.caption ?? raw.surprise?.caption;
+  const review = (value) => (value && text(value.text, 40) && Number.isInteger(value.stars) && value.stars >= 1 && value.stars <= 5 ? { text: value.text, stars: value.stars } : null);
+  const reviews = { wrong: review(raw.reviews?.wrong), right: review(raw.reviews?.right) };
+  return train &&
+    test &&
+    surprise &&
+    reviews.wrong &&
+    reviews.right &&
+    text(raw.trainPrompt, 80) &&
+    text(raw.testPrompt, 60) &&
+    text(raw.pass, 40) &&
+    text(raw.fail, 60) &&
+    text(raw.launch, 60) &&
+    text(caption, 30) &&
+    text(raw.explanation, 160)
+    ? {
+        labels,
+        features,
+        train,
+        test,
+        surprise: { ...surprise, caption },
+        reviews,
+        trainPrompt: raw.trainPrompt,
+        testPrompt: raw.testPrompt,
+        pass: raw.pass,
+        fail: raw.fail,
+        launch: raw.launch,
+        explanation: raw.explanation,
+      }
+    : null;
+}
+
 export const templates = {
   A: { title: "문지르기", clean: cleanRub },
   B: { title: "순서 맞추기", clean: cleanOrder },
   C: { title: "분류하기", clean: cleanClassify },
   D: { title: "반응 실험", clean: cleanReaction },
   F: { title: "계획 조립", clean: cleanPlan },
+  G: { title: "AI 가르치기", clean: cleanTrain },
 };
 
 // 체험 데이터를 검사한다. 형식이 맞지 않으면 null이다.
@@ -174,6 +238,44 @@ export function startOrder(size, swap, random = Math.random) {
 
 // ---- C 분류하기
 export const checkPicks = (item, picks) => item.answer.every((id, i) => picks[i] === id);
+
+// ---- G AI 가르치기: 아주 단순한 학습 방법(결정 그루터기). 특징 하나만 보고 판단하는 규칙을 배운다.
+// examples: [{ picture, label }]. 특징마다 "그 값을 가진 사진에 가장 많이 붙은 이름표"를 규칙으로 삼고,
+// 학습 사진을 가장 많이 맞히는 특징을 고른다(같으면 features의 앞쪽). 사진이 없는 값은 전체에서 많은 이름표를 쓴다.
+export function trainStump(data, examples) {
+  const most = (items) => {
+    const counts = data.labels.map((label) => items.filter((item) => item.label === label.id).length);
+    return data.labels[counts.indexOf(Math.max(...counts))].id;
+  };
+  const fallback = most(examples);
+  let best = null;
+  for (const feature of data.features) {
+    const rule = Object.fromEntries(
+      feature.values.map((value) => {
+        const same = examples.filter((item) => item.picture[feature.id] === value.id);
+        return [value.id, same.length ? most(same) : fallback];
+      }),
+    );
+    const right = examples.filter((item) => rule[item.picture[feature.id]] === item.label).length;
+    if (!best || right > best.right) best = { feature: feature.id, rule, right };
+  }
+  // 확신도: 학습 사진 중 그 특징값을 가진 사진에서 그 이름표의 비율(라플라스 보정으로 0%·100%를 피한다).
+  const counts = Object.fromEntries(
+    data.features
+      .find((feature) => feature.id === best.feature)
+      .values.map((value) => {
+        const same = examples.filter((item) => item.picture[best.feature] === value.id);
+        return [value.id, { total: same.length, hits: same.filter((item) => item.label === best.rule[value.id]).length }];
+      }),
+  );
+  return { feature: best.feature, rule: best.rule, counts };
+}
+// 학습한 규칙으로 사진 하나를 판단한다. confidence는 0~100의 정수.
+export function predict(model, picture) {
+  const value = picture[model.feature];
+  const { total, hits } = model.counts[value];
+  return { label: model.rule[value], confidence: Math.round(((hits + 1) / (total + 2)) * 100) };
+}
 
 // ---- D 반응 실험
 // 힉의 법칙: 앞의 pairs문제는 늘 첫 번째 보기의 신호(condition 0 = 신호 하나),
@@ -301,6 +403,53 @@ const raw = {
         options: ["앞 학년에서 배운 원리로 시제품을 만든다", "앱이나 프로그램으로 만든다", "설계도를 그리고 모형으로 확인한다"],
       },
     ],
+  },
+  // 컴퓨터·AI 졸업 과제(groupData.js의 base). 학습 사진 6장은 이름표를 맞게 붙이면 귀 모양만 고양이와 강아지를
+  // 완벽하게 나누도록 짰다(주둥이·털 색은 4/6). 시험 3장은 귀 모양을 배운 AI만 다 맞힌다(주둥이를 배우면 3번이,
+  // 털 색을 배우면 3장 모두 틀린다). 머리띠를 한 강아지는 귀가 뾰족해 보여서 귀 모양을 배운 AI가 고양이라고 판단한다.
+  // 특징 조합이 8가지뿐이라 시험 1·2번은 학습 사진과 특징이 같다. 그래서 목걸이·무늬(look)로 다른 사진임을 보여 준다.
+  petClassifier: {
+    template: "G",
+    title: "캡스톤 디자인",
+    task: "우리 팀의 AI 반려동물 사진 분류 앱을 학습시키고, 시험하고, 출시해요.",
+    learn:
+      "4학년은 팀을 꾸려 4년 동안 배운 걸 모아 진짜 서비스를 만들어요. 우리 팀 주제는 'AI 반려동물 사진 분류 앱'! 출시 전에 AI를 직접 학습시켜 주세요.",
+    labels: [
+      { id: "cat", label: "고양이" },
+      { id: "dog", label: "강아지" },
+    ],
+    features: [
+      { id: "ears", label: "귀 모양", values: [{ id: "pointy", label: "뾰족한 귀" }, { id: "floppy", label: "늘어진 귀" }] },
+      { id: "nose", label: "주둥이", values: [{ id: "small", label: "작은 주둥이" }, { id: "long", label: "긴 주둥이" }] },
+      { id: "fur", label: "털 색", values: [{ id: "light", label: "밝은 털" }, { id: "dark", label: "어두운 털" }] },
+    ],
+    train: [
+      { picture: { ears: "pointy", nose: "small", fur: "light" }, answer: "cat" },
+      { picture: { ears: "floppy", nose: "long", fur: "light" }, answer: "dog" },
+      { picture: { ears: "pointy", nose: "long", fur: "dark" }, answer: "cat" },
+      { picture: { ears: "floppy", nose: "long", fur: "dark" }, answer: "dog" },
+      { picture: { ears: "pointy", nose: "small", fur: "dark" }, answer: "cat" },
+      { picture: { ears: "floppy", nose: "small", fur: "light" }, answer: "dog" },
+    ],
+    test: [
+      { picture: { ears: "floppy", nose: "long", fur: "dark", look: "collar" }, answer: "dog" },
+      { picture: { ears: "pointy", nose: "small", fur: "light", look: "spot" }, answer: "cat" },
+      { picture: { ears: "floppy", nose: "small", fur: "dark", look: "collar" }, answer: "dog" },
+    ],
+    // 진짜 귀는 늘어졌지만 머리띠의 고양이 귀 때문에 AI에게는 뾰족한 귀로 보인다.
+    surprise: { picture: { ears: "pointy", nose: "long", fur: "light", headband: true }, answer: "dog" },
+    caption: "고양이 귀 머리띠를 한 강아지",
+    reviews: {
+      wrong: { text: "우리 집 강아지를 고양이라고 하네요…", stars: 1 },
+      right: { text: "우리 집 강아지를 잘 알아보네요!", stars: 5 },
+    },
+    trainPrompt: "사진 6장을 고양이와 강아지로 나눠 AI에게 알려줘요. 고양이는 왼쪽, 강아지는 오른쪽으로 밀거나 버튼을 눌러요.",
+    testPrompt: "AI가 처음 보는 사진 3장으로 시험을 봐요. AI가 맞히는지 지켜봐요.",
+    pass: "출시 준비 완료!",
+    fail: "앗, AI가 헷갈렸어요. 가르칠 때 실수한 사진이 있었나 봐요!",
+    launch: "출시 첫날, 예상 못 한 사용자가 사진을 올렸어요.",
+    explanation:
+      "이 앱의 AI는 학습 사진을 가장 잘 나누는 특징 하나로 판단해요. 실제 사용자는 개발자가 예상 못 한 방식으로 서비스를 써요. 캡스톤에서는 직접 만든 서비스를 사용자에게 시험해 보고 이런 문제를 고쳐 나가요.",
   },
   thesis: {
     template: "F",

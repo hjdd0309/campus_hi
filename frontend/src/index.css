@@ -427,6 +427,75 @@ body {
   font-weight: 800;
   text-align: center;
 }
+.pet-card {
+  display: flex;
+  justify-content: center;
+  margin: 4px auto 14px;
+  border: 1px solid #d1d5da;
+  border-radius: 16px;
+  background: #fff;
+  padding: 14px;
+  touch-action: pan-y;
+  user-select: none;
+  cursor: grab;
+}
+.pet-results {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+}
+.pet-results li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #d1d5da;
+  border-radius: 12px;
+  background: #fff;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+.pet-results li span {
+  display: grid;
+}
+.pet-results li small {
+  font-size: 12px;
+  color: #087f77;
+}
+.pet-results li.is-wrong {
+  border-color: #e5484d;
+}
+.pet-results li.is-wrong small {
+  color: #c4323a;
+}
+.pet-caption {
+  margin-top: -6px;
+  font-size: 13px;
+  color: #6b6560;
+  text-align: center;
+}
+.pet-verdict {
+  margin: 10px 0 6px;
+  border-radius: 10px;
+  background: #fff4d6;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #7a4f00;
+}
+.pet-review {
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  line-height: 20px;
+}
+.pet-review.is-wrong {
+  background: #fff1f1;
+  color: #a3242a;
+}
+.pet-review.is-right {
+  background: #d6f8f6;
+  color: #087f77;
+}
 .game-choices {
   display: grid;
   grid-template-columns: 1fr 1fr;

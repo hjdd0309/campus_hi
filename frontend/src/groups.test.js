@@ -52,10 +52,10 @@ test("모든 학과군에 검토를 통과한 실습과 졸업 과제가 있다"
     const final = groupExperience(group.id, "final");
     assert.ok(practice, `${group.id} 실습`);
     assert.ok(final, `${group.id} 졸업 과제`);
-    // 실습은 수업 안에 들어가는 틀(B·C·D), 졸업 과제는 작품(A) 또는 계획서(F)다.
+    // 실습은 수업 안에 들어가는 틀(B·C·D), 졸업 과제는 작품(A), AI 가르치기(G, 컴퓨터·AI) 또는 계획서(F)다.
     assert.ok(["B", "C", "D"].includes(practice.template), group.id);
     assert.ok(practice.learn, `${group.id} 알아두기`);
-    assert.equal(final.template, group.id === "design" ? "A" : "F", group.id);
+    assert.equal(final.template, { design: "A", computing: "G" }[group.id] || "F", group.id);
     if (final.template === "F") for (const prompt of final.prompts) assert.ok(prompt.options.length >= 2);
   }
   // 학과군마다 실습이 서로 다르다.

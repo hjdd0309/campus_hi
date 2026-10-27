@@ -32,13 +32,15 @@ export const planReady = (plan) =>
 // 학과의 졸업 과제. 학과군 데이터로 만든 학과는 졸업 과제 데이터를, 기본 학과는 finals의 이름을 갖고 있다.
 export const finalOf = (department) =>
   department?.final && typeof department.final === "object" ? department.final : finals[department?.final] || finals.artwork;
-// 체험 데이터(틀 A 또는 F)를 졸업 과제로 쓴다. A는 칠해서 완성하는 작품, F는 계획서다.
-const asFinal = (data) => ({ kind: data.template === "A" ? "artwork" : "plan", name: data.title, ...data });
-// 마지막 학년을 완료할 준비가 됐는지: 졸업작품은 칠한 작품이, 계획서는 세 칸이 모두 있어야 한다.
+// 체험 데이터를 졸업 과제로 쓴다. A는 칠해서 완성하는 작품, F는 계획서, 그 밖의 틀(G AI 가르치기 등)은
+// 수업 안에서 끝까지 해보는 프로젝트다.
+const asFinal = (data) => ({ kind: data.template === "A" ? "artwork" : data.template === "F" ? "plan" : "project", name: data.title, ...data });
+// 마지막 학년을 완료할 준비가 됐는지: 졸업작품·프로젝트는 끝까지 해봤어야(artworks에 기록), 계획서는 세 칸이 모두 있어야 한다.
+// artworks는 이름과 달리 "만들어서 마치는 졸업 과제를 마쳤는지"를 학과마다 기록한다(저장 형식을 바꾸지 않으려고 그대로 둔다).
 export function finalReady(state, department) {
-  return finalOf(department).kind === "artwork"
-    ? !!state.artworks?.[department.id]
-    : planReady(state.capstones?.[department.id]);
+  return finalOf(department).kind === "plan"
+    ? planReady(state.capstones?.[department.id])
+    : !!state.artworks?.[department.id];
 }
 // 수업연한("4년", "2.5년", "1년(전공심화)")을 체험할 학년 목록으로 바꾼다. 학년마다 체험이 하나씩 있다.
 export function stageYears(duration) {
