@@ -20,6 +20,7 @@ logger = logging.getLogger("uvicorn.error")
 DATA_PATH = Path(__file__).parent / "data" / "courses.csv.gz"
 YEARS_PATH = Path(__file__).parent / "data" / "year_curricula.json"
 GAMES_PATH = Path(__file__).parent / "data" / "lesson_games.jsonl"
+LEVELS_PATH = Path(__file__).parent / "data" / "subject_levels.json"
 DIST_PATH = Path(__file__).parent.parent / "frontend" / "dist"
 MAX_BODY_BYTES = 16 * 1024
 HASHED_ASSET = re.compile(r"^/assets/.+-[A-Za-z0-9_-]{8}\.(js|css|png|webp|svg)$")
@@ -242,6 +243,15 @@ def lesson_games():
 
 
 @lru_cache(maxsize=1)
+def subject_levels():
+    """`backend/subject_levels.py`로 넣은 과목별 학년 범위 중 검증된 것만 과목 키 → [시작, 끝]으로 돌려준다."""
+    if not LEVELS_PATH.exists():
+        return {}
+    records = json.loads(LEVELS_PATH.read_text(encoding="utf-8"))
+    return {key: [record["from"], record["to"]] for key, record in records.items() if record.get("status") == "verified"}
+
+
+@lru_cache(maxsize=1)
 def catalog():
     with gzip.open(DATA_PATH, "rt", encoding="utf-8-sig", newline="") as file:
         return Catalog(csv.DictReader(file))
@@ -388,7 +398,9 @@ def curriculum_list(body: CurriculumRequest):
     games = lesson_games()
     # 연습 문제가 있는 과목과 그 유형. 화면이 체험할 과목을 고를 때 쓴다.
     types = {subject: games[compact(subject)]["type"] for subject in program["curriculum"] if compact(subject) in games}
-    return {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "years": years, "games": types}
+    # 과목을 보통 듣는 학년 범위. 화면이 학년마다 맞는 과목을 고를 때 쓴다.
+    levels = {subject: subject_levels()[compact(subject)] for subject in program["curriculum"] if compact(subject) in subject_levels()}
+    return {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "years": years, "games": types, "levels": levels}
 
 
 @app.post("/api/lesson_game")

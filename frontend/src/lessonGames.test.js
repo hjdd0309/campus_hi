@@ -190,21 +190,21 @@ test("이론 수업은 연습 문제가 있는 과목을, 없으면 기본 체�
   assert.ok(isGame("group:music") && isGame("match") && !isGame("stroop") && !isGame("group:없음") && !isGame("없는게임") && !isGame(undefined));
 
   const curriculum = ["C언어", "운영체제", "데이터베이스", "컴퓨터구조", "자료구조", "알고리즘"];
-  assert.deepEqual(pickLessons(curriculum, 3, lessonGames), [
+  assert.deepEqual(pickLessons(curriculum, [1, 2, 3], lessonGames), [
     { subject: "운영체제", game: "blank" },
     { subject: "컴퓨터구조", game: "order" },
     { subject: "자료구조", game: "ox" },
   ]);
   // 유형이 다른 연습 문제가 모자라면 같은 유형의 연습 문제로, 그것도 모자라면 나머지 과목으로 채운다.
-  assert.deepEqual(pickLessons(curriculum, 5, lessonGames).slice(3), [
+  assert.deepEqual(pickLessons(curriculum, [1, 2, 3, 4, 4], lessonGames).slice(3), [
     { subject: "데이터베이스", game: "blank" },
     { subject: "C언어", game: null },
   ]);
-  assert.deepEqual(pickLessons(curriculum, 2), [
+  assert.deepEqual(pickLessons(curriculum, [1, 2]), [
     { subject: "C언어", game: null },
     { subject: "운영체제", game: null },
   ]);
-  assert.deepEqual(pickLessons(["가", "나"], 2, { 나: "ox" }), [
+  assert.deepEqual(pickLessons(["가", "나"], [1, 2], { 나: "ox" }), [
     { subject: "나", game: "ox" },
     { subject: "가", game: null },
   ]);

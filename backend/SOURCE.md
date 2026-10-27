@@ -26,7 +26,7 @@
 | POST | `/api/course_list` | `{"interests":"공학","query":"컴퓨터","offset":0,"limit":30}` | `{"course_list":["컴퓨터공학과","..."],"total":33}` |
 | POST | `/api/program_list` | `{"interests":"전체","school":"서울대","course":"전기","offset":0,"limit":30}` | `{"programs":[{"school":"서울대학교","course":"전기·정보공학부","category":"공학","duration":"4년","region":"서울특별시"}],"total":2,"similar_programs":[],"similar_courses":[]}` |
 | POST | `/api/school_list` | `{"course":"산업디자인학과"}` | `{"school_list":["경희대학교","..."]}` |
-| POST | `/api/curriculum_list` | `{"school":"경희대학교","course":"산업디자인학과"}` | `{"curriculum_list":["3D Design 1","..."],"category":"예체능","duration":"4년","region":"경기도","years":null,"games":{"과목명":"ox"}}` |
+| POST | `/api/curriculum_list` | `{"school":"경희대학교","course":"산업디자인학과"}` | `{"curriculum_list":["3D Design 1","..."],"category":"예체능","duration":"4년","region":"경기도","years":null,"games":{"과목명":"ox"},"levels":{"과목명":[1,2]}}` |
 | POST | `/api/lesson_game` | `{"subject":"데이터베이스"}` | `{"game":{"type":"blank","course_name":"데이터베이스","...":"..."}}` |
 | GET | `/api/health` | 없음 | `{"status":"ok","source":"litton","records":13347}` |
 
@@ -36,7 +36,7 @@
 
 찾는 학과가 없으면 비슷한 학과를 함께 보냅니다(관심 분야 필터와 상관없이 찾음). 학교를 입력했으면 찾는 학교(이름이 같은 학교, 없으면 검색어로 시작하는 학교, 없으면 걸린 학교 전부)에서 나온 결과가 없을 때 `similar_programs`에 그 학교의 학과를 최대 3개 보냅니다. 전국에서 `course`가 이름에 들어간 학과(없으면 오타를 고친 학과)가 가르치는 과목을 얼마나 가르치는지로 고르고, 여러 학과에서 두루 가르치는 과목은 낮게 칩니다. 학교 없이 찾아 결과가 0곳이면 `similar_courses`에 이름이 비슷한 학과명을 최대 5개 보냅니다. 검색어를 자모로 풀어 학과명 안에 맞추고 자모 네 개에 하나까지 틀려도 찾습니다. 둘 다 해당하지 않으면 빈 배열입니다.
 
-`games`는 그 학과의 교과목 중 공개된 연습 문제가 있는 과목과 그 유형입니다. `/api/lesson_game`은 과목명(띄어쓰기·대소문자 무시)으로 연습 문제를 찾고, 없으면 404를 반환합니다.
+`games`는 그 학과의 교과목 중 공개된 연습 문제가 있는 과목과 그 유형입니다. `levels`는 그 학과의 교과목 중 학년 범위가 공개된 과목이 4년제 기준으로 보통 몇 학년에 듣는 과목인지(`[시작, 끝]`, 1~4학년)입니다. 원본 데이터에는 과목의 학년이 없어서 `backend/subject_levels.py`로 따로 매기고, 매긴 사람(에이전트)이 아닌 별도 에이전트가 범위를 보지 않고 따로 매긴 범위와 겹칠 때만 공개합니다(`data/subject_levels.json`). 화면은 학년별 편성 데이터가 없는 학과에서 이론 수업 학년마다 그 학년에 맞는 과목을 고를 때 씁니다. `/api/lesson_game`은 과목명(띄어쓰기·대소문자 무시)으로 연습 문제를 찾고, 없으면 404를 반환합니다.
 
 빈 필드나 잘못된 자료형은 400, 존재하지 않는 대학·학과 조합은 404를 반환합니다. 오류 응답은 `{"detail":"메시지"}` 형식입니다. 검색 결과가 없으면 빈 배열을 반환합니다.
 

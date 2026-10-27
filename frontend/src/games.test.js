@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gameFor, pickLessons } from "./games.js";
+import { cleanLevels, gameFor, pickLessons } from "./games.js";
 import {
   createDepartment,
   completeLesson,
@@ -22,20 +22,20 @@ test("이론 수업의 체험은 그 과목의 연습 문제 유형이다", () =
 });
 test("이론 수업 과목은 서로 다른 유형의 연습 문제가 있는 과목부터, 교과목 순서대로 고른다", () => {
   const types = { 자료구조: "ox", 알고리즘: "ox", 회계원리: "match" };
-  assert.deepEqual(pickLessons(["C언어", "자료구조", "알고리즘", "회계원리"], 2, types), [
+  assert.deepEqual(pickLessons(["C언어", "자료구조", "알고리즘", "회계원리"], [1, 2], types), [
     { subject: "자료구조", game: "ox" },
     { subject: "회계원리", game: "match" },
   ]);
-  assert.deepEqual(pickLessons(["C언어", "자료구조", "알고리즘"], 3, types), [
+  assert.deepEqual(pickLessons(["C언어", "자료구조", "알고리즘"], [1, 2, 3], types), [
     { subject: "자료구조", game: "ox" },
     { subject: "알고리즘", game: "ox" },
     { subject: "C언어", game: null },
   ]);
   assert.deepEqual(pickLessons(["운영체제"]), [{ subject: "운영체제", game: null }]);
   assert.deepEqual(pickLessons([]), []);
-  assert.deepEqual(pickLessons(["자료구조"], 0, types), []);
+  assert.deepEqual(pickLessons(["자료구조"], [], types), []);
   // 같은 입력이면 언제나 같은 과목을 고른다.
-  assert.deepEqual(pickLessons(["C언어", "자료구조"], 2, types), pickLessons(["C언어", "자료구조"], 2, types));
+  assert.deepEqual(pickLessons(["C언어", "자료구조"], [1, 2], types), pickLessons(["C언어", "자료구조"], [1, 2], types));
 });
 test("학과군 실습은 체험을 마쳐야 완료된다", () => {
   const d = createDepartment("컴퓨터공학과", "가천대학교", ["C언어", "자료구조"], "공학", null, "3년");
