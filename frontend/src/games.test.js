@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanLevels, gameFor, pickLessons } from "./games.js";
+import { cleanLevels, cleanPicks, gameFor, pickLessons } from "./games.js";
 import {
   createDepartment,
   completeLesson,
@@ -96,4 +96,23 @@ test("게임 결과와 학년별 편성은 형식이 맞는 것만 복구한다"
   });
   assert.deepEqual(restored.catalog[0].yearly, d.yearly);
   assert.deepEqual(restored.catalog[0].games, [null, null, "group:welfare", null]);
+});
+test("사람이 정해 둔 학년별 과목이 교과목에 있으면 규칙보다 먼저 쓴다", () => {
+  const types = { 딥러닝: "match", 운영체제: "sort", 객체지향프로그래밍: "match", 데이터베이스: "blank" };
+  const levels = { 딥러닝: [3, 4], 운영체제: [2, 3], 객체지향프로그래밍: [1, 2], 데이터베이스: [2, 3] };
+  const curriculum = ["딥러닝", "운영체제", "객체지향프로그래밍", "데이터베이스"];
+  const picks = { 1: ["객체지향프로그래밍"], 2: ["없는과목", "데이터베이스", "운영체제"] };
+  assert.deepEqual(pickLessons(curriculum, [1, 2], types, levels, picks), [
+    { subject: "객체지향프로그래밍", game: "match" },
+    { subject: "데이터베이스", game: "blank" },
+  ]);
+  // 정해 둔 과목이 교과목에 없으면 규칙으로 고르고, 이미 고른 과목은 다시 쓰지 않는다.
+  assert.equal(pickLessons(curriculum, [1], types, levels, { 1: ["자료구조"] })[0].subject, "객체지향프로그래밍");
+  assert.deepEqual(pickLessons(curriculum, [1, 2], types, levels, { 1: ["딥러닝"], 2: ["딥러닝"] }).map((item) => item.subject), ["딥러닝", "운영체제"]);
+  // 연습 문제가 없는 과목도 정해 두면 그대로 쓴다.
+  assert.deepEqual(pickLessons(["C언어", "딥러닝"], [1], types, {}, { 1: ["C언어"] }), [{ subject: "C언어", game: null }]);
+});
+test("학년별 과목 후보는 형식이 맞는 것만 받는다", () => {
+  assert.deepEqual(cleanPicks({ 1: ["가", 3, ""], 2: [], 7: ["나"], x: ["다"], 3: "라" }), { 1: ["가"] });
+  assert.deepEqual(cleanPicks(null), {});
 });

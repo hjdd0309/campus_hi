@@ -21,6 +21,7 @@ DATA_PATH = Path(__file__).parent / "data" / "courses.csv.gz"
 YEARS_PATH = Path(__file__).parent / "data" / "year_curricula.json"
 GAMES_PATH = Path(__file__).parent / "data" / "lesson_games.jsonl"
 LEVELS_PATH = Path(__file__).parent / "data" / "subject_levels.json"
+PICKS_PATH = Path(__file__).parent / "data" / "lesson_picks.json"
 DIST_PATH = Path(__file__).parent.parent / "frontend" / "dist"
 MAX_BODY_BYTES = 16 * 1024
 HASHED_ASSET = re.compile(r"^/assets/.+-[A-Za-z0-9_-]{8}\.(js|css|png|webp|svg)$")
@@ -184,6 +185,10 @@ def excluded(course, duration):
     return bool(UNDECIDED.search(course)) or (years is not None and years < 2)
 
 
+# 원본 교과목명의 오타. 같은 과목이 다른 이름으로 나뉘어 연습 문제·학년 범위가 연결되지 않으므로 읽을 때 바로잡는다.
+SUBJECT_FIXES = {"객체지항프로그래밍": "객체지향프로그래밍"}
+
+
 class Catalog:
     """학부 과정 중 교과목이 등록된 학교·학과만 담는다(대학원, 폐과, 교과목 없는 학과, 학년별 체험을 만들 수 없는 과정 제외)."""
 
@@ -193,7 +198,7 @@ class Catalog:
         categories = defaultdict(Counter)
         for row in records:
             school, course = row["학교명"].strip(), row["학과명"].strip()
-            subjects = [subject.strip() for subject in row["주요교과목명"].split("+") if subject.strip()]
+            subjects = [SUBJECT_FIXES.get(subject.strip(), subject.strip()) for subject in row["주요교과목명"].split("+") if subject.strip()]
             if row["학과상태명"] == "폐과" or "대학원" in school or not school or not course or not subjects or excluded(course, row["수업연한"].strip()):
                 continue
             program = self.programs.setdefault((school, course), {"curriculum": {}, "duration": row["수업연한"].strip(), "region": row["시도명"].strip()})
@@ -249,6 +254,21 @@ def subject_levels():
         return {}
     records = json.loads(LEVELS_PATH.read_text(encoding="utf-8"))
     return {key: [record["from"], record["to"]] for key, record in records.items() if record.get("status") == "verified"}
+
+
+@lru_cache(maxsize=1)
+def lesson_picks():
+    """학과마다 사람이 정해 둔 이론 수업 과목(`data/lesson_picks.json`): (학교, 학과) → {학년: [과목 후보, ...]}.
+    후보는 앞에서부터 그 학과 교과목에 있는 첫 과목을 쓴다. 형식이 틀린 항목은 버린다."""
+    if not PICKS_PATH.exists():
+        return {}
+    picks = {}
+    for entry in json.loads(PICKS_PATH.read_text(encoding="utf-8")):
+        years = {year: subjects for year, subjects in entry.get("years", {}).items()
+                 if year in {"1", "2", "3", "4", "5", "6"} and isinstance(subjects, list) and subjects and all(isinstance(subject, str) and subject for subject in subjects)}
+        if isinstance(entry.get("school"), str) and isinstance(entry.get("course"), str) and years:
+            picks[(entry["school"], entry["course"])] = years
+    return picks
 
 
 @lru_cache(maxsize=1)
@@ -400,7 +420,10 @@ def curriculum_list(body: CurriculumRequest):
     types = {subject: games[compact(subject)]["type"] for subject in program["curriculum"] if compact(subject) in games}
     # 과목을 보통 듣는 학년 범위. 화면이 학년마다 맞는 과목을 고를 때 쓴다.
     levels = {subject: subject_levels()[compact(subject)] for subject in program["curriculum"] if compact(subject) in subject_levels()}
-    return {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "years": years, "games": types, "levels": levels}
+    # 사람이 정해 둔 학년별 과목. 그 학과 교과목에 있는 후보만 보낸다.
+    picks = {year: [subject for subject in subjects if subject in program["curriculum"]] for year, subjects in lesson_picks().get((body.school, body.course), {}).items()}
+    picks = {year: subjects for year, subjects in picks.items() if subjects}
+    return {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "years": years, "games": types, "levels": levels, "picks": picks}
 
 
 @app.post("/api/lesson_game")

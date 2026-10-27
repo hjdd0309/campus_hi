@@ -1,5 +1,5 @@
 import { cleanGame, cleanLessonGames } from "./lessonGames.js";
-import { cleanLevels } from "./games.js";
+import { cleanLevels, cleanPicks } from "./games.js";
 
 export class ApiError extends Error {
   constructor(status, detail) {
@@ -114,6 +114,7 @@ export async function getCurriculum(school, course, signal) {
     region: typeof data.region === "string" ? data.region : "",
     games: cleanLessonGames(data.games),
     levels: cleanLevels(data.levels),
+    picks: cleanPicks(data.picks),
   };
 }
 // 과목의 연습 문제를 받는다. 문제가 없으면 404, 받은 문제의 형식이 맞지 않으면 422 오류를 낸다.

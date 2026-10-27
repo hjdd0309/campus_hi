@@ -19,6 +19,17 @@ export function cleanLevels(value) {
   return Object.fromEntries(Object.entries(value).filter(([, level]) => valid(level)));
 }
 
+// 사람이 정해 둔 학년별 과목 후보(학년 → [과목, ...]). 형식이 맞는 것만 남긴다.
+export function cleanPicks(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([year, subjects]) => /^[1-6]$/.test(year) && Array.isArray(subjects))
+      .map(([year, subjects]) => [year, subjects.filter((subject) => typeof subject === "string" && subject)])
+      .filter(([, subjects]) => subjects.length),
+  );
+}
+
 // 그 학년이 과목의 학년 범위에서 얼마나 먼지. 5·6학년은 4학년으로 보고, 범위를 모르면 1.5로 본다.
 function distance(year, level) {
   if (!level) return 1.5;
@@ -32,12 +43,17 @@ function before(rank, other) {
   return i >= 0 && rank[i] < other[i];
 }
 
-// 이론 수업 학년(years)마다 과목을 하나씩 고른다. 연습 문제가 있는 과목, 그 학년에 보통 듣는 과목(levels),
-// 앞 학년과 유형이 다른 연습 문제 순서로 고르고, 나머지가 같으면 교과목 목록의 순서를 따르므로
-// 같은 학과는 언제나 같은 과목이 나온다.
-export function pickLessons(curriculum, years = [1, 2], lessonGames = {}, levels = {}) {
+// 이론 수업 학년(years)마다 과목을 하나씩 고른다. 사람이 정해 둔 과목(picks)이 교과목에 있으면 그 과목을 쓰고,
+// 없으면 연습 문제가 있는 과목, 그 학년에 보통 듣는 과목(levels), 앞 학년과 유형이 다른 연습 문제 순서로 고른다.
+// 나머지가 같으면 교과목 목록의 순서를 따르므로 같은 학과는 언제나 같은 과목이 나온다.
+export function pickLessons(curriculum, years = [1, 2], lessonGames = {}, levels = {}, picks = {}) {
   const picked = [];
   for (const year of years) {
+    const chosen = (picks[year] || []).find((subject) => curriculum.includes(subject) && !picked.some((item) => item.subject === subject));
+    if (chosen) {
+      picked.push({ subject: chosen, game: gameFor(chosen, lessonGames) });
+      continue;
+    }
     let best = null;
     curriculum.forEach((subject, index) => {
       if (picked.some((item) => item.subject === subject)) return;

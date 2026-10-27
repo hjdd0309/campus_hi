@@ -33,6 +33,7 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     games: {},
     // 학년 범위는 1~4학년, 시작 ≤ 끝인 것만 받는다.
     levels: { 기초설계: [1, 2] },
+    picks: {},
   });
   assert.deepEqual(requests, [
     ["/api/course_list", { interests: "디자인", query: "산업", offset: 30, limit: 30 }],
