@@ -793,8 +793,10 @@ export function Detail({ active, nav, state, setState }) {
           d.lessonsFromYears ? "학교 홈페이지의 학년별 편성을 따랐어요" : "학년 배치는 실제 편성과 다를 수 있어요"
         }`}
       </T>
+      {/* 등장 모션을 거는 감싸개는 크기가 있어야 한다. 크기 0인 감싸개에 opacity·transform을 걸면 모바일 사파리 등에서
+          애니메이션이 끝난 뒤 안의 절대 위치 요소를 다시 그리지 않아 일부가 안 보인다. */}
       {d.lessons.map((lesson, i) => (
-        <div key={i} className="a-up" style={delay(0.28 + i * 0.08)}>
+        <div key={i} className="a-up pointer-events-none absolute inset-0" style={delay(0.28 + i * 0.08)}>
           <span
             className="absolute left-[33px] flex h-[28px] w-[47px] items-center justify-center rounded-full border border-mint text-[13px] font-semibold text-mint"
             style={{ top: 536 + i * step }}
@@ -825,7 +827,7 @@ function useAutoAdvance(fn, ms) {
 
 function PaperRow({ y, left, right, lineFrom = 24, lineTo = 255, d = 0 }) {
   return (
-    <div className="a-fade" style={delay(d)}>
+    <div className="a-fade pointer-events-none absolute inset-0" style={delay(d)}>
       <T y={y} size={11.5} left={26.5} className="text-gray">
         {left}
       </T>
@@ -892,7 +894,7 @@ export function Enrolled({ active, nav, state }) {
 
 function BottomSign({ d: department, wait }) {
   return (
-    <div className="a-fade" style={delay(wait)}>
+    <div className="a-fade pointer-events-none absolute inset-0" style={delay(wait)}>
       <T y={288.5} size={10} left={48} className="text-gray">
         체험생
       </T>
@@ -1639,12 +1641,12 @@ export function Graduation({ active, nav, state }) {
         ))}
       </div>
       <div className="absolute bottom-0 left-0 top-[507px] w-full bg-butter">
-        <div className="a-up" style={delay(0.65)}>
+        <div className="a-up pointer-events-none absolute inset-0" style={delay(0.65)}>
           <T y={53.5} size={21} left={21} clip={360} className="font-bold text-ink-2">
             {`나의 ${d.name} 체험 리포트`}
           </T>
         </div>
-        <div className="a-up" style={delay(0.75)}>
+        <div className="a-up pointer-events-none absolute inset-0" style={delay(0.75)}>
           <T y={105} size={13} left={20.5} className="font-bold text-mint-deep">
             배운 내용
           </T>
@@ -1652,7 +1654,7 @@ export function Graduation({ active, nav, state }) {
             {d.lessons.join(" → ")}
           </div>
         </div>
-        <div className="a-up" style={delay(0.85)}>
+        <div className="a-up pointer-events-none absolute inset-0" style={delay(0.85)}>
           <T y={173} size={13} left={20.5} className="font-bold text-mint-deep">
             느낀 점
           </T>
