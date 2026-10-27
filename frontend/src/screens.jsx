@@ -63,6 +63,11 @@ function view(state) {
   };
 }
 
+/** 가장 최근에 입학한 학과의 id. 입학한 학과가 없으면 null. */
+function latestJourney(state) {
+  return Object.keys(state.journeys).reverse().find((id) => all(state).some((item) => item.id === id && item.school)) ?? null;
+}
+
 /**
  * 화면에 필요한 학과나 진행 기록이 없으면 처음 화면으로 돌려보낸다.
  * 뒤에 깔려 있는 화면은 다른 학과를 보는 중일 수 있으므로, 맨 위 화면일 때만 확인한다.
@@ -151,10 +156,12 @@ function QuestionTitle({ title, sub }) {
   );
 }
 
-export function Interest({ nav }) {
+export function Interest({ nav, setState }) {
   const [picked, setPicked] = useState(null);
   const choose = (i) => {
     setPicked(i);
+    // 탐색을 새로 시작하므로 지난번에 고른 답과 관심 키워드는 비운다(탐색 안에서 뒤로 갔다 오는 것은 그대로 둔다).
+    setState((s) => ({ ...s, interests: [], answers: {} }));
     window.setTimeout(() => nav.push("explore", { start: i === 0 ? 1 : 8, direct: i === 1 }), 260);
   };
   return (
@@ -1122,15 +1129,21 @@ function TaskCard({ top, title, sub, hint, onClick, d }) {
   );
 }
 
-export function Home({ active, nav, state }) {
+export function Home({ active, nav, state, setState }) {
   const v = view(state);
+  // 탐색에서 다른 학과를 열어 보면 current가 그 학과로 바뀐다. 그 학과에 입학하지 않았으면
+  // 처음 화면으로 보내지 않고 가장 최근에 입학한 학과를 보여준다.
+  const fallback = v?.journey ? null : latestJourney(state);
+  useEffect(() => {
+    if (fallback) setState((s) => ({ ...s, current: fallback }));
+  }, [fallback, setState]);
   const percent = v?.journey ? Math.round((v.completed / v.total) * 100) : 0;
   const pct = useCountUp(percent);
   // 잠긴 과제를 눌렀을 때 그 카드에 보여줄 안내.
   const [hint, setHint] = useState(null);
   const hintTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(hintTimer.current), []);
-  useGuard(!!v?.journey, nav, active);
+  useGuard(!!v?.journey || !!fallback, nav, active);
   if (!v?.journey) return null;
   const { d, total, completed, index, year, finished } = v;
   const tellLocked = (i) => {
@@ -1577,9 +1590,18 @@ export function Graduation({ active, nav, state }) {
       foot={754}
       veil="#feeaa0"
       footer={
-        <OutlineButton onClick={() => nav.reset(["home", "schools"], "fade")} className="a-up" style={delay(0.95)}>
-          다른 학과도 체험하러가기
-        </OutlineButton>
+        <>
+          <OutlineButton onClick={() => nav.reset(["home"], "fade")} className="a-up" style={delay(0.95)}>
+            홈으로 가기
+          </OutlineButton>
+          <button
+            onClick={() => nav.reset(["home", "schools"], "fade")}
+            className="pressable a-fade absolute left-[100px] top-[830px] h-[32px] w-[202px] text-[13px] text-mint-deep underline"
+            style={delay(1.05)}
+          >
+            다른 학과도 체험하러 가기
+          </button>
+        </>
       }
     >
       <Header title="졸업을 축하합니다" onBack={() => nav.reset(["home"], "fade")} />
