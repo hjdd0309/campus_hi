@@ -8,9 +8,11 @@ import {
   inversions,
   isSorted,
   makeTrials,
+  predict,
   startOrder,
   summarizeReaction,
   swapAdjacent,
+  trainStump,
 } from "./experiences.js";
 
 // 체험 틀의 화면. 데이터 형식과 채점은 experiences.js에 있다.
@@ -625,8 +627,197 @@ export function PlanSummary({ final, plan }) {
   );
 }
 
-// 수업 안에 들어가는 틀(B·C·D). A는 화면 전체를 쓰고, F는 계획서 저장이 따로 있어서 수업 화면이 직접 그린다.
-const embedded = { B: OrderTemplate, C: Classify, D: Reaction };
+/* ---- G AI 가르치기: 그림 카드로 AI를 학습시키고, 시험하고, 출시한다. ---- */
+const FUR = {
+  light: { fill: "#f2c38b", line: "#8a5a2b", muzzle: "#fbe6cc" },
+  dark: { fill: "#7a5238", line: "#3f2a1c", muzzle: "#b08a6e" },
+};
+// 반려동물 그림. 특징값(귀 모양·주둥이·털 색)대로 그린다. headband면 진짜 귀는 늘어졌지만 고양이 귀 머리띠를 썼다.
+export function PetPicture({ picture, size = 132, label }) {
+  const fur = FUR[picture.fur] || FUR.light;
+  const floppy = picture.ears === "floppy" || picture.headband;
+  return (
+    <svg viewBox="0 0 120 110" width={size} height={(size * 110) / 120} role="img" aria-label={label}>
+      {floppy && (
+        <>
+          <ellipse cx="27" cy="58" rx="11" ry="24" transform="rotate(18 27 58)" fill={fur.line} opacity="0.85" />
+          <ellipse cx="93" cy="58" rx="11" ry="24" transform="rotate(-18 93 58)" fill={fur.line} opacity="0.85" />
+        </>
+      )}
+      {!floppy && (
+        <>
+          <polygon points="30,46 36,12 54,36" fill={fur.fill} stroke={fur.line} strokeWidth="2.5" strokeLinejoin="round" />
+          <polygon points="90,46 84,12 66,36" fill={fur.fill} stroke={fur.line} strokeWidth="2.5" strokeLinejoin="round" />
+        </>
+      )}
+      <ellipse cx="60" cy="62" rx="34" ry="31" fill={fur.fill} stroke={fur.line} strokeWidth="2.5" />
+      {picture.headband && (
+        <>
+          <path d="M28 44 Q60 18 92 44" fill="none" stroke="#f28db2" strokeWidth="5" strokeLinecap="round" />
+          <polygon points="34,36 38,8 54,28" fill="#f28db2" stroke="#c45c86" strokeWidth="2" strokeLinejoin="round" />
+          <polygon points="86,36 82,8 66,28" fill="#f28db2" stroke="#c45c86" strokeWidth="2" strokeLinejoin="round" />
+        </>
+      )}
+      {picture.look === "spot" && <ellipse cx="78" cy="48" rx="10" ry="8" fill={fur.line} opacity="0.35" />}
+      {picture.look === "collar" && (
+        <>
+          <path d="M34 86 Q60 102 86 86" fill="none" stroke="#e5484d" strokeWidth="6" strokeLinecap="round" />
+          <circle cx="60" cy="97" r="4.5" fill="#ffd34d" stroke="#b8860b" strokeWidth="1.5" />
+        </>
+      )}
+      <circle cx="47" cy="58" r="4" fill="#2c1502" />
+      <circle cx="73" cy="58" r="4" fill="#2c1502" />
+      {picture.nose === "long" ? (
+        <>
+          <ellipse cx="60" cy="79" rx="17" ry="12" fill={fur.muzzle} stroke={fur.line} strokeWidth="2" />
+          <ellipse cx="60" cy="72" rx="6" ry="4.5" fill="#2c1502" />
+          <path d="M60 77 L60 83 M53 86 Q60 90 67 86" fill="none" stroke="#2c1502" strokeWidth="2" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <path d="M56 69 L64 69 L60 74 Z" fill="#c45c86" />
+          <path d="M60 74 L60 77 M55 79 Q60 82 65 79" fill="none" stroke="#2c1502" strokeWidth="2" strokeLinecap="round" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+const describe = (data, picture) =>
+  data.features.map((feature) => feature.values.find((value) => value.id === picture[feature.id])?.label).join(", ");
+
+function TrainTemplate({ data, onComplete }) {
+  const [stage, setStage] = useState("train");
+  const [labels, setLabels] = useState([]);
+  const [model, setModel] = useState(null);
+  const [attempts, setAttempts] = useState(1);
+  const [drag, setDrag] = useState(0);
+  const start = useRef(null);
+  const nameOf = (id) => data.labels.find((label) => label.id === id)?.label || "";
+  const results = model ? data.test.map((card) => ({ ...card, ...predict(model, card.picture) })) : [];
+  const right = results.filter((result) => result.label === result.answer).length;
+  const passed = right === data.test.length;
+  const surprise = model ? predict(model, data.surprise.picture) : null;
+  const fooled = surprise && surprise.label !== data.surprise.answer;
+  const feature = model ? data.features.find((item) => item.id === model.feature) : null;
+
+  function choose(id) {
+    const next = [...labels, id];
+    setLabels(next);
+    setDrag(0);
+    if (next.length === data.train.length) {
+      setModel(trainStump(data, data.train.map((card, i) => ({ picture: card.picture, label: next[i] }))));
+      setStage("test");
+    }
+  }
+  function retrain() {
+    setLabels([]);
+    setModel(null);
+    setAttempts((n) => n + 1);
+    setStage("train");
+  }
+
+  if (stage === "train") {
+    const card = data.train[labels.length];
+    // 카드를 왼쪽으로 밀면 첫 번째 이름표, 오른쪽으로 밀면 두 번째 이름표다.
+    const release = () => {
+      if (start.current === null) return;
+      start.current = null;
+      if (drag < -70) choose(data.labels[0].id);
+      else if (drag > 70) choose(data.labels[1].id);
+      else setDrag(0);
+    };
+    return (
+      <>
+        <p className="body-copy">{data.trainPrompt}</p>
+        <p className="game-progress">
+          AI 가르치기 · {labels.length + 1} / {data.train.length}
+        </p>
+        <div
+          key={labels.length}
+          className="pet-card a-pop"
+          style={{ transform: `translateX(${drag}px) rotate(${drag / 18}deg)`, transition: start.current === null ? "transform 0.2s" : "none" }}
+          onPointerDown={(e) => {
+            start.current = e.clientX;
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => start.current !== null && setDrag(e.clientX - start.current)}
+          onPointerUp={release}
+          onPointerCancel={() => {
+            start.current = null;
+            setDrag(0);
+          }}
+        >
+          <PetPicture picture={card.picture} label={`사진 ${labels.length + 1}: ${describe(data, card.picture)}`} />
+        </div>
+        <div className="game-choices">
+          <button onClick={() => choose(data.labels[0].id)}>← {data.labels[0].label}</button>
+          <button onClick={() => choose(data.labels[1].id)}>{data.labels[1].label} →</button>
+        </div>
+      </>
+    );
+  }
+
+  if (stage === "test")
+    return (
+      <>
+        <p className="body-copy">{data.testPrompt}</p>
+        <ul className="pet-results">
+          {results.map((result, i) => (
+            <li key={i} className={result.label === result.answer ? "is-right" : "is-wrong"}>
+              <PetPicture picture={result.picture} size={64} label={`시험 사진 ${i + 1}: ${describe(data, result.picture)}`} />
+              <span>
+                AI 판단 <b>{nameOf(result.label)}</b>
+                <small>{result.label === result.answer ? "정답" : `오답 · 정답은 ${nameOf(result.answer)}`}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="game-feedback" role="status">
+          정확도 {right} / {data.test.length}. {passed ? data.pass : data.fail}
+        </p>
+        {passed ? (
+          <button
+            className="button"
+            onClick={() => {
+              setStage("launch");
+              onComplete(`학습 사진 ${data.train.length}장 · 시험 ${right}/${data.test.length} · 가르친 횟수 ${attempts}번`);
+            }}
+          >
+            출시하기
+          </button>
+        ) : (
+          <button className="button" onClick={retrain}>
+            다시 가르치기
+          </button>
+        )}
+      </>
+    );
+
+  const review = fooled ? data.reviews.wrong : data.reviews.right;
+  return (
+    <div role="status">
+      <p className="body-copy">{data.launch}</p>
+      <div className="pet-card">
+        <PetPicture picture={data.surprise.picture} label={data.surprise.caption} />
+      </div>
+      <p className="pet-caption">{data.surprise.caption}</p>
+      <p className="pet-verdict">
+        AI 판단: {nameOf(surprise.label)} {surprise.confidence}%
+      </p>
+      <p className={`pet-review ${fooled ? "is-wrong" : "is-right"}`}>
+        <span aria-label={`별점 ${review.stars}점`}>{"★".repeat(review.stars) + "☆".repeat(5 - review.stars)}</span> {review.text}
+      </p>
+      <p className="game-feedback">
+        {fooled ? `AI가 '${feature.label}'만 보고 판단했어요.` : `AI가 '${feature.label}'을 보고 맞혔어요.`}
+      </p>
+      <Restart onClick={retrain}>처음부터 다시 가르치기 →</Restart>
+    </div>
+  );
+}
+
+// 수업 안에 들어가는 틀(B·C·D·G). A는 화면 전체를 쓰고, F는 계획서 저장이 따로 있어서 수업 화면이 직접 그린다.
+const embedded = { B: OrderTemplate, C: Classify, D: Reaction, G: TrainTemplate };
 export function Experience({ data, onComplete }) {
   const Component = embedded[data?.template];
   return Component ? <Component data={data} onComplete={onComplete} /> : null;

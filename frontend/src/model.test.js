@@ -266,8 +266,13 @@ test("졸업 과제는 학과에 맞게 정해진다", () => {
   const computer = createDepartment("컴퓨터공학과", "가천대학교", ["자료구조"], "공학");
   assert.equal(finalReady({ artworks: { [design.id]: "data:image/png;base64,AA==" } }, design), true);
   assert.equal(finalReady({ artworks: {}, capstones: { [design.id]: { topic: "가", reason: "나", method: "다" } } }, design), false);
-  assert.equal(finalReady({ artworks: { [computer.id]: "data:image/png;base64,AA==" } }, computer), false);
-  assert.equal(finalReady({ capstones: { [computer.id]: { topic: "가", reason: "나", method: "다" } } }, computer), true);
+  // 컴퓨터·AI는 AI 가르치기를 끝까지 해봐야(artworks에 기록) 완료되고, 다른 공학은 계획서를 채워야 한다.
+  assert.equal(computer.final.kind, "project");
+  assert.equal(finalReady({ artworks: { [computer.id]: true } }, computer), true);
+  assert.equal(finalReady({ artworks: {}, capstones: { [computer.id]: { topic: "가", reason: "나", method: "다" } } }, computer), false);
+  const machine = createDepartment("기계공학과", "가천대학교", ["정역학"], "공학");
+  assert.equal(finalReady({ artworks: { [machine.id]: true } }, machine), false);
+  assert.equal(finalReady({ capstones: { [machine.id]: { topic: "가", reason: "나", method: "다" } } }, machine), true);
 });
 test("계획서는 형식이 맞는 것만 복구한다", () => {
   const restored = loadState(
