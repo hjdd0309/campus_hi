@@ -1131,12 +1131,16 @@ function TaskCard({ top, title, sub, hint, onClick, d }) {
 
 export function Home({ active, nav, state, setState }) {
   const v = view(state);
-  // 탐색에서 다른 학과를 열어 보면 current가 그 학과로 바뀐다. 그 학과에 입학하지 않았으면
-  // 처음 화면으로 보내지 않고 가장 최근에 입학한 학과를 보여준다.
-  const fallback = v?.journey ? null : latestJourney(state);
+  // 탐색에서 다른 학과를 열어 보면 current가 그 학과로 바뀐다. 그 학과에 입학하지 않은 채 홈으로 돌아오면
+  // 처음 화면으로 보내지 않고, 홈에 보여 주던 학과(없으면 가장 최근에 입학한 학과)를 다시 보여준다.
+  // 홈이 뒤에 깔려 있는 동안(탐색·학과 상세를 보는 중)에는 건드리지 않는다. 건드리면 열어 본 학과가 진행 중인 학과로 바뀐다.
+  const fallback = v?.journey ? null : state.journeys[state.studying] ? state.studying : latestJourney(state);
+  const shown = v?.journey ? v.d.id : null;
   useEffect(() => {
+    if (!active) return;
     if (fallback) setState((s) => ({ ...s, current: fallback }));
-  }, [fallback, setState]);
+    else if (shown && state.studying !== shown) setState((s) => ({ ...s, studying: shown }));
+  }, [active, fallback, shown, state.studying, setState]);
   const percent = v?.journey ? Math.round((v.completed / v.total) * 100) : 0;
   const pct = useCountUp(percent);
   // 잠긴 과제를 눌렀을 때 그 카드에 보여줄 안내.

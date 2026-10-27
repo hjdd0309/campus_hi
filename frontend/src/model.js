@@ -230,6 +230,8 @@ export const initialState = {
   answers: {},
   journeys: {},
   current: "design",
+  // 홈에 보여 주던(지금 체험 중인) 학과. current는 탐색에서 열어 본 학과로도 바뀌므로 따로 둔다.
+  studying: null,
   notes: {},
   drafts: {},
   plays: {},
@@ -468,6 +470,7 @@ export function loadState(storage) {
       drafts,
       plays,
       current: validIds.has(value.current) ? value.current : "design",
+      studying: Object.hasOwn(journeys, value.studying) ? value.studying : null,
       interests: Array.isArray(value.interests)
         ? value.interests.filter((v) => typeof v === "string")
         : [],

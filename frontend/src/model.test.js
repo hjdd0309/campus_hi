@@ -122,6 +122,14 @@ test("손상된 저장 데이터는 초기 상태로 복구하고 진행률 범�
   assert.equal(state.journeys.invalid, undefined);
   assert.deepEqual(state.notes, { "design-0": "기록", [`design-${TOTAL - 1}`]: "범위 밖" });
 });
+test("홈에 보여 주던 학과는 입학 기록이 있을 때만 복구한다", () => {
+  const journeys = { design: { completed: 1 }, psychology: { completed: 0 } };
+  assert.equal(loadState(only(STORAGE_KEY, { journeys, studying: "psychology" })).studying, "psychology");
+  assert.equal(loadState(only(STORAGE_KEY, { journeys, studying: "missing" })).studying, null);
+  assert.equal(loadState(only(STORAGE_KEY, { journeys: {}, studying: "design" })).studying, null);
+  assert.equal(loadState(only(STORAGE_KEY, { journeys, studying: { id: "design" } })).studying, null);
+});
+
 test("작성 중인 노트는 새로고침 후 복구하고 잘못된 값은 버린다", () => {
   const restored = loadState(
     only(STORAGE_KEY, {
