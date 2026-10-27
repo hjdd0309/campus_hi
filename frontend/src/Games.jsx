@@ -7,7 +7,7 @@ import { templates } from "./experiences.js";
 
 // 수업의 "직접 해보기" 단계에 들어가는 체험: 학과군 실습(체험 틀) 또는 미리 만들어 둔 연습 문제.
 
-function GameFrame({ title, played, note, children }) {
+function GameFrame({ title, played, children }) {
   return (
     <section className="lesson-game" aria-label={title}>
       <h2 className="section-title">
@@ -21,7 +21,6 @@ function GameFrame({ title, played, note, children }) {
           </span>
         )}
       </h2>
-      {note && <p className="game-note">{note}</p>}
       {children}
       {played && <p className="footnote">최근 결과 · {played}</p>}
     </section>
@@ -62,14 +61,14 @@ export function useLessonGame(subject) {
 export default function LessonGame({ game, played, onComplete }) {
   if (game?.template && templates[game.template])
     return (
-      <GameFrame title={templates[game.template].title} played={played} note="AI가 만든 체험이에요. 실제 수업 내용과 다를 수 있어요.">
+      <GameFrame title={templates[game.template].title} played={played}>
         <Experience data={game} onComplete={onComplete} />
       </GameFrame>
     );
   const Component = game && typedComponents[game.type];
   if (!Component) return null;
   return (
-    <GameFrame title={lessonTypes[game.type].title} played={played} note="AI가 만든 연습 문제예요. 실제 수업 내용과 다를 수 있어요.">
+    <GameFrame title={lessonTypes[game.type].title} played={played}>
       <Component game={game} onComplete={onComplete} />
     </GameFrame>
   );
