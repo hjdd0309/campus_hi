@@ -37,6 +37,22 @@ function distance(year, level) {
   return Math.max(0, level[0] - y, y - level[1]);
 }
 
+// 학과군 실습 학년에 보여줄 과목. 교과목 중 이름이 patterns에 맞고 이론 수업에 쓰지 않은(used) 과목에서,
+// 그 학년에 보통 듣는 과목, 범위가 조금 어긋나거나 모르는 과목(앞쪽 패턴부터), 크게 어긋나는 과목 순서로 고른다.
+// 학년 범위가 없는 과목(알고리즘분석 등)도 패턴이 앞이면 범위가 한 학년 어긋나는 과목보다 먼저 나온다. 없으면 null.
+export function pickPracticeSubject(curriculum, patterns = [], year = 3, levels = {}, used = new Set()) {
+  let best = null;
+  curriculum.forEach((subject, index) => {
+    if (used.has(subject)) return;
+    const pattern = patterns.findIndex((re) => re.test(subject));
+    if (pattern < 0) return;
+    const gap = distance(year, Object.hasOwn(levels, subject) ? levels[subject] : null);
+    const rank = [gap === 0 ? 0 : gap < 2 ? 1 : 2, pattern, gap, index];
+    if (!best || before(rank, best.rank)) best = { subject, rank };
+  });
+  return best?.subject ?? null;
+}
+
 // 순위 [a, b, ...]가 앞 항목부터 견주어 더 작은지.
 function before(rank, other) {
   const i = rank.findIndex((value, at) => value !== other[at]);
