@@ -275,21 +275,31 @@ def lesson_picks():
 
 @lru_cache(maxsize=1)
 def partners():
-    """제휴 대학(`data/partners.json`): 학교명 → {"since": "YYYY-MM-DD"}. 제공 대상에 없는 학교나 날짜가 틀린 항목은 버린다."""
+    """제휴 대학(`data/partners.json`): 학교명 → {"since": "YYYY-MM-DD", "example": bool}.
+    `example: true`는 실제 제휴가 아니라 "제휴하면 이렇게 보인다"는 예시이고, 실제 제휴는 example 없이 적는다.
+    제공 대상에 없는 학교, 날짜가 틀리거나 example이 참·거짓이 아닌 항목은 버린다."""
     if not PARTNERS_PATH.exists():
         return {}
     found = {}
     for school, entry in json.loads(PARTNERS_PATH.read_text(encoding="utf-8")).items():
         try:
             date.fromisoformat(entry["since"])
-        except (TypeError, KeyError, ValueError):
+            if not isinstance(entry.get("example", False), bool):
+                raise ValueError
+        except (TypeError, KeyError, ValueError, AttributeError):
             logger.warning("제휴 대학 항목의 형식이 올바르지 않아 뺍니다: %s", school)
             continue
         if school not in catalog().courses_at:
             logger.warning("제휴 대학이 제공 대상 학교 목록에 없어 뺍니다: %s", school)
             continue
-        found[school] = {"since": entry["since"]}
+        found[school] = {"since": entry["since"], "example": entry.get("example", False)}
     return found
+
+
+def partner_fields(school):
+    """API 응답에 붙이는 제휴 여부. 예시 제휴도 partner는 참이고 partner_example로 구분한다."""
+    entry = partners().get(school)
+    return {"partner": entry is not None, "partner_example": bool(entry and entry["example"])}
 
 
 @lru_cache(maxsize=1)
@@ -372,7 +382,7 @@ def similar_programs(data, schools, words, limit=3):
 
 def describe(data, school, course):
     program = data.programs[(school, course)]
-    return {"school": school, "course": course, "category": data.categories[course], "duration": program["duration"], "region": program["region"], "partner": school in partners()}
+    return {"school": school, "course": course, "category": data.categories[course], "duration": program["duration"], "region": program["region"], **partner_fields(school)}
 
 
 @app.post("/api/program_list")
@@ -385,7 +395,7 @@ def program_list(body: ProgramRequest):
     found = [(school, course, school_text, course_text) for school, course, school_text, course_text, key, category in data.pairs
              if matches(key, category) and all(word in school_text for word in school_words) and all(word in course_text for word in course_words)]
     school_query, course_query = "".join(school_words), "".join(course_words)
-    # 검색 결과 안의 제휴 대학을 맨 위에 둔다(화면은 "제휴"를 함께 표시한다). 검색어에 걸리지 않은 제휴 대학을 끼워 넣지는 않는다.
+    # 검색 결과 안의 제휴 대학(예시 포함)을 맨 위에 둔다(화면은 "제휴"·"제휴 예시"를 함께 표시한다). 검색어에 걸리지 않은 제휴 대학을 끼워 넣지는 않는다.
     # 그다음 검색어와 이름이 같은 것, 검색어로 시작하는 것을 먼저 보여준다(학교가 먼저, 그 안에서 학과). 나머지는 원래 순서를 지킨다.
     partner_schools = partners()
     found.sort(key=lambda item: (
@@ -428,9 +438,9 @@ def course_list(body: CourseRequest):
 
 @app.post("/api/school_list")
 def school_list(body: SchoolRequest):
-    # 제휴 대학을 맨 위에, 그 안과 나머지는 학교 이름순으로 보여준다.
+    # 제휴 대학(예시 포함)을 맨 위에, 그 안과 나머지는 학교 이름순으로 보여준다.
     schools = sorted(catalog().schools.get(body.course, []), key=lambda school: school not in partners())
-    return {"school_list": [{"school": school, "partner": school in partners()} for school in schools]}
+    return {"school_list": [{"school": school, **partner_fields(school)} for school in schools]}
 
 
 @app.post("/api/curriculum_list")
@@ -441,8 +451,9 @@ def curriculum_list(body: CurriculumRequest):
         raise HTTPException(status_code=404, detail="해당 학교의 학과 정보를 찾을 수 없습니다.")
     verified = year_curricula().get((body.school, body.course))
     years = verified and {"terms": verified["years"], "source_url": verified["url"], "checked_at": verified["checked_at"]}
-    partner = body.school in partners()
-    terms = verified["years"] if partner and verified else None
+    fields = partner_fields(body.school)
+    # 예시 제휴도 실제 제휴와 똑같이 학기별 편성을 보낸다.
+    terms = verified["years"] if fields["partner"] and verified else None
     games = lesson_games()
     # 연습 문제가 있는 과목과 그 유형. 화면이 체험할 과목을 고를 때 쓴다. 제휴 대학의 학기별 편성에만 있는 과목도 넣는다.
     named = list(program["curriculum"]) + [subject for term in terms or [] for subject in term["subjects"]]
@@ -452,7 +463,7 @@ def curriculum_list(body: CurriculumRequest):
     # 사람이 정해 둔 학년별 과목. 그 학과 교과목에 있는 후보만 보낸다.
     picks = {year: [subject for subject in subjects if subject in program["curriculum"]] for year, subjects in lesson_picks().get((body.school, body.course), {}).items()}
     picks = {year: subjects for year, subjects in picks.items() if subjects}
-    result = {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "partner": partner, "years": years, "games": types, "levels": levels, "picks": picks}
+    result = {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], **fields, "years": years, "games": types, "levels": levels, "picks": picks}
     # 제휴 대학이고 검증된 학년·학기 편성이 있을 때만 보낸다. 편성이 없으면 지금처럼 교과목 목록만 보낸다.
     if terms:
         result["terms"] = terms

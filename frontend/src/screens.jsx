@@ -356,25 +356,28 @@ function TagPill({ children }) {
 }
 
 // 제휴 대학 표시. 제휴 대학은 검색 결과 맨 위에 오므로, 왜 위에 있는지 보이도록 이름 옆에 늘 붙인다.
-function PartnerBadge() {
+// 예시 제휴는 실제 제휴로 오해하지 않게 "제휴 예시"로 적는다.
+function PartnerBadge({ example }) {
   return (
-    <span className="flex h-[18px] shrink-0 items-center rounded-full border border-mint bg-mint-soft px-[6px] text-[10px] font-semibold leading-none text-mint-deep">
-      제휴<span className="sr-only"> 대학</span>
+    <span className="flex h-[18px] shrink-0 items-center whitespace-nowrap rounded-full border border-mint bg-mint-soft px-[6px] text-[10px] font-semibold leading-none text-mint-deep">
+      {/* flex 안에서는 글 조각 앞뒤 공백이 사라지므로 보이는 글과 읽어 주는 글을 따로 둔다. */}
+      <span aria-hidden="true">{example ? "제휴 예시" : "제휴"}</span>
+      <span className="sr-only">{example ? "제휴 대학 예시" : "제휴 대학"}</span>
     </span>
   );
 }
 
-// 이름이 길면 이름만 말줄임하고 제휴 표시는 늘 보이게 둔다.
-function NameWithBadge({ partner, children }) {
+// 이름이 길면 이름만 말줄임하고 제휴 표시는 늘 보이게 둔다. 예시 여부를 아직 모르는 옛 기록(null)은 표시하지 않는다.
+function NameWithBadge({ partner, example, children }) {
   return (
     <>
       <span className="min-w-0 truncate">{children}</span>
-      {partner && <PartnerBadge />}
+      {partner && example !== null && <PartnerBadge example={example} />}
     </>
   );
 }
 
-function YellowCard({ top, title, partner = false, sub, onClick, className = "", style }) {
+function YellowCard({ top, title, partner = false, example = false, sub, onClick, className = "", style }) {
   return (
     <button
       onClick={onClick}
@@ -382,7 +385,7 @@ function YellowCard({ top, title, partner = false, sub, onClick, className = "",
       style={{ top, ...style }}
     >
       <T y={20} size={16} left={15.5} className="flex items-center gap-[6px] font-semibold text-slate" style={{ maxWidth: 330 }}>
-        <NameWithBadge partner={partner}>{title}</NameWithBadge>
+        <NameWithBadge partner={partner} example={example}>{title}</NameWithBadge>
       </T>
       <T y={48} size={11} left={16} clip={330} className="text-gray">
         {sub}
@@ -547,14 +550,14 @@ export function Schools({ nav, route, setState }) {
     setFailed(null);
     getCurriculum(p.school, p.course)
       .then((result) => {
-        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games, result.levels, result.picks, result.partner, result.terms);
+        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games, result.levels, result.picks, result.partner, result.terms, result.partnerExample);
         // 이미 입학한 학과는 입학할 때 정한 학년별 수업을 그대로 둔다. 새로 받은 데이터로 바꾸면 진행 중인 학년의 수업이 바뀐다.
         // 제휴 여부는 수업과 상관없으니 새로 받은 값으로 바꾼다.
         setState((s) => ({
           ...s,
           current: dept.id,
           catalog: s.journeys[dept.id] && s.catalog.some((item) => item.id === dept.id)
-            ? s.catalog.map((item) => (item.id === dept.id ? { ...item, partner: dept.partner } : item))
+            ? s.catalog.map((item) => (item.id === dept.id ? { ...item, partner: dept.partner, partnerExample: dept.partnerExample } : item))
             : [...s.catalog.filter((item) => item.id !== dept.id), dept],
         }));
         nav.push("detail");
@@ -574,6 +577,7 @@ export function Schools({ nav, route, setState }) {
         top={top}
         title={`${p.school} ${p.course}`}
         partner={p.partner}
+        example={p.partnerExample}
         sub={
           opening === key
             ? "불러오는 중이에요…"
@@ -731,12 +735,30 @@ export function Schools({ nav, route, setState }) {
 /* 08 · 학과 상세                                                      */
 /* ------------------------------------------------------------------ */
 
+// 교표 이미지는 출처를 확인한 경희대학교 것만 있다. 다른 학교는 이름 첫 글자로 그린다(다른 학교 로고는 넣지 않는다).
+const isKhu = (school) => school.startsWith("경희대학교");
+// 이모지 등 두 칸짜리 문자도 반쪽이 나지 않게 문자 단위로 자른다.
+const initialOf = (school) => (Array.from(school.trim())[0] || "").toUpperCase();
+
 function SchoolLogo({ name }) {
-  if (name.startsWith("경희대학교")) return <img src={img.khuLogo} alt="경희대학교 로고" className="h-full w-full" />;
+  if (isKhu(name)) return <img src={img.khuLogo} alt="경희대학교 로고" className="h-full w-full" />;
   return (
     <div className="flex h-full w-full items-center justify-center">
       <div className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-mint/60 text-[26px] font-bold text-mint">
-        {name.slice(0, 1)}
+        {initialOf(name)}
+      </div>
+    </div>
+  );
+}
+
+/** 입학증·성적표·졸업증명서의 도장. 위치와 크기는 세 화면이 같고, 등장 모션은 화면마다 넘겨받는다. */
+function SchoolSeal({ school, className, style }) {
+  const box = `${className} absolute left-[112px] top-[308px] h-[40px] w-[53px]`;
+  if (isKhu(school)) return <img src={img.seal} alt="" className={box} style={style} />;
+  return (
+    <div aria-hidden="true" className={`${box} flex items-center justify-center`} style={style}>
+      <div className="flex h-[40px] w-[40px] items-center justify-center rounded-full border-2 border-mint/70 text-[18px] font-bold leading-none text-mint">
+        {initialOf(school)}
       </div>
     </div>
   );
@@ -763,6 +785,26 @@ function Palette() {
 export function Detail({ active, nav, state, setState }) {
   const v = view(state);
   useGuard(!!v, nav, active);
+  // 예시 여부를 저장하기 전에 입학한 제휴 학과는 서버에서 제휴 정보를 다시 받아 채운다(수업은 그대로 둔다).
+  // 화면을 다시 그릴 때마다 학과 객체가 새로 만들어지므로 학과 id로만 다시 받을지 정한다.
+  const stale = useRef(null);
+  stale.current = v?.d.partner && v.d.partnerExample === null ? v.d : null;
+  const staleId = stale.current?.id;
+  useEffect(() => {
+    if (!active || !staleId) return;
+    const { school, name } = stale.current;
+    const controller = new AbortController();
+    getCurriculum(school, name, controller.signal)
+      .then((result) =>
+        setState((s) => ({
+          ...s,
+          catalog: s.catalog.map((item) => (item.id === staleId ? { ...item, partner: result.partner, partnerExample: result.partnerExample } : item)),
+        })),
+      )
+      // 받지 못하면 제휴 표시만 빼 둔 채로 두고, 다음에 학과 상세를 열 때 다시 받는다.
+      .catch(() => {});
+    return () => controller.abort();
+  }, [active, staleId, setState]);
   if (!v) return null;
   const { d, journey, total, finished } = v;
   const field = fieldOf(d.category);
@@ -788,7 +830,7 @@ export function Detail({ active, nav, state, setState }) {
           <SchoolLogo name={d.school} />
         </div>
         <T y={27} size={d.school.length > 9 ? 16 : 21} left={135.5} className="flex items-center gap-[6px] font-semibold text-slate" style={{ maxWidth: 215 }}>
-          <NameWithBadge partner={d.partner}>{d.school}</NameWithBadge>
+          <NameWithBadge partner={d.partner} example={d.partnerExample}>{d.school}</NameWithBadge>
         </T>
         <T y={57} size={11} lh={17} left={135} clip={215} className="text-gray">
           {`${d.region ? `${d.region}에 있는 학교예요` : "대학 정보 공시 자료 기준이에요"}\n수업연한 ${d.duration || "4년"} 과정`}
@@ -917,7 +959,7 @@ export function Enrolled({ active, nav, state }) {
       <Statement y={210} d={0.9}>
         {`위 사람은 ${d.school} ${d.name}의\n진로 체험을 시작할 수 있음을 증명합니다`}
       </Statement>
-      <img src={img.seal} alt="" className="a-pop absolute left-[112px] top-[308px] h-[40px] w-[53px]" style={delay(1.1)} />
+      <SchoolSeal school={d.school} className="a-pop" style={delay(1.1)} />
     </CertificateShell>
   );
 }
@@ -969,7 +1011,7 @@ export function Grades({ active, nav, state }) {
           </ul>
         )}
         <BottomSign d={d} wait={0.7} />
-        <img src={img.seal} alt="" className="a-fade absolute left-[112px] top-[308px] h-[40px] w-[53px]" style={delay(0.8)} />
+        <SchoolSeal school={d.school} className="a-fade" style={delay(0.8)} />
         <img
           src={img.gradeAplus}
           alt="A+"
@@ -1004,7 +1046,7 @@ export function Diploma({ active, nav, state }) {
         {`위 사람은 ${d.school} ${d.name}\n체험 과정을 졸업하였음을 증명합니다`}
       </Statement>
       <BottomSign d={d} wait={0.95} />
-      <img src={img.seal} alt="" className="a-pop absolute left-[112px] top-[308px] h-[40px] w-[53px]" style={delay(1.15)} />
+      <SchoolSeal school={d.school} className="a-pop" style={delay(1.15)} />
     </CertificateShell>
   );
 }
@@ -1666,6 +1708,8 @@ export function Choose({ active, nav, state, setState }) {
     .map((subject) => ({ subject, type: gameFor(subject, d.lessonGames), taken: taken.has(subject) }))
     .sort((a, b) => a.taken - b.taken || !a.type - !b.type);
   const quizzes = items.filter((item) => item.type && !item.taken).length;
+  // 예시 제휴 대학이면 첫 학기 과목 고르기에서 한 번만 예시라고 알린다.
+  const exampleNote = d.partnerExample && d.options.findIndex(Boolean) === index;
   const pick = (subject) => {
     setState((s) => chooseSubject(s, d.id, index, subject));
     nav.replace("lesson");
@@ -1681,6 +1725,11 @@ export function Choose({ active, nav, state, setState }) {
             ? `‘연습 문제’ 표시가 있는 ${quizzes}개 과목은 문제를 풀어 보고, 나머지는 관찰 과제로 체험해요.`
             : "이 학기 과목은 모두 관찰 과제로 체험해요."}
         </p>
+        {exampleNote && (
+          <p className="a-up mt-[12px] rounded-[12px] border border-mint bg-mint-soft px-[14px] py-[10px] text-[12.5px] leading-[19px] text-mint-deep" style={delay(0.08)}>
+            제휴 대학은 이렇게 학기별로 과목을 골라 체험할 수 있어요 (예시)
+          </p>
+        )}
         <ul className="mt-[18px] grid gap-[10px]">
           {items.map(({ subject, type, taken: used }, i) => (
             <li key={subject} className="a-up" style={delay(0.1 + Math.min(i, 8) * 0.03)}>

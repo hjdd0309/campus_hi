@@ -15,7 +15,15 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     const data = url.endsWith("course_list")
       ? { course_list: ["산업디자인학과", "PEP(정치학,경제학,철학)연계전공"], total: 41 }
       : url.endsWith("school_list")
-        ? { school_list: [{ school: "경희대학교", partner: true }, { school: "국민대학교", partner: false }] }
+        ? {
+            school_list: [
+              { school: "경희대학교", partner: true, partner_example: true },
+              { school: "고려대학교", partner: true, partner_example: false },
+              { school: "국민대학교", partner: false },
+              // 제휴가 아닌데 예시로 온 값은 예시로 보지 않는다.
+              { school: "단국대학교", partner: false, partner_example: true },
+            ],
+          }
         : { curriculum_list: ["기초설계", "제품설계"], category: "예체능", duration: "4년", levels: { 기초설계: [1, 2], 제품설계: [3, 2], 없는값: [0, 5], 문자: "2-3" } };
     return new Response(JSON.stringify(data), { status: 200 });
   });
@@ -24,8 +32,10 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     total: 41,
   });
   assert.deepEqual(await getSchoolList("산업디자인학과"), [
-    { school: "경희대학교", partner: true },
-    { school: "국민대학교", partner: false },
+    { school: "경희대학교", partner: true, partnerExample: true },
+    { school: "고려대학교", partner: true, partnerExample: false },
+    { school: "국민대학교", partner: false, partnerExample: false },
+    { school: "단국대학교", partner: false, partnerExample: false },
   ]);
   assert.deepEqual(await getCurriculum("경희대학교", "산업디자인학과"), {
     curriculum: ["기초설계", "제품설계"],
@@ -38,6 +48,7 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     levels: { 기초설계: [1, 2] },
     picks: {},
     partner: false,
+    partnerExample: false,
     terms: null,
   });
   assert.deepEqual(requests, [
@@ -97,11 +108,19 @@ test("제휴 대학의 학년·학기 편성은 형식이 맞는 학기만 받�
   );
   const result = await getCurriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과");
   assert.equal(result.partner, true);
+  assert.equal(result.partnerExample, false);
   assert.deepEqual(result.terms, [{ year: 2, semester: 1, subjects: ["자료구조"] }]);
   t.mock.method(globalThis, "fetch", async () =>
     new Response(JSON.stringify({ curriculum_list: ["자료구조"], partner: true, terms: "1학년" }), { status: 200 }),
   );
   assert.equal((await getCurriculum("경희대학교", "산업디자인학과")).terms, null);
+  // 예시 제휴도 학기별 편성을 똑같이 받는다.
+  t.mock.method(globalThis, "fetch", async () =>
+    new Response(JSON.stringify({ curriculum_list: ["자료구조"], partner: true, partner_example: true, terms: [{ year: 1, semester: 1, subjects: ["자료구조"] }] }), { status: 200 }),
+  );
+  const example = await getCurriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과");
+  assert.equal(example.partnerExample, true);
+  assert.deepEqual(example.terms, [{ year: 1, semester: 1, subjects: ["자료구조"] }]);
   t.mock.method(globalThis, "fetch", async () =>
     new Response(JSON.stringify({ school_list: ["경희대학교"] }), { status: 200 }),
   );
@@ -109,18 +128,23 @@ test("제휴 대학의 학년·학기 편성은 형식이 맞는 학기만 받�
 });
 test("학교·학과 목록은 형식이 맞을 때만 받아들인다", async (t) => {
   const requests = [];
-  const program = { school: "경희대학교", course: "산업디자인학과", category: "예체능", duration: "4년", region: "경기도", partner: true };
+  const program = { school: "경희대학교", course: "산업디자인학과", category: "예체능", duration: "4년", region: "경기도", partner: true, partner_example: true };
+  const real = { school: "고려대학교", course: "디자인조형학부", category: "예체능", duration: "4년", region: "서울특별시", partner: true };
   t.mock.method(globalThis, "fetch", async (url, options) => {
     requests.push([url, JSON.parse(options.body)]);
     return new Response(
-      JSON.stringify({ programs: [program, { school: "가천대학교", course: "심리학과" }], total: 2, similar_programs: [{ school: "경희대학교", course: "시각디자인학과" }], similar_courses: [] }),
+      JSON.stringify({ programs: [program, real, { school: "가천대학교", course: "심리학과" }], total: 3, similar_programs: [{ school: "경희대학교", course: "시각디자인학과" }], similar_courses: [] }),
       { status: 200 },
     );
   });
   assert.deepEqual(await getProgramList("전체", { school: "경희대", course: "디자인" }, 30), {
-    programs: [program, { school: "가천대학교", course: "심리학과", category: "", duration: "", region: "", partner: false }],
-    total: 2,
-    similarPrograms: [{ school: "경희대학교", course: "시각디자인학과", category: "", duration: "", region: "", partner: false }],
+    programs: [
+      { school: "경희대학교", course: "산업디자인학과", category: "예체능", duration: "4년", region: "경기도", partner: true, partnerExample: true },
+      { ...real, partnerExample: false },
+      { school: "가천대학교", course: "심리학과", category: "", duration: "", region: "", partner: false, partnerExample: false },
+    ],
+    total: 3,
+    similarPrograms: [{ school: "경희대학교", course: "시각디자인학과", category: "", duration: "", region: "", partner: false, partnerExample: false }],
     similarCourses: [],
   });
   assert.deepEqual(requests, [["/api/program_list", { interests: "전체", school: "경희대", course: "디자인", offset: 30, limit: 30 }]]);

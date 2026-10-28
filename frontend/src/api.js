@@ -88,6 +88,7 @@ export async function getProgramList(interests, search, offset, signal) {
     duration: text(item.duration),
     region: text(item.region),
     partner: item.partner === true,
+    partnerExample: item.partner === true && item.partner_example === true,
   });
   return {
     programs: data.programs.map(program),
@@ -96,12 +97,16 @@ export async function getProgramList(interests, search, offset, signal) {
     similarCourses: stringList(data.similar_courses, message).filter(Boolean),
   };
 }
-// 학과를 개설한 학교 목록: [{ school, partner }]. partner는 제휴 대학 여부다.
+// 학과를 개설한 학교 목록: [{ school, partner, partnerExample }]. partner는 제휴 대학 여부, partnerExample은 실제 제휴가 아닌 예시 제휴인지다.
 export async function getSchoolList(course, signal) {
   const data = await post("/school_list", { course }, signal);
   if (!Array.isArray(data.school_list) || !data.school_list.every((item) => typeof item?.school === "string" && item.school))
     throw new ApiError(502, "목록 형식이 올바르지 않아요. 다시 시도해주세요.");
-  return data.school_list.map((item) => ({ school: item.school, partner: item.partner === true }));
+  return data.school_list.map((item) => ({
+    school: item.school,
+    partner: item.partner === true,
+    partnerExample: item.partner === true && item.partner_example === true,
+  }));
 }
 export async function getCurriculum(school, course, signal) {
   const data = await post("/curriculum_list", { school, course }, signal);
@@ -118,6 +123,7 @@ export async function getCurriculum(school, course, signal) {
     levels: cleanLevels(data.levels),
     picks: cleanPicks(data.picks),
     partner: data.partner === true,
+    partnerExample: data.partner === true && data.partner_example === true,
     // 제휴 대학의 학년·학기별 편성. 제휴 대학이 아니거나 편성 데이터가 없으면 null.
     terms: cleanYears({ terms: data.terms })?.terms ?? null,
   };

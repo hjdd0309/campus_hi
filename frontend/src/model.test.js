@@ -413,6 +413,31 @@ test("제휴 대학 표시는 새로고침 후에도 남고, true가 아닌 값�
   const restored = loadState(only(STORAGE_KEY, { ...structuredClone(initialState), catalog: [d, { ...d, id: "x", school: "가천대학교", partner: "true" }] }));
   assert.deepEqual(restored.catalog.map((item) => item.partner), [true, false]);
 });
+test("예시 제휴는 표시만 다르고 학기별 체험은 실제 제휴와 같으며, 예시 여부가 없는 옛 기록은 모름(null)으로 읽는다", () => {
+  const terms = [
+    { year: 1, semester: 1, subjects: ["자료구조"] },
+    { year: 1, semester: 2, subjects: ["운영체제"] },
+    { year: 2, semester: 1, subjects: ["알고리즘"] },
+    { year: 2, semester: 2, subjects: ["데이터베이스"] },
+  ];
+  const make = (partner, example) =>
+    createDepartment("컴퓨터공학과", "경희대학교", ["자료구조", "운영체제"], "공학", { terms }, "4년", "", null, null, null, partner, terms, example);
+  const example = make(true, true);
+  const real = make(true, false);
+  const none = make(false, true);
+  assert.deepEqual([example.partnerExample, real.partnerExample, none.partnerExample], [true, false, false]);
+  assert.deepEqual({ ...example, partnerExample: false }, real);
+  assert.equal(none.options, undefined);
+  // 저장했다 읽으면 그대로다.
+  const restored = loadState(only(STORAGE_KEY, { ...structuredClone(initialState), catalog: [example, real, none] }));
+  assert.deepEqual(restored.catalog.map((item) => [item.partner, item.partnerExample]), [[true, true], [true, false], [false, false]]);
+  // 예시 여부를 저장하기 전의 기록: 제휴였으면 모름(null), 아니면 false. 학기 자리는 그대로 다시 만든다.
+  const { partnerExample: _, ...old } = example;
+  const before = loadState(only(STORAGE_KEY, { ...structuredClone(initialState), catalog: [old, { ...old, id: "x", partner: false }] }));
+  assert.deepEqual(before.catalog.map((item) => item.partnerExample), [null, false]);
+  assert.deepEqual(before.catalog[0].lessons, example.lessons);
+  assert.deepEqual(before.catalog[0].options, example.options);
+});
 test("어느 학교·학과든 만들 수 있고 계열에 맞는 기본 구성을 쓴다", () => {
   const d = createDepartment("컴퓨터공학과", "가천대학교", ["자료구조", "운영체제"], "공학", null, "4년");
   assert.equal(d.id, "api:가천대학교:컴퓨터공학과");

@@ -336,7 +336,11 @@ export function createDepartment(
   picks = null,
   partner = false,
   terms = null,
+  partnerExample = false,
 ) {
+  // 예시 제휴("제휴하면 이렇게 보인다")인지. 예시도 제휴 대학과 똑같이 동작하고 표시만 다르다.
+  // null은 예시 여부를 저장하기 전의 기록이라 아직 모른다는 뜻이다(학과 상세가 서버에서 다시 받아 채운다).
+  const example = partner !== true ? false : partnerExample === null ? null : partnerExample === true;
   const yearly = cleanYears(years);
   // 미리 만들어 둔 연습 문제가 있는 과목과 그 유형.
   const lessonGames = cleanLessonGames(games);
@@ -386,6 +390,7 @@ export function createDepartment(
       levels: subjectLevels,
       picks: lessonPicks,
       partner: true,
+      partnerExample: example,
       lessons: [...plan.slots.map(() => CHOOSE_TITLE), ...(practice ? [practiceSubject || practice.title] : []), final.name],
       games: [...plan.slots.map(() => null), ...(practice ? [`group:${group}`] : []), null],
     };
@@ -430,8 +435,9 @@ export function createDepartment(
     lessonGames,
     levels: subjectLevels,
     picks: lessonPicks,
-    // 제휴 대학 여부. 화면에 "제휴"를 표시하는 데만 쓴다.
+    // 제휴 대학 여부. 화면에 "제휴"·"제휴 예시"를 표시하는 데만 쓴다.
     partner: partner === true,
+    partnerExample: example,
     lessons: [
       ...theoryYears.map((year, i) => picked[i]?.subject || `${year}학년 전공 탐색`),
       ...(practice ? [practiceSubject || practice.title] : []),
@@ -479,6 +485,7 @@ export function loadState(storage) {
               d.picks,
               d.partner,
               d.terms,
+              "partnerExample" in d ? d.partnerExample : null,
             ),
           )
       : [];
