@@ -237,8 +237,9 @@ def validate(school, course, terms):
             raise ValueError(f"학기 값이 올바르지 않습니다: {semester!r}")
         for subject in term.get("subjects", []):
             name = " ".join(str(subject).split())
-            key = normalize(name)
-            if not key or len(name) > 100 or (year, semester, key) in seen:
+            # 괄호 안까지 견줘서 거른다. normalize는 괄호를 지워 "몰입심화학습(딥엑스)"와 "몰입심화학습(알체라)"를 같은 과목으로 본다.
+            key = compact(name)
+            if not normalize(name) or len(name) > 100 or (year, semester, key) in seen:
                 continue
             seen.add((year, semester, key))
             merged.setdefault((year, semester), []).append(name)

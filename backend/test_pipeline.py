@@ -62,6 +62,11 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pipeline.validate("가천대학교 일반대학원", "심리학과", TERMS)
 
+    def test_validate_keeps_subjects_that_differ_only_in_parentheses(self):
+        subjects = ["드로잉", "드로잉 ", "기초 디자인", "기초디자인", "몰입심화학습(딥엑스)", "몰입심화학습(알체라)", "제품디자인", "색채학"]
+        terms, _ = pipeline.validate(SCHOOL, COURSE, [{"year": 1, "semester": 1, "subjects": subjects}])
+        self.assertEqual(terms[0]["subjects"], ["드로잉", "기초 디자인", "몰입심화학습(딥엑스)", "몰입심화학습(알체라)", "제품디자인", "색채학"])
+
     def test_normalize_ignores_notation_differences(self):
         self.assertEqual(pipeline.normalize("기초 산업디자인 Ⅱ (Basic Design)"), pipeline.normalize("기초산업디자인2"))
         self.assertNotEqual(pipeline.normalize("공간디자인1"), pipeline.normalize("공간디자인2"))

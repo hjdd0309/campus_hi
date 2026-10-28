@@ -15,7 +15,7 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     const data = url.endsWith("course_list")
       ? { course_list: ["산업디자인학과", "PEP(정치학,경제학,철학)연계전공"], total: 41 }
       : url.endsWith("school_list")
-        ? { school_list: ["경희대학교"] }
+        ? { school_list: [{ school: "경희대학교", partner: true }, { school: "국민대학교", partner: false }] }
         : { curriculum_list: ["기초설계", "제품설계"], category: "예체능", duration: "4년", levels: { 기초설계: [1, 2], 제품설계: [3, 2], 없는값: [0, 5], 문자: "2-3" } };
     return new Response(JSON.stringify(data), { status: 200 });
   });
@@ -23,7 +23,10 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     courses: ["산업디자인학과", "PEP(정치학,경제학,철학)연계전공"],
     total: 41,
   });
-  assert.deepEqual(await getSchoolList("산업디자인학과"), ["경희대학교"]);
+  assert.deepEqual(await getSchoolList("산업디자인학과"), [
+    { school: "경희대학교", partner: true },
+    { school: "국민대학교", partner: false },
+  ]);
   assert.deepEqual(await getCurriculum("경희대학교", "산업디자인학과"), {
     curriculum: ["기초설계", "제품설계"],
     category: "예체능",
@@ -34,6 +37,8 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     // 학년 범위는 1~4학년, 시작 ≤ 끝인 것만 받는다.
     levels: { 기초설계: [1, 2] },
     picks: {},
+    partner: false,
+    terms: null,
   });
   assert.deepEqual(requests, [
     ["/api/course_list", { interests: "디자인", query: "산업", offset: 30, limit: 30 }],
@@ -82,9 +87,29 @@ test("서버 오류와 잘못된 응답은 가짜 목록으로 대체하지 않�
     );
   }
 });
+test("제휴 대학의 학년·학기 편성은 형식이 맞는 학기만 받는다", async (t) => {
+  t.mock.method(globalThis, "fetch", async () =>
+    new Response(JSON.stringify({
+      curriculum_list: ["자료구조"],
+      partner: true,
+      terms: [{ year: 2, semester: 1, subjects: ["자료구조", ""] }, { year: 9, semester: 1, subjects: ["가"] }, { year: 3, semester: 2, subjects: [] }],
+    }), { status: 200 }),
+  );
+  const result = await getCurriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과");
+  assert.equal(result.partner, true);
+  assert.deepEqual(result.terms, [{ year: 2, semester: 1, subjects: ["자료구조"] }]);
+  t.mock.method(globalThis, "fetch", async () =>
+    new Response(JSON.stringify({ curriculum_list: ["자료구조"], partner: true, terms: "1학년" }), { status: 200 }),
+  );
+  assert.equal((await getCurriculum("경희대학교", "산업디자인학과")).terms, null);
+  t.mock.method(globalThis, "fetch", async () =>
+    new Response(JSON.stringify({ school_list: ["경희대학교"] }), { status: 200 }),
+  );
+  await assert.rejects(getSchoolList("산업디자인학과"), (error) => error instanceof ApiError && error.status === 502);
+});
 test("학교·학과 목록은 형식이 맞을 때만 받아들인다", async (t) => {
   const requests = [];
-  const program = { school: "경희대학교", course: "산업디자인학과", category: "예체능", duration: "4년", region: "경기도" };
+  const program = { school: "경희대학교", course: "산업디자인학과", category: "예체능", duration: "4년", region: "경기도", partner: true };
   t.mock.method(globalThis, "fetch", async (url, options) => {
     requests.push([url, JSON.parse(options.body)]);
     return new Response(
@@ -93,9 +118,9 @@ test("학교·학과 목록은 형식이 맞을 때만 받아들인다", async (
     );
   });
   assert.deepEqual(await getProgramList("전체", { school: "경희대", course: "디자인" }, 30), {
-    programs: [program, { school: "가천대학교", course: "심리학과", category: "", duration: "", region: "" }],
+    programs: [program, { school: "가천대학교", course: "심리학과", category: "", duration: "", region: "", partner: false }],
     total: 2,
-    similarPrograms: [{ school: "경희대학교", course: "시각디자인학과", category: "", duration: "", region: "" }],
+    similarPrograms: [{ school: "경희대학교", course: "시각디자인학과", category: "", duration: "", region: "", partner: false }],
     similarCourses: [],
   });
   assert.deepEqual(requests, [["/api/program_list", { interests: "전체", school: "경희대", course: "디자인", offset: 30, limit: 30 }]]);

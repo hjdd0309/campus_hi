@@ -12,7 +12,7 @@ class ApiTests(unittest.TestCase):
         response = self.client.post("/api/course_list", json={"interests": "디자인"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("산업디자인학과", response.json()["course_list"])
-        schools = self.client.post("/api/school_list", json={"course": "산업디자인학과"}).json()["school_list"]
+        schools = [item["school"] for item in self.client.post("/api/school_list", json={"course": "산업디자인학과"}).json()["school_list"]]
         self.assertIn("경희대학교", schools)
         self.assertEqual(schools, sorted(schools))
         curriculum = self.client.post("/api/curriculum_list", json={"school": "경희대학교", "course": "산업디자인학과"})
@@ -89,7 +89,7 @@ class ApiTests(unittest.TestCase):
         result = self.similar("서울대학교", "전자")
         self.assertGreater(result["total"], 0)
         self.assertNotIn("서울대학교", {item["school"] for item in result["programs"]})
-        self.assertEqual(result["similar_programs"][0], {"school": "서울대학교", "course": "전기·정보공학부", "category": "공학", "duration": "4년", "region": "서울특별시"})
+        self.assertEqual(result["similar_programs"][0], {"school": "서울대학교", "course": "전기·정보공학부", "category": "공학", "duration": "4년", "region": "서울특별시", "partner": False})
         self.assertEqual(self.similar("서울대", "전자")["similar_programs"], result["similar_programs"])
         self.assertEqual(result["similar_courses"], [])
         software = [item["course"] for item in self.similar("고려대학교", "소프트웨어")["similar_programs"]]
@@ -121,9 +121,9 @@ class ApiTests(unittest.TestCase):
         everything = self.client.post("/api/program_list", json={"interests": "전체"}).json()
         self.assertEqual(everything["total"], 12732)
         self.assertEqual(len(everything["programs"]), 30)
-        self.assertEqual(set(everything["programs"][0]), {"school", "course", "category", "duration", "region"})
+        self.assertEqual(set(everything["programs"][0]), {"school", "course", "category", "duration", "region", "partner"})
         both = self.client.post("/api/program_list", json={"interests": "전체", "school": "경희대", "course": "산업디자인"}).json()["programs"]
-        self.assertEqual(both[0], {"school": "경희대학교", "course": "산업디자인학과", "category": "예체능", "duration": "4년", "region": "경기도"})
+        self.assertEqual(both[0], {"school": "경희대학교", "course": "산업디자인학과", "category": "예체능", "duration": "4년", "region": "경기도", "partner": True})
         exact = self.client.post("/api/program_list", json={"interests": "전체", "course": "심리학과", "limit": 100}).json()["programs"]
         self.assertTrue(all(item["course"] == "심리학과" for item in exact[:27]))
         school = self.client.post("/api/program_list", json={"interests": "공학", "school": "가천대학교", "limit": 100}).json()
@@ -158,6 +158,75 @@ class ApiTests(unittest.TestCase):
         # 구두점만 쓴 검색어는 없는 것으로 본다.
         self.assertEqual(search(school="·", course="  ")["total"], 12732)
         self.assertEqual(self.client.post("/api/program_list", json={"interests": ""}).status_code, 400)
+
+    def curriculum(self, school, course):
+        response = self.client.post("/api/curriculum_list", json={"school": school, "course": course})
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_partner_with_terms_gets_year_and_semester_subjects(self):
+        result = self.curriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과")
+        self.assertIs(result["partner"], True)
+        terms = result["terms"]
+        self.assertGreater(len(terms), 0)
+        for term in terms:
+            self.assertEqual(set(term), {"year", "semester", "subjects"})
+            self.assertTrue(1 <= term["year"] <= 4)
+            self.assertIn(term["semester"], (0, 1, 2))
+            self.assertTrue(term["subjects"] and all(isinstance(subject, str) and subject for subject in term["subjects"]))
+        self.assertEqual([(term["year"], term["semester"]) for term in terms], sorted({(term["year"], term["semester"]) for term in terms}))
+        # 학년별 체험에 쓰는 years와 같은 편성이다.
+        self.assertEqual(result["years"]["terms"], terms)
+
+    def test_partner_without_terms_works_as_before(self):
+        result = self.curriculum("경희대학교", "산업디자인학과")
+        self.assertIs(result["partner"], True)
+        self.assertNotIn("terms", result)
+        self.assertIsNone(result["years"])
+        self.assertGreater(len(result["curriculum_list"]), 0)
+
+    def test_non_partner_never_gets_terms(self):
+        from unittest import mock
+        result = self.curriculum("서울대학교", "전기·정보공학부")
+        self.assertIs(result["partner"], False)
+        self.assertNotIn("terms", result)
+        # 검증된 편성이 있어도 제휴 대학이 아니면 terms는 보내지 않는다(학년별 체험용 years는 그대로).
+        entry = {"school": "서울대학교", "course": "전기·정보공학부", "url": "https://example.ac.kr/c", "checked_at": "2026-10-28", "status": "verified", "years": [{"year": 1, "semester": 1, "subjects": ["회로이론"]}]}
+        with mock.patch("backend.main.year_curricula", return_value={("서울대학교", "전기·정보공학부"): entry}):
+            result = self.curriculum("서울대학교", "전기·정보공학부")
+        self.assertIs(result["partner"], False)
+        self.assertNotIn("terms", result)
+        self.assertEqual(result["years"]["terms"], entry["years"])
+
+    def test_school_and_program_lists_mark_partners(self):
+        schools = self.client.post("/api/school_list", json={"course": "산업디자인학과"}).json()["school_list"]
+        self.assertTrue(all(set(item) == {"school", "partner"} and isinstance(item["partner"], bool) for item in schools))
+        self.assertEqual([item["school"] for item in schools if item["partner"]], ["경희대학교"])
+        programs = self.client.post("/api/program_list", json={"interests": "전체", "course": "산업디자인학과", "limit": 100}).json()["programs"]
+        self.assertTrue(all(item["partner"] is (item["school"] == "경희대학교") for item in programs))
+        # 제휴 여부는 검색 순서를 바꾸지 않는다.
+        from unittest import mock
+        with mock.patch("backend.main.partners", return_value={}):
+            plain = self.client.post("/api/program_list", json={"interests": "전체", "course": "산업디자인학과", "limit": 100}).json()["programs"]
+        self.assertEqual([(item["school"], item["course"]) for item in programs], [(item["school"], item["course"]) for item in plain])
+
+    def test_partner_file_drops_bad_entries(self):
+        import json, tempfile
+        from pathlib import Path
+        from unittest import mock
+        from backend import main
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "partners.json"
+            path.write_text(json.dumps({"경희대학교": {"since": "2026-10-28"}, "서울대학교": {"since": "어제"}, "고려대학교": {}, "없는대학교": {"since": "2026-10-28"}}), encoding="utf-8")
+            main.partners.cache_clear()
+            try:
+                with mock.patch.object(main, "PARTNERS_PATH", path), self.assertLogs("uvicorn.error", "WARNING"):
+                    self.assertEqual(main.partners(), {"경희대학교": {"since": "2026-10-28"}})
+                main.partners.cache_clear()
+                with mock.patch.object(main, "PARTNERS_PATH", Path(folder) / "none.json"):
+                    self.assertEqual(main.partners(), {})
+            finally:
+                main.partners.cache_clear()
 
     def test_course_names_with_commas_stay_intact(self):
         result = self.client.post("/api/course_list", json={"interests": "전체", "query": "PEP"}).json()["course_list"]

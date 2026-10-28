@@ -6,6 +6,7 @@ import math
 import re
 from collections import Counter, defaultdict
 from contextlib import asynccontextmanager
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -22,6 +23,7 @@ YEARS_PATH = Path(__file__).parent / "data" / "year_curricula.json"
 GAMES_PATH = Path(__file__).parent / "data" / "lesson_games.jsonl"
 LEVELS_PATH = Path(__file__).parent / "data" / "subject_levels.json"
 PICKS_PATH = Path(__file__).parent / "data" / "lesson_picks.json"
+PARTNERS_PATH = Path(__file__).parent / "data" / "partners.json"
 DIST_PATH = Path(__file__).parent.parent / "frontend" / "dist"
 MAX_BODY_BYTES = 16 * 1024
 HASHED_ASSET = re.compile(r"^/assets/.+-[A-Za-z0-9_-]{8}\.(js|css|png|webp|svg)$")
@@ -42,7 +44,7 @@ CONTENT_SECURITY_POLICY = "; ".join([
 
 @asynccontextmanager
 async def lifespan(app):
-    logger.info("학교·학과 %d건, 연습 문제 %d건을 불러왔습니다.", len(catalog().programs), len(lesson_games()))
+    logger.info("학교·학과 %d건, 연습 문제 %d건, 제휴 대학 %d곳을 불러왔습니다.", len(catalog().programs), len(lesson_games()), len(partners()))
     yield
 
 
@@ -272,6 +274,25 @@ def lesson_picks():
 
 
 @lru_cache(maxsize=1)
+def partners():
+    """제휴 대학(`data/partners.json`): 학교명 → {"since": "YYYY-MM-DD"}. 제공 대상에 없는 학교나 날짜가 틀린 항목은 버린다."""
+    if not PARTNERS_PATH.exists():
+        return {}
+    found = {}
+    for school, entry in json.loads(PARTNERS_PATH.read_text(encoding="utf-8")).items():
+        try:
+            date.fromisoformat(entry["since"])
+        except (TypeError, KeyError, ValueError):
+            logger.warning("제휴 대학 항목의 형식이 올바르지 않아 뺍니다: %s", school)
+            continue
+        if school not in catalog().courses_at:
+            logger.warning("제휴 대학이 제공 대상 학교 목록에 없어 뺍니다: %s", school)
+            continue
+        found[school] = {"since": entry["since"]}
+    return found
+
+
+@lru_cache(maxsize=1)
 def catalog():
     with gzip.open(DATA_PATH, "rt", encoding="utf-8-sig", newline="") as file:
         return Catalog(csv.DictReader(file))
@@ -351,7 +372,7 @@ def similar_programs(data, schools, words, limit=3):
 
 def describe(data, school, course):
     program = data.programs[(school, course)]
-    return {"school": school, "course": course, "category": data.categories[course], "duration": program["duration"], "region": program["region"]}
+    return {"school": school, "course": course, "category": data.categories[course], "duration": program["duration"], "region": program["region"], "partner": school in partners()}
 
 
 @app.post("/api/program_list")
@@ -404,7 +425,7 @@ def course_list(body: CourseRequest):
 
 @app.post("/api/school_list")
 def school_list(body: SchoolRequest):
-    return {"school_list": catalog().schools.get(body.course, [])}
+    return {"school_list": [{"school": school, "partner": school in partners()} for school in catalog().schools.get(body.course, [])]}
 
 
 @app.post("/api/curriculum_list")
@@ -423,7 +444,12 @@ def curriculum_list(body: CurriculumRequest):
     # 사람이 정해 둔 학년별 과목. 그 학과 교과목에 있는 후보만 보낸다.
     picks = {year: [subject for subject in subjects if subject in program["curriculum"]] for year, subjects in lesson_picks().get((body.school, body.course), {}).items()}
     picks = {year: subjects for year, subjects in picks.items() if subjects}
-    return {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "years": years, "games": types, "levels": levels, "picks": picks}
+    partner = body.school in partners()
+    result = {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "partner": partner, "years": years, "games": types, "levels": levels, "picks": picks}
+    # 제휴 대학이고 검증된 학년·학기 편성이 있을 때만 보낸다. 편성이 없으면 지금처럼 교과목 목록만 보낸다.
+    if partner and verified:
+        result["terms"] = verified["years"]
+    return result
 
 
 @app.post("/api/lesson_game")
