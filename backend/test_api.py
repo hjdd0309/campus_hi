@@ -178,6 +178,10 @@ class ApiTests(unittest.TestCase):
         self.assertEqual([(term["year"], term["semester"]) for term in terms], sorted({(term["year"], term["semester"]) for term in terms}))
         # 학년별 체험에 쓰는 years와 같은 편성이다.
         self.assertEqual(result["years"]["terms"], terms)
+        # 편성에만 있는 과목도 연습 문제 유형을 함께 보낸다(화면이 학기마다 연습 문제가 있는 과목을 표시한다).
+        from backend.main import compact, lesson_games
+        planned = {subject for term in terms for subject in term["subjects"]}
+        self.assertEqual({subject for subject in result["games"] if subject in planned}, {subject for subject in planned if compact(subject) in lesson_games()})
 
     def test_partner_without_terms_works_as_before(self):
         result = self.curriculum("경희대학교", "산업디자인학과")

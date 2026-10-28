@@ -441,19 +441,21 @@ def curriculum_list(body: CurriculumRequest):
         raise HTTPException(status_code=404, detail="해당 학교의 학과 정보를 찾을 수 없습니다.")
     verified = year_curricula().get((body.school, body.course))
     years = verified and {"terms": verified["years"], "source_url": verified["url"], "checked_at": verified["checked_at"]}
+    partner = body.school in partners()
+    terms = verified["years"] if partner and verified else None
     games = lesson_games()
-    # 연습 문제가 있는 과목과 그 유형. 화면이 체험할 과목을 고를 때 쓴다.
-    types = {subject: games[compact(subject)]["type"] for subject in program["curriculum"] if compact(subject) in games}
+    # 연습 문제가 있는 과목과 그 유형. 화면이 체험할 과목을 고를 때 쓴다. 제휴 대학의 학기별 편성에만 있는 과목도 넣는다.
+    named = list(program["curriculum"]) + [subject for term in terms or [] for subject in term["subjects"]]
+    types = {subject: games[compact(subject)]["type"] for subject in named if compact(subject) in games}
     # 과목을 보통 듣는 학년 범위. 화면이 학년마다 맞는 과목을 고를 때 쓴다.
     levels = {subject: subject_levels()[compact(subject)] for subject in program["curriculum"] if compact(subject) in subject_levels()}
     # 사람이 정해 둔 학년별 과목. 그 학과 교과목에 있는 후보만 보낸다.
     picks = {year: [subject for subject in subjects if subject in program["curriculum"]] for year, subjects in lesson_picks().get((body.school, body.course), {}).items()}
     picks = {year: subjects for year, subjects in picks.items() if subjects}
-    partner = body.school in partners()
     result = {"curriculum_list": list(program["curriculum"]), "category": data.categories[body.course], "duration": program["duration"], "region": program["region"], "partner": partner, "years": years, "games": types, "levels": levels, "picks": picks}
     # 제휴 대학이고 검증된 학년·학기 편성이 있을 때만 보낸다. 편성이 없으면 지금처럼 교과목 목록만 보낸다.
-    if partner and verified:
-        result["terms"] = verified["years"]
+    if terms:
+        result["terms"] = terms
     return result
 
 
