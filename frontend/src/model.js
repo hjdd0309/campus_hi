@@ -284,6 +284,7 @@ export function createDepartment(
   games = null,
   levels = null,
   picks = null,
+  partner = false,
 ) {
   const yearly = cleanYears(years);
   // 미리 만들어 둔 연습 문제가 있는 과목과 그 유형.
@@ -339,6 +340,8 @@ export function createDepartment(
     lessonGames,
     levels: subjectLevels,
     picks: lessonPicks,
+    // 제휴 대학 여부. 화면에 "제휴"를 표시하는 데만 쓴다.
+    partner: partner === true,
     lessons: [
       ...theoryYears.map((year, i) => picked[i]?.subject || `${year}학년 전공 탐색`),
       ...(practice ? [practiceSubject || practice.title] : []),
@@ -384,6 +387,7 @@ export function loadState(storage) {
               d.lessonGames,
               d.levels,
               d.picks,
+              d.partner,
             ),
           )
       : [];

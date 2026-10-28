@@ -385,8 +385,11 @@ def program_list(body: ProgramRequest):
     found = [(school, course, school_text, course_text) for school, course, school_text, course_text, key, category in data.pairs
              if matches(key, category) and all(word in school_text for word in school_words) and all(word in course_text for word in course_words)]
     school_query, course_query = "".join(school_words), "".join(course_words)
-    # 검색어와 이름이 같은 것, 검색어로 시작하는 것을 먼저 보여준다(학교가 먼저, 그 안에서 학과). 나머지는 원래 순서를 지킨다.
+    # 검색 결과 안의 제휴 대학을 맨 위에 둔다(화면은 "제휴"를 함께 표시한다). 검색어에 걸리지 않은 제휴 대학을 끼워 넣지는 않는다.
+    # 그다음 검색어와 이름이 같은 것, 검색어로 시작하는 것을 먼저 보여준다(학교가 먼저, 그 안에서 학과). 나머지는 원래 순서를 지킨다.
+    partner_schools = partners()
     found.sort(key=lambda item: (
+        item[0] not in partner_schools,
         bool(school_query) and item[2] != school_query,
         bool(school_query) and not item[2].startswith(school_query),
         bool(course_query) and item[3] != course_query,
@@ -425,7 +428,9 @@ def course_list(body: CourseRequest):
 
 @app.post("/api/school_list")
 def school_list(body: SchoolRequest):
-    return {"school_list": [{"school": school, "partner": school in partners()} for school in catalog().schools.get(body.course, [])]}
+    # 제휴 대학을 맨 위에, 그 안과 나머지는 학교 이름순으로 보여준다.
+    schools = sorted(catalog().schools.get(body.course, []), key=lambda school: school not in partners())
+    return {"school_list": [{"school": school, "partner": school in partners()} for school in schools]}
 
 
 @app.post("/api/curriculum_list")

@@ -401,6 +401,13 @@ test("API로 선택한 대학과 교육과정은 새로고침 후 복구된다",
   assert.deepEqual(restored.catalog[0].yearNumbers, [1, 2]);
   assert.deepEqual(restored.catalog[0].lessons, d.lessons);
   assert.equal(restored.journeys[d.id].completed, 1);
+  assert.equal(restored.catalog[0].partner, false);
+});
+test("제휴 대학 표시는 새로고침 후에도 남고, true가 아닌 값은 제휴로 보지 않는다", () => {
+  const d = createDepartment("산업디자인학과", "경희대학교", ["기초설계"], "예체능", null, "4년", "", null, null, null, true);
+  assert.equal(d.partner, true);
+  const restored = loadState(only(STORAGE_KEY, { ...structuredClone(initialState), catalog: [d, { ...d, id: "x", school: "가천대학교", partner: "true" }] }));
+  assert.deepEqual(restored.catalog.map((item) => item.partner), [true, false]);
 });
 test("어느 학교·학과든 만들 수 있고 계열에 맞는 기본 구성을 쓴다", () => {
   const d = createDepartment("컴퓨터공학과", "가천대학교", ["자료구조", "운영체제"], "공학", null, "4년");

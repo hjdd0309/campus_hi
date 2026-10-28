@@ -14,7 +14,8 @@ class ApiTests(unittest.TestCase):
         self.assertIn("산업디자인학과", response.json()["course_list"])
         schools = [item["school"] for item in self.client.post("/api/school_list", json={"course": "산업디자인학과"}).json()["school_list"]]
         self.assertIn("경희대학교", schools)
-        self.assertEqual(schools, sorted(schools))
+        # 제휴 대학(경희대학교)이 먼저, 그다음 이름순.
+        self.assertEqual(schools, sorted(schools, key=lambda school: (school != "경희대학교", school)))
         curriculum = self.client.post("/api/curriculum_list", json={"school": "경희대학교", "course": "산업디자인학과"})
         self.assertEqual(curriculum.status_code, 200)
         subjects = curriculum.json()["curriculum_list"]
@@ -202,13 +203,32 @@ class ApiTests(unittest.TestCase):
         schools = self.client.post("/api/school_list", json={"course": "산업디자인학과"}).json()["school_list"]
         self.assertTrue(all(set(item) == {"school", "partner"} and isinstance(item["partner"], bool) for item in schools))
         self.assertEqual([item["school"] for item in schools if item["partner"]], ["경희대학교"])
+        # 제휴 대학이 맨 위, 나머지는 이름순.
+        self.assertEqual(schools[0], {"school": "경희대학교", "partner": True})
+        self.assertEqual([item["school"] for item in schools[1:]], sorted(item["school"] for item in schools[1:]))
         programs = self.client.post("/api/program_list", json={"interests": "전체", "course": "산업디자인학과", "limit": 100}).json()["programs"]
         self.assertTrue(all(item["partner"] is (item["school"] == "경희대학교") for item in programs))
-        # 제휴 여부는 검색 순서를 바꾸지 않는다.
+        # 검색 결과 안의 제휴 대학만 맨 위로 올린다. 결과의 구성은 그대로이고, 나머지의 순서도 그대로다.
         from unittest import mock
         with mock.patch("backend.main.partners", return_value={}):
             plain = self.client.post("/api/program_list", json={"interests": "전체", "course": "산업디자인학과", "limit": 100}).json()["programs"]
-        self.assertEqual([(item["school"], item["course"]) for item in programs], [(item["school"], item["course"]) for item in plain])
+        pairs = lambda items: [(item["school"], item["course"]) for item in items]
+        self.assertTrue(programs[0]["partner"])
+        self.assertEqual(sorted(pairs(programs)), sorted(pairs(plain)))
+        self.assertEqual(pairs(programs), pairs([item for item in plain if item["school"] == "경희대학교"] + [item for item in plain if item["school"] != "경희대학교"]))
+
+    def test_partners_lead_only_within_matching_results(self):
+        search = lambda **body: self.client.post("/api/program_list", json={"interests": "전체", "limit": 100, **body}).json()
+        # 경희대에 없는 학과를 찾으면 제휴 대학을 끼워 넣지 않는다.
+        therapy = search(course="물리치료학과")["programs"]
+        self.assertTrue(therapy and all(not item["partner"] and "물리치료" in item["course"] for item in therapy))
+        # 다른 학교를 찾으면 제휴 대학이 나오지 않는다.
+        self.assertTrue(all(item["school"] == "서울대학교" or "서울대" in item["school"] for item in search(school="서울대")["programs"]))
+        # 여러 쪽으로 나눠 받아도 제휴 대학은 첫 쪽 맨 위에만 있다.
+        first = self.client.post("/api/program_list", json={"interests": "전체", "course": "컴퓨터", "limit": 5}).json()["programs"]
+        second = self.client.post("/api/program_list", json={"interests": "전체", "course": "컴퓨터", "limit": 5, "offset": 5}).json()["programs"]
+        self.assertTrue(all(item["partner"] for item in first[:3]))
+        self.assertFalse(any(item["partner"] for item in second))
 
     def test_partner_file_drops_bad_entries(self):
         import json, tempfile

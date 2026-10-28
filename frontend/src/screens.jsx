@@ -348,15 +348,34 @@ function TagPill({ children }) {
   );
 }
 
-function YellowCard({ top, title, sub, onClick, className = "", style }) {
+// 제휴 대학 표시. 제휴 대학은 검색 결과 맨 위에 오므로, 왜 위에 있는지 보이도록 이름 옆에 늘 붙인다.
+function PartnerBadge() {
+  return (
+    <span className="flex h-[18px] shrink-0 items-center rounded-full border border-mint bg-mint-soft px-[6px] text-[10px] font-semibold leading-none text-mint-deep">
+      제휴<span className="sr-only"> 대학</span>
+    </span>
+  );
+}
+
+// 이름이 길면 이름만 말줄임하고 제휴 표시는 늘 보이게 둔다.
+function NameWithBadge({ partner, children }) {
+  return (
+    <>
+      <span className="min-w-0 truncate">{children}</span>
+      {partner && <PartnerBadge />}
+    </>
+  );
+}
+
+function YellowCard({ top, title, partner = false, sub, onClick, className = "", style }) {
   return (
     <button
       onClick={onClick}
       className={`pressable absolute left-[20px] h-[80px] w-[362px] rounded-[16px] border border-cream-line bg-cream text-left active:bg-cream-2 ${className}`}
       style={{ top, ...style }}
     >
-      <T y={20} size={16} left={15.5} clip={330} className="font-semibold text-slate">
-        {title}
+      <T y={20} size={16} left={15.5} className="flex items-center gap-[6px] font-semibold text-slate" style={{ maxWidth: 330 }}>
+        <NameWithBadge partner={partner}>{title}</NameWithBadge>
       </T>
       <T y={48} size={11} left={16} clip={330} className="text-gray">
         {sub}
@@ -521,12 +540,15 @@ export function Schools({ nav, route, setState }) {
     setFailed(null);
     getCurriculum(p.school, p.course)
       .then((result) => {
-        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games, result.levels, result.picks);
+        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games, result.levels, result.picks, result.partner);
         // 이미 입학한 학과는 입학할 때 정한 학년별 수업을 그대로 둔다. 새로 받은 데이터로 바꾸면 진행 중인 학년의 수업이 바뀐다.
+        // 제휴 여부는 수업과 상관없으니 새로 받은 값으로 바꾼다.
         setState((s) => ({
           ...s,
           current: dept.id,
-          catalog: s.journeys[dept.id] && s.catalog.some((item) => item.id === dept.id) ? s.catalog : [...s.catalog.filter((item) => item.id !== dept.id), dept],
+          catalog: s.journeys[dept.id] && s.catalog.some((item) => item.id === dept.id)
+            ? s.catalog.map((item) => (item.id === dept.id ? { ...item, partner: dept.partner } : item))
+            : [...s.catalog.filter((item) => item.id !== dept.id), dept],
         }));
         nav.push("detail");
       })
@@ -544,6 +566,7 @@ export function Schools({ nav, route, setState }) {
         key={key}
         top={top}
         title={`${p.school} ${p.course}`}
+        partner={p.partner}
         sub={
           opening === key
             ? "불러오는 중이에요…"
@@ -757,8 +780,8 @@ export function Detail({ active, nav, state, setState }) {
         <div className="absolute left-[11px] top-[21px] h-[72px] w-[108px]">
           <SchoolLogo name={d.school} />
         </div>
-        <T y={27} size={d.school.length > 9 ? 16 : 21} left={135.5} clip={215} className="font-semibold text-slate">
-          {d.school}
+        <T y={27} size={d.school.length > 9 ? 16 : 21} left={135.5} className="flex items-center gap-[6px] font-semibold text-slate" style={{ maxWidth: 215 }}>
+          <NameWithBadge partner={d.partner}>{d.school}</NameWithBadge>
         </T>
         <T y={57} size={11} lh={17} left={135} clip={215} className="text-gray">
           {`${d.region ? `${d.region}에 있는 학교예요` : "대학 정보 공시 자료 기준이에요"}\n수업연한 ${d.duration || "4년"} 과정`}
