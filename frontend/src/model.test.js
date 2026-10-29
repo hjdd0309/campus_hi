@@ -737,25 +737,37 @@ test("학년별 과목: 체험하는 과목은 열림, 그 학년의 다른 교�
   const list = yearSubjects(d);
   assert.equal(list.estimated, true);
   assert.deepEqual(list.years.map((item) => item.year), [1, 2, 3, 4]);
-  for (const [i, item] of list.years.entries()) assert.deepEqual(item.open, [{ index: i, title: d.lessons[i] }]);
-  const all = list.years.flatMap((item) => item.locked);
+  // 체험하는 자리는 실제 교과목일 때만 들어간다(졸업 과제처럼 과목이 아닌 이름은 빠진다).
+  for (const [i, item] of list.years.entries())
+    assert.deepEqual(item.open, curriculum.includes(d.lessons[i]) ? [{ index: i, title: d.lessons[i] }] : []);
+  assert.ok(!curriculum.includes(d.lessons[3]));
+  assert.deepEqual(list.years[3].open, []);
+  const all = list.years.flatMap((item) => item.others);
   // 체험하는 과목은 잠긴 목록에 다시 나오지 않고, 학년 범위가 없는 졸업연구와 '해당없음'은 빠진다.
   for (const lesson of d.lessons) assert.ok(!all.includes(lesson));
   assert.ok(!all.includes("졸업연구"));
   assert.ok(!all.includes("해당없음"));
   // 과목은 보통 듣기 시작하는 학년 하나에만 들어간다.
   assert.equal(new Set(all).size, all.length);
-  const yearOf = (subject) => list.years.find((item) => item.locked.includes(subject))?.year;
+  const yearOf = (subject) => list.years.find((item) => item.others.includes(subject))?.year;
   for (const subject of all) assert.equal(yearOf(subject), levels[subject][0]);
   // 학년별 편성을 확보한 학과는 그 편성의 학년을 그대로 쓴다.
   const years = { terms: [{ year: 1, semester: 1, subjects: ["프로그래밍기초", "미적분학"] }, { year: 2, semester: 1, subjects: ["컴퓨터구조", "확률통계"] }] };
   const exact = createDepartment("컴퓨터공학과", "가나대학교", ["프로그래밍기초", "미적분학", "컴퓨터구조", "확률통계"], "공학", years, "4년");
   const exactList = yearSubjects(exact);
   assert.equal(exactList.estimated, false);
-  assert.deepEqual(exactList.years[0].locked, ["미적분학"]);
-  assert.deepEqual(exactList.years[1].locked, ["확률통계"]);
-  // 학기마다 과목을 고르는 제휴 학과는 잠긴 과목이 없다.
-  assert.equal(yearSubjects(semesterDept()), null);
+  assert.deepEqual(exactList.years[0].others, ["미적분학"]);
+  assert.deepEqual(exactList.years[1].others, ["확률통계"]);
+  // 학기마다 과목을 고르는 제휴 학과는 학기별 편성의 과목을 학년마다 보여주고, 아직 고르지 않은 자리("과목 고르기")는 넣지 않는다.
+  const semester = semesterDept();
+  const semesterList = yearSubjects(semester);
+  assert.equal(semesterList.estimated, false);
+  assert.deepEqual(semesterList.years[0], { year: 1, open: [], others: ["선형대수", "객체지향프로그래밍", "이산구조", "미분방정식"] });
+  assert.ok(!semesterList.years.flatMap((item) => item.open).some((item) => item.title === CHOOSE_TITLE));
+  // 고른 과목은 체험 과목으로 먼저 나오고, 다른 과목 목록에서는 빠진다.
+  const picked = withChoices(semester, { [`${semester.id}-0`]: "이산구조" });
+  assert.deepEqual(yearSubjects(picked).years[0].open, [{ index: 0, title: "이산구조" }]);
+  assert.ok(!yearSubjects(picked).years[0].others.includes("이산구조"));
 });
 
 test("궁금해요는 학교·학과·과목마다 한 번만 남고, 저장했다 불러와도 형식이 맞는 것만 남는다", () => {
@@ -856,12 +868,12 @@ test("홈의 이 학년 과목은 2·3·4·6년제 모두 학년이 맞고, 다�
   assert.equal(homeSubjects(null, null), null);
 });
 
-test("제휴 학교는 학기별 편성이 없어도 '제휴하면 열리는' 잠긴 과목을 보여주지 않는다", () => {
+test("제휴 학교도 학과 상세에는 학년별 과목을 보여주지만, 홈에는 '제휴하면 열리는' 과목을 두지 않는다", () => {
   const levels = { 약물학: [2, 3], 생화학: [1, 2], 약제학: [2, 2], 유기화학: [1, 1], 물리약학: [1, 2], 약품분석학: [2, 2], 생리학: [1, 1], 미생물학: [2, 2] };
   const curriculum = ["약물학", "생화학", "약제학", "약학개론", "유기화학", "물리약학", "약품분석학", "생리학", "미생물학"];
   const partner = createDepartment("약학과", "경희대학교", curriculum, "의학", null, "6년", "", null, levels, null, true, null, true);
-  assert.equal(yearSubjects(partner), null);
+  assert.ok(yearSubjects(partner).years.some((item) => item.others.length > 0));
   assert.deepEqual(homeSubjects(partner, { completed: 1, paused: false }).others, []);
   const plain = createDepartment("약학과", "가나대학교", curriculum, "의학", null, "6년", "", null, levels);
-  assert.ok(yearSubjects(plain).years.some((item) => item.locked.length > 0));
+  assert.ok(yearSubjects(plain).years.some((item) => item.others.length > 0));
 });

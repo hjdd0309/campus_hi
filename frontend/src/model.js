@@ -728,12 +728,13 @@ export function progressOf(journey, total) {
   return { completed, skipped, passed: completed - skipped.length, finished: !!journey && completed === total };
 }
 
-// 학년마다 보여줄 과목: [{ year, open: [{ index, title }], locked: [과목] }]. open은 체험하는 자리, locked는 그 학년의 다른 교과목이다.
-// 학년별 편성을 확보한 학과는 그 편성을, 아니면 과목을 보통 듣기 시작하는 학년(levels)을 쓰고, 학년을 모르는 과목은 넣지 않는다.
-// 제휴 학교는 "제휴하면 열리는" 과목이 없으므로 null이다(학기마다 편성 과목을 고르는 학과도 여기에 든다).
+// 학년마다 보여줄 과목: [{ year, open: [{ index, title }], others: [과목] }]. open은 체험하는 자리, others는 그 학년의 다른 교과목이다.
+// 학년별 편성을 확보한 학과는 그 편성을(제휴 학교의 학기별 편성 포함), 아니면 과목을 보통 듣기 시작하는 학년(levels)을 쓰고,
+// 학년을 모르는 과목은 넣지 않는다. open에는 실제 교과목인 자리만 넣는다(학과군 실습·졸업 과제 이름, 아직 고르지 않은 학기 자리는 빠진다).
 export function yearSubjects(d) {
-  if (!d?.school || d.options || d.partner) return null;
+  if (!d?.school) return null;
   const used = new Set(d.lessons);
+  const real = new Set([...(d.curriculum || []), ...(d.yearly?.terms || []).flatMap((term) => term.subjects)]);
   const fromYears = !!d.lessonsFromYears && !!d.yearly;
   const ofYear = (year) =>
     fromYears
@@ -744,8 +745,11 @@ export function yearSubjects(d) {
     estimated: !fromYears,
     years: years.map((year) => ({
       year,
-      open: d.yearNumbers.map((y, index) => ({ y, index, title: d.lessons[index] })).filter((item) => item.y === year).map(({ index, title }) => ({ index, title })),
-      locked: [...new Set(ofYear(year))].filter((subject) => subject !== "해당없음" && !used.has(subject)),
+      open: d.yearNumbers
+        .map((y, index) => ({ y, index, title: d.lessons[index] }))
+        .filter((item) => item.y === year && real.has(item.title))
+        .map(({ index, title }) => ({ index, title })),
+      others: [...new Set(ofYear(year))].filter((subject) => subject !== "해당없음" && !used.has(subject)),
     })),
   };
 }
@@ -767,11 +771,12 @@ export function homeSubjects(d, journey) {
   const { completed, finished } = progressOf(journey, d.lessons.length);
   const index = Math.min(completed, d.lessons.length - 1);
   const year = d.yearNumbers[index];
-  const list = yearSubjects(d);
+  // 홈의 다른 과목은 "제휴하면 열리는" 과목으로 보여주므로, 이미 제휴 학교인 학과(학기별 편성 학과 포함)에는 두지 않는다.
+  const list = d.partner || d.options ? null : yearSubjects(d);
   return {
     year,
     main: { index, title: d.lessons[index], done: finished },
-    others: list?.years.find((item) => item.year === year)?.locked || [],
+    others: list?.years.find((item) => item.year === year)?.others || [],
     estimated: !!list?.estimated,
   };
 }

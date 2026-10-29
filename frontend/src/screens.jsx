@@ -143,7 +143,7 @@ function YearSubjects({ years }) {
   const [opened, setOpened] = useState({});
   return (
     <div className="grid gap-[16px]">
-      {years.map(({ year, open, locked: names }) => {
+      {years.map(({ year, open, others: names }) => {
         const more = names.length > SHOWN_SUBJECTS && !opened[year];
         const shown = more ? names.slice(0, SHOWN_SUBJECTS) : names;
         return (
@@ -151,13 +151,17 @@ function YearSubjects({ years }) {
             <span className="inline-flex h-[28px] w-[47px] items-center justify-center rounded-full border border-mint text-[13px] font-semibold text-mint">
               {year}학년
             </span>
-            <ul className="mt-[8px] grid gap-[6px]">
-              {[...open.map((item) => item.title), ...shown].map((name, i) => (
-                <li key={`${i}-${name}`} className="flex min-h-[40px] items-center rounded-[12px] border border-cream-line bg-cream px-[14px] py-[8px]">
-                  <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink-2">{name}</span>
-                </li>
-              ))}
-            </ul>
+            {open.length + names.length ? (
+              <ul className="mt-[8px] grid gap-[6px]">
+                {[...open.map((item) => item.title), ...shown].map((name, i) => (
+                  <li key={`${i}-${name}`} className="flex min-h-[40px] items-center rounded-[12px] border border-cream-line bg-cream px-[14px] py-[8px]">
+                    <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink-2">{name}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-[6px] text-[12.5px] leading-[20px] text-gray">이 학년 과목은 아직 정보가 없어요.</p>
+            )}
             {more && (
               <button className="text-button mt-[6px]" onClick={() => setOpened((o) => ({ ...o, [year]: true }))}>
                 {`더 보기 (${names.length - SHOWN_SUBJECTS}개)`}
@@ -986,7 +990,6 @@ export function Detail({ active, nav, state, setState }) {
   if (!v) return null;
   const { d, journey, total, finished } = v;
   const field = fieldOf(d.category);
-  const step = total <= 5 ? 39 : Math.floor(198 / total);
   const enroll = () => {
     if (finished) return nav.push("graduation");
     if (journey) return nav.reset(["home"]);
@@ -995,7 +998,7 @@ export function Detail({ active, nav, state, setState }) {
   };
   return (
     <Screen
-      h={subjects ? Math.max(600, 528 + listH + 24) : Math.min(740, 580 + (total - 1) * step)}
+      h={Math.max(600, 528 + listH + 24)}
       footer={
         <OutlineButton onClick={enroll} className="a-up" style={delay(0.5)}>
           {finished ? "졸업 리포트 보기" : journey ? "이어서 체험하기" : `${d.name} 입학하기`}
@@ -1054,21 +1057,6 @@ export function Detail({ active, nav, state, setState }) {
           {subjects.estimated && <p className="footnote">{ESTIMATED_NOTE}</p>}
         </div>
       )}
-      {/* 등장 모션을 거는 감싸개는 크기가 있어야 한다. 크기 0인 감싸개에 opacity·transform을 걸면 모바일 사파리 등에서
-          애니메이션이 끝난 뒤 안의 절대 위치 요소를 다시 그리지 않아 일부가 안 보인다. */}
-      {!subjects && d.lessons.map((lesson, i) => (
-        <div key={i} className="a-up pointer-events-none absolute inset-0" style={delay(0.28 + i * 0.08)}>
-          <span
-            className={`absolute left-[33px] flex h-[28px] items-center justify-center rounded-full border border-mint font-semibold text-mint ${d.semesters ? "w-[80px] text-[12px]" : "w-[47px] text-[13px]"}`}
-            style={{ top: 536 + i * step }}
-          >
-            {stageLabel(d, i)}
-          </span>
-          <T y={544.5 + i * step} size={12} left={d.semesters ? 131 : 98} clip={d.semesters ? 247 : 280} className="text-slate/90">
-            {d.options?.[i] && !d.chosen?.[i] ? `${lesson} · 편성 과목 ${d.options[i].length}개 중 하나` : lesson}
-          </T>
-        </div>
-      ))}
     </Screen>
   );
 }
