@@ -1,4 +1,4 @@
-import { cleanLevels, cleanPicks, gameFor, isGame, pickLessons, pickPracticeSubject } from "./games.js";
+import { cleanLevels, cleanPicks, isGame, pickLessons, pickPracticeSubject } from "./games.js";
 import { cleanLessonGames } from "./lessonGames.js";
 import { experiences } from "./experiences.js";
 import { groupExperience, groupOf, PRACTICE_SUBJECTS } from "./groups.js";
@@ -243,86 +243,34 @@ export const initialState = {
   capstones: {},
   // 체험 구조가 바뀌어 학년 자리에서 빠진 예전 기록: [{ id, title, note }]. 마이페이지 리포트에 함께 담는다.
   archive: [],
-  // 학기별 편성이 있는 학과에서 학기 자리마다 고른 과목: { "학과id-자리번호": 과목 }.
-  choices: {},
   // 잠긴 과목에 남긴 "궁금해요": [{ school, course, subject, createdAt }]. 개인 정보 없이 학교·학과·과목만 둔다.
   curious: [],
   onboarded: false,
 };
-// 수집 파이프라인이 검증한 학년별 편성. 형식이 맞지 않으면 없는 것으로 본다.
+// 수집 파이프라인이 검증한 과목별 학년: { subjects: { 과목: 학년 }, source_url, curriculum_year, checked_at }.
+// 형식이 맞지 않으면 없는 것으로 본다. 학기별 편성({ terms })으로 저장된 예전 기록은 과목마다 가장 낮은 학년으로 합친다.
 export function cleanYears(years) {
-  if (!years || !Array.isArray(years.terms)) return null;
-  const terms = years.terms
-    .filter(
-      (term) =>
-        Number.isInteger(term?.year) &&
-        term.year >= 1 &&
-        term.year <= 6 &&
-        [0, 1, 2].includes(term.semester) &&
-        Array.isArray(term.subjects),
-    )
-    .map((term) => ({
-      year: term.year,
-      semester: term.semester,
-      subjects: term.subjects.filter((s) => typeof s === "string" && s),
-    }))
-    .filter((term) => term.subjects.length);
-  if (!terms.length) return null;
+  if (!years || typeof years !== "object") return null;
+  const subjects = {};
+  const keep = (subject, year) => {
+    if (typeof subject !== "string" || !subject || !Number.isInteger(year) || year < 1 || year > 6) return;
+    if (!Object.hasOwn(subjects, subject) || year < subjects[subject]) subjects[subject] = year;
+  };
+  if (Array.isArray(years.terms))
+    for (const term of years.terms) for (const subject of Array.isArray(term?.subjects) ? term.subjects : []) keep(subject, term.year);
+  else if (years.subjects && typeof years.subjects === "object" && !Array.isArray(years.subjects))
+    for (const [subject, year] of Object.entries(years.subjects)) keep(subject, year);
+  if (!Object.keys(subjects).length) return null;
   const url = typeof years.source_url === "string" ? years.source_url : "";
   return {
-    terms,
+    subjects,
     source_url: /^https?:\/\//.test(url) ? url : "",
+    curriculum_year: Number.isInteger(years.curriculum_year) ? years.curriculum_year : null,
     checked_at: typeof years.checked_at === "string" ? years.checked_at : "",
   };
 }
-// 제휴 대학의 학기별 편성을 이론 학년의 학기 자리로 나눈다: [{ year, semester, subjects }].
-// 이론 학년 중 하나라도 편성 과목이 없으면 null(학년별 체험으로 만든다). 학기 구분이 없는(0) 과목은 그 학년의 모든 학기에 넣는다.
-function semesterSlots(terms, theoryYears) {
-  const cleaned = cleanYears({ terms })?.terms;
-  if (!cleaned || !theoryYears.length) return null;
-  const slots = [];
-  for (const year of theoryYears) {
-    const ofYear = cleaned.filter((term) => term.year === year);
-    const common = ofYear.filter((term) => term.semester === 0).flatMap((term) => term.subjects);
-    const semesters = [...new Set(ofYear.map((term) => term.semester).filter(Boolean))].sort();
-    if (!semesters.length && !common.length) return null;
-    for (const semester of semesters.length ? semesters : [0]) {
-      const own = ofYear.filter((term) => semester && term.semester === semester).flatMap((term) => term.subjects);
-      slots.push({ year, semester, subjects: [...new Set([...own, ...common])] });
-    }
-  }
-  return { terms: cleaned, slots };
-}
-// 체험 자리의 이름: "2학년" 또는 학기별 자리면 "2학년 1학기".
-export const stageLabel = (d, index) =>
-  d.semesters?.[index] ? `${d.yearNumbers[index]}학년 ${d.semesters[index]}학기` : `${d.yearNumbers[index]}학년`;
-// 학기 자리에서 고르기 전에 보여주는 이름.
-export const CHOOSE_TITLE = "과목 고르기";
-// 고른 과목을 반영한 학과: 학기 자리의 수업 이름과 체험(연습 문제 유형)을 고른 과목으로 바꾼다. chosen[i]는 그 자리에서 골랐는지.
-export function withChoices(d, choices = {}) {
-  if (!d?.options) return d;
-  const picked = d.options.map((options, i) => (options ? choices[`${d.id}-${i}`] || null : null));
-  return {
-    ...d,
-    chosen: picked.map((subject, i) => (d.options[i] ? !!subject : null)),
-    lessons: d.lessons.map((lesson, i) => picked[i] || lesson),
-    games: d.games.map((game, i) => (picked[i] ? gameFor(picked[i], d.lessonGames) : game)),
-  };
-}
-// 지금 하는 학기 자리의 과목을 고른다. 그 자리의 편성 과목이 아니거나 다른 학기에 이미 고른 과목이면 그대로 둔다.
-// 과목을 바꾸면 그 자리에서 해 둔 체험과 쓰던 기록은 지운다(다른 과목의 것이므로).
-export function chooseSubject(state, id, index, subject) {
-  const department = state.catalog?.find((d) => d.id === id);
-  const journey = state.journeys[id];
-  const key = `${id}-${index}`;
-  const choices = state.choices || {};
-  if (!department?.options?.[index]?.includes(subject) || !journey || journey.paused || journey.completed !== index) return state;
-  if (department.options.some((options, i) => options && i !== index && choices[`${id}-${i}`] === subject)) return state;
-  if (choices[key] === subject) return state;
-  const { [key]: oldPlay, ...plays } = state.plays || {};
-  const { [key]: oldDraft, ...drafts } = state.drafts || {};
-  return { ...state, plays, drafts, choices: { ...choices, [key]: subject } };
-}
+// 체험 자리의 이름: "2학년".
+export const stageLabel = (d, index) => `${d.yearNumbers[index]}학년`;
 // 학과 하나의 학년별 체험. 마지막 학년은 졸업 과제, 그 바로 앞 학년은 학과군 전공 실습, 나머지 학년은 이론 수업(과목 하나)이다.
 // 학과군 데이터가 아직 공개되지 않았으면 실습 자리도 이론 수업으로, 졸업 과제는 계열에 맞는 기본 과제로 채운다.
 export function createDepartment(
@@ -337,7 +285,6 @@ export function createDepartment(
   levels = null,
   picks = null,
   partner = false,
-  terms = null,
   partnerExample = false,
 ) {
   // 예시 제휴("제휴하면 이렇게 보인다")인지. 예시도 제휴 대학과 똑같이 동작하고 표시만 다르다.
@@ -357,59 +304,16 @@ export function createDepartment(
   const groupFinal = groupExperience(group, "final");
   const final = groupFinal ? asFinal(groupFinal) : finals[finalFor(course, field.id)];
   const theoryYears = yearNumbers.slice(0, practice ? -2 : -1);
-  // 제휴 대학이고 학기별 편성이 있으면 이론 학년을 학기 자리로 나누고, 학기마다 편성 과목 중 하나를 사용자가 고른다.
-  // 실습·졸업 과제는 학년에 하나씩 그대로 둔다.
-  const plan = partner === true ? semesterSlots(terms, theoryYears) : null;
-  if (plan) {
-    const tail = [...(practice ? [yearNumbers[yearNumbers.length - 2]] : []), yearNumbers[yearNumbers.length - 1]];
-    const practiceSubject = practice
-      ? pickPracticeSubject(curriculum, PRACTICE_SUBJECTS[group], yearNumbers[yearNumbers.length - 2], subjectLevels)
-      : null;
-    const template = departments.find((d) => d.name === course) || { category: field.id, group: field.group, icon: field.icon, tags: field.tags };
-    return {
-      ...template,
-      id: `api:${school}:${course}`,
-      name: course,
-      school,
-      curriculum,
-      duration,
-      region,
-      category: field.id || template.category,
-      source: "litton",
-      description: `${school} ${course}의 교과목을 살펴보고, 학기별 체험으로 전공을 미리 경험해요.`,
-      yearly,
-      // 학기 자리를 만든 편성. 저장해 두었다가 새로고침 때 같은 자리를 다시 만든다.
-      terms: plan.terms,
-      yearNumbers: [...plan.slots.map((slot) => slot.year), ...tail],
-      semesters: [...plan.slots.map((slot) => slot.semester), ...tail.map(() => 0)],
-      // 학기 자리마다 고를 수 있는 편성 과목. 실습·졸업 자리는 null.
-      options: [...plan.slots.map((slot) => slot.subjects), ...tail.map(() => null)],
-      studyGroup: group,
-      practice,
-      final,
-      lessonsFromYears: true,
-      lessonGames,
-      levels: subjectLevels,
-      picks: lessonPicks,
-      partner: true,
-      partnerExample: example,
-      lessons: [...plan.slots.map(() => CHOOSE_TITLE), ...(practice ? [practiceSubject || practice.title] : []), final.name],
-      games: [...plan.slots.map(() => null), ...(practice ? [`group:${group}`] : []), null],
-    };
-  }
-  const subjectsOf = (year) =>
-    yearly.terms.filter((t) => t.year === year).flatMap((t) => t.subjects);
-  // 검증된 학년별 편성이 이론 학년 모두에 있으면 그 학년의 과목으로, 없으면 교과목 목록에서 고른다.
+  // 과목의 학년은 학교 홈페이지에서 모은 학년(yearly) → 사람이 정한 과목(picks) → 보통 듣는 학년(levels) 순서로 쓴다.
+  const subjectYears = yearly?.subjects || {};
+  const known = { ...subjectLevels, ...Object.fromEntries(Object.entries(subjectYears).map(([subject, year]) => [subject, [year, year]])) };
+  // 모은 학년이 이론 학년 모두에 있으면 학년 배치를 추정하지 않은 것이다.
   const lessonsFromYears =
-    !!yearly &&
-    theoryYears.length > 0 &&
-    theoryYears.every((year) => subjectsOf(year).length > 0);
-  const picked = lessonsFromYears
-    ? theoryYears.map((year) => pickLessons(subjectsOf(year), [year], lessonGames, subjectLevels, lessonPicks)[0])
-    : pickLessons(curriculum, theoryYears, lessonGames, subjectLevels, lessonPicks);
+    !!yearly && theoryYears.length > 0 && theoryYears.every((year) => Object.values(subjectYears).includes(year));
+  const picked = pickLessons(curriculum, theoryYears, lessonGames, known, lessonPicks, subjectYears);
   // 학과군 실습 학년은 교과목에 실습과 이어지는 과목이 있으면 그 과목 이름으로 보여준다(하는 활동은 실습 그대로).
   const practiceSubject = practice
-    ? pickPracticeSubject(curriculum, PRACTICE_SUBJECTS[group], yearNumbers[yearNumbers.length - 2], subjectLevels, new Set(picked.map((item) => item?.subject)))
+    ? pickPracticeSubject(curriculum, PRACTICE_SUBJECTS[group], yearNumbers[yearNumbers.length - 2], known, new Set(picked.map((item) => item?.subject)))
     : null;
   const template = departments.find((d) => d.name === course) || {
     category: field.id,
@@ -486,7 +390,6 @@ export function loadState(storage) {
               d.levels,
               d.picks,
               d.partner,
-              d.terms,
               "partnerExample" in d ? d.partnerExample : null,
             ),
           )
@@ -522,8 +425,22 @@ export function loadState(storage) {
       return false;
     };
     const validIds = new Set(counts.keys());
+    // 학기 자리(1-1·1-2 …)로 저장된 제휴 학과: 학과 id → 그때의 자리별 학년. 같은 학년의 학기 자리는 그 학년 자리 하나로 합친다.
+    const semesterYears = new Map(
+      Array.isArray(value.catalog)
+        ? value.catalog
+            .filter((d) => typeof d?.id === "string" && Array.isArray(d.semesters) && d.semesters.some(Boolean) && Array.isArray(d.yearNumbers))
+            .map((d) => [d.id, d.yearNumbers])
+        : [],
+    );
+    const yearNumbersOf = new Map([...departments, ...catalog].map((d) => [d.id, d.yearNumbers]));
+    const yearSlot = (id, index) => {
+      const at = yearNumbersOf.get(id)?.indexOf(semesterYears.get(id)[index]) ?? -1;
+      return at >= 0 ? at : null;
+    };
     // 예전 단계 번호를 지금의 학년 단계 번호로 옮긴다. 마지막 단계(졸업작품)는 마지막 학년으로 간다.
     const moveIndex = (id, index) => {
+      if (semesterYears.has(id)) return yearSlot(id, index);
       const last = counts.get(id) - 1;
       if (stages === 3 && index >= 2) return last;
       if (stages === 8) return Math.min(last, Math.floor((index * (last + 1)) / 8));
@@ -531,13 +448,14 @@ export function loadState(storage) {
     };
     const moveKey = (key) => {
       const match = key.match(/^(.*)-(\d+)$/);
-      return match && validIds.has(match[1])
-        ? `${match[1]}-${moveIndex(match[1], Number(match[2]))}`
-        : null;
+      const index = match && validIds.has(match[1]) ? moveIndex(match[1], Number(match[2])) : null;
+      return index === null ? null : `${match[1]}-${index}`;
     };
     const moveCompleted = (id, completed) => {
       const total = counts.get(id);
       const done = Math.max(0, Math.floor(Number(completed) || 0));
+      // 학기 자리에서 옮길 때는 학년의 모든 학기를 마친 학년까지만 마친 것으로 본다.
+      if (semesterYears.has(id)) return done >= semesterYears.get(id).length ? total : Math.min(total, yearSlot(id, done) ?? total);
       if (stages === 3) return done >= 3 ? total : Math.min(done, total - 1);
       if (stages === 8) return Math.min(total, Math.floor((done * total) / 8));
       return Math.min(total, done);
@@ -549,7 +467,9 @@ export function loadState(storage) {
           const completed = moveCompleted(id, item?.completed);
           // 휴강해서 미이수로 남긴 자리. 지나온 자리 번호만 남긴다(이 필드가 없던 기록은 빈 목록).
           const skipped = Array.isArray(item?.skipped)
-            ? [...new Set(item.skipped.filter((n) => Number.isInteger(n) && n >= 0 && n < completed))].sort((a, b) => a - b)
+            ? [...new Set(item.skipped.filter((n) => Number.isInteger(n) && n >= 0).map((n) => (semesterYears.has(id) ? yearSlot(id, n) : n)))]
+                .filter((n) => n !== null && n < completed)
+                .sort((a, b) => a - b)
             : [];
           return [id, { completed, paused: !!item?.paused, ...(skipped.length ? { skipped } : {}) }];
         }),
@@ -633,18 +553,6 @@ export function loadState(storage) {
             ),
           ]),
       ),
-      // 학기 자리마다 고른 과목. 그 자리의 편성 과목이고 다른 자리와 겹치지 않는 것만 둔다.
-      choices: (() => {
-        const kept = {};
-        for (const [key, subject] of Object.entries(value.choices && typeof value.choices === "object" ? value.choices : {})) {
-          const match = key.match(/^(.*)-(\d+)$/);
-          const department = match && catalog.find((d) => d.id === match[1]);
-          if (typeof subject !== "string" || !department?.options?.[Number(match[2])]?.includes(subject)) continue;
-          if (Object.entries(kept).some(([other, picked]) => other.startsWith(`${match[1]}-`) && picked === subject)) continue;
-          kept[key] = subject;
-        }
-        return kept;
-      })(),
       curious: cleanCurious(value.curious),
       onboarded: !!value.onboarded,
     };
@@ -678,10 +586,8 @@ export function completeLesson(state, id, index, note) {
   // 마지막 학년은 졸업 과제(작품 또는 계획서)를 마쳐야 완료된다.
   if (department && index === total - 1 && !finalReady(state, department))
     return state;
-  // 학기 자리는 과목을 골라야 완료할 수 있다.
-  if (department?.options?.[index] && !state.choices?.[`${id}-${index}`]) return state;
   // 미니게임이 있는 수업은 게임을 해본 뒤에만 완료할 수 있다.
-  const game = state.catalog?.some((d) => d.id === id) ? withChoices(department, state.choices).games?.[index] : undefined;
+  const game = state.catalog?.some((d) => d.id === id) ? department.games?.[index] : undefined;
   if (game && state.plays?.[`${id}-${index}`]?.game !== game) return state;
   // 지금 차례인 자리이거나, 휴강해서 미이수로 남긴 자리(다시 듣기)만 완료할 수 있다.
   const retake = isSkipped(journey, index);
@@ -711,13 +617,12 @@ export function completeLesson(state, id, index, note) {
 // 휴강해서 미이수로 남긴 자리인지.
 export const isSkipped = (journey, index) => Array.isArray(journey?.skipped) && journey.skipped.includes(index);
 // 지금 차례인 수업을 휴강한다: 미이수로 기록하고 다음 자리로 넘어간다. 마지막 자리(졸업 과제)도 휴강하면 졸업한다.
-// 쓰던 기록과 해 둔 체험은 지우지 않는다(다시 들을 때 이어서 한다). 학기 자리는 과목을 고른 뒤에만 휴강할 수 있다.
+// 쓰던 기록과 해 둔 체험은 지우지 않는다(다시 들을 때 이어서 한다).
 export function skipLesson(state, id, index) {
   const journey = state.journeys[id];
   const department = [...departments, ...(state.catalog || [])].find((d) => d.id === id);
   const total = department?.lessons.length || 0;
   if (!journey || journey.paused || journey.completed !== index || index >= total) return state;
-  if (department.options?.[index] && !state.choices?.[`${id}-${index}`]) return state;
   const skipped = [...new Set([...(journey.skipped || []), index])].sort((a, b) => a - b);
   return { ...state, journeys: { ...state.journeys, [id]: { ...journey, completed: index + 1, skipped } } };
 }
@@ -729,16 +634,17 @@ export function progressOf(journey, total) {
 }
 
 // 학년마다 보여줄 과목: [{ year, open: [{ index, title }], others: [과목] }]. open은 체험하는 자리, others는 그 학년의 다른 교과목이다.
-// 학년별 편성을 확보한 학과는 그 편성을(제휴 학교의 학기별 편성 포함), 아니면 과목을 보통 듣기 시작하는 학년(levels)을 쓰고,
-// 학년을 모르는 과목은 넣지 않는다. open에는 실제 교과목인 자리만 넣는다(학과군 실습·졸업 과제 이름, 아직 고르지 않은 학기 자리는 빠진다).
+// 학교 홈페이지에서 모은 학년이 있는 학과는 그 학년을, 아니면 과목을 보통 듣기 시작하는 학년(levels)을 쓰고(이때는 추정이라고 알린다),
+// 학년을 모르는 과목은 넣지 않는다. open에는 실제 교과목인 자리만 넣는다(학과군 실습·졸업 과제 이름은 빠진다).
 export function yearSubjects(d) {
   if (!d?.school) return null;
   const used = new Set(d.lessons);
-  const real = new Set([...(d.curriculum || []), ...(d.yearly?.terms || []).flatMap((term) => term.subjects)]);
+  const subjectYears = d.yearly?.subjects || {};
+  const real = new Set([...(d.curriculum || []), ...Object.keys(subjectYears)]);
   const fromYears = !!d.lessonsFromYears && !!d.yearly;
   const ofYear = (year) =>
     fromYears
-      ? d.yearly.terms.filter((term) => term.year === year).flatMap((term) => term.subjects)
+      ? Object.keys(subjectYears).filter((subject) => subjectYears[subject] === year)
       : (d.curriculum || []).filter((subject) => Object.hasOwn(d.levels || {}, subject) && d.levels[subject][0] === year);
   const years = [...new Set(d.yearNumbers)];
   return {
@@ -765,14 +671,14 @@ export const cardTone = (partner) => (partner === true ? "cream" : "white");
 export const showsExampleNote = (items) => items.some((item) => item?.partner === true && item.partnerExample === true);
 
 // 홈의 "이 학년 때 이런 과목을 들어요": 지금 자리의 학년(year), 지금 체험하는 과목(main, done은 마쳤는지),
-// 같은 학년의 다른 교과목(others, 제휴 대학 전용으로 보여준다). 다른 교과목을 알 수 없으면(학기별 제휴 학과, 5·6학년 등) others는 비어 있다.
+// 같은 학년의 다른 교과목(others, 제휴 대학 전용으로 보여준다). 다른 교과목을 알 수 없으면(5·6학년 등) others는 비어 있다.
 export function homeSubjects(d, journey) {
   if (!d?.lessons?.length) return null;
   const { completed, finished } = progressOf(journey, d.lessons.length);
   const index = Math.min(completed, d.lessons.length - 1);
   const year = d.yearNumbers[index];
-  // 홈의 다른 과목은 "제휴하면 열리는" 과목으로 보여주므로, 이미 제휴 학교인 학과(학기별 편성 학과 포함)에는 두지 않는다.
-  const list = d.partner || d.options ? null : yearSubjects(d);
+  // 홈의 다른 과목은 "제휴하면 열리는" 과목으로 보여주므로, 이미 제휴 학교인 학과에는 두지 않는다.
+  const list = d.partner ? null : yearSubjects(d);
   return {
     year,
     main: { index, title: d.lessons[index], done: finished },

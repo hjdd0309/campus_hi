@@ -49,7 +49,6 @@ test("요청 필드와 응답 형식을 따른다", async (t) => {
     picks: {},
     partner: false,
     partnerExample: false,
-    terms: null,
   });
   assert.deepEqual(requests, [
     ["/api/course_list", { interests: "디자인", query: "산업", offset: 30, limit: 30 }],
@@ -98,29 +97,30 @@ test("서버 오류와 잘못된 응답은 가짜 목록으로 대체하지 않�
     );
   }
 });
-test("제휴 대학의 학년·학기 편성은 형식이 맞는 학기만 받는다", async (t) => {
+test("과목별 학년은 형식이 맞는 과목만 받는다", async (t) => {
   t.mock.method(globalThis, "fetch", async () =>
     new Response(JSON.stringify({
-      curriculum_list: ["자료구조"],
+      curriculum_list: ["자료구조", "운영체제"],
       partner: true,
-      terms: [{ year: 2, semester: 1, subjects: ["자료구조", ""] }, { year: 9, semester: 1, subjects: ["가"] }, { year: 3, semester: 2, subjects: [] }],
+      years: {
+        subjects: { 자료구조: 2, 운영체제: 9, "": 1, 컴퓨터구조: "2" },
+        source_url: "https://ce.khu.ac.kr/c.pdf",
+        curriculum_year: 2026,
+        checked_at: "2026-10-28",
+      },
     }), { status: 200 }),
   );
   const result = await getCurriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과");
   assert.equal(result.partner, true);
   assert.equal(result.partnerExample, false);
-  assert.deepEqual(result.terms, [{ year: 2, semester: 1, subjects: ["자료구조"] }]);
-  t.mock.method(globalThis, "fetch", async () =>
-    new Response(JSON.stringify({ curriculum_list: ["자료구조"], partner: true, terms: "1학년" }), { status: 200 }),
-  );
-  assert.equal((await getCurriculum("경희대학교", "산업디자인학과")).terms, null);
-  // 예시 제휴도 학기별 편성을 똑같이 받는다.
-  t.mock.method(globalThis, "fetch", async () =>
-    new Response(JSON.stringify({ curriculum_list: ["자료구조"], partner: true, partner_example: true, terms: [{ year: 1, semester: 1, subjects: ["자료구조"] }] }), { status: 200 }),
-  );
-  const example = await getCurriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과");
-  assert.equal(example.partnerExample, true);
-  assert.deepEqual(example.terms, [{ year: 1, semester: 1, subjects: ["자료구조"] }]);
+  assert.deepEqual(result.years, { subjects: { 자료구조: 2 }, source_url: "https://ce.khu.ac.kr/c.pdf", curriculum_year: 2026, checked_at: "2026-10-28" });
+  assert.equal("terms" in result, false);
+  for (const years of ["1학년", { subjects: [] }, { subjects: { 가: 0 } }, null]) {
+    t.mock.method(globalThis, "fetch", async () =>
+      new Response(JSON.stringify({ curriculum_list: ["자료구조"], years }), { status: 200 }),
+    );
+    assert.equal((await getCurriculum("경희대학교", "산업디자인학과")).years, null);
+  }
   t.mock.method(globalThis, "fetch", async () =>
     new Response(JSON.stringify({ school_list: ["경희대학교"] }), { status: 200 }),
   );

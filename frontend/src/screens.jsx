@@ -32,8 +32,6 @@ import {
   recommend,
   completeLesson,
   initialState,
-  withChoices,
-  chooseSubject,
   stageLabel,
   skipLesson,
   progressOf,
@@ -51,17 +49,15 @@ import { isLessonType, lessonTypes } from "./lessonGames.js";
 import LessonGame, { useLessonGame } from "./Games.jsx";
 import { PlanSummary, PlanTemplate, Rub } from "./Templates.jsx";
 import { templates } from "./experiences.js";
-import { gameFor } from "./games.js";
 import { groupName } from "./groups.js";
 
 /* ------------------------------------------------------------------ */
 /* 공통                                                                */
 /* ------------------------------------------------------------------ */
 
-// 학기별 학과는 학기 자리마다 고른 과목을 반영해서 돌려준다.
-// 좁은 자리에 쓰는 짧은 이름: 학기 자리는 "1-2", 학년 자리는 "3학년".
-const shortStage = (d, i) => (d.semesters?.[i] ? `${d.yearNumbers[i]}-${d.semesters[i]}` : `${d.yearNumbers[i]}학년`);
-const all = (state) => [...departments, ...state.catalog.map((d) => withChoices(d, state.choices))];
+// 좁은 자리에 쓰는 짧은 이름: "3학년".
+const shortStage = (d, i) => `${d.yearNumbers[i]}학년`;
+const all = (state) => [...departments, ...state.catalog];
 
 /**
  * 지금 보고 있는 학과와 그 진행 상태. 학교가 정해진 학과가 없으면 null.
@@ -720,7 +716,7 @@ export function Schools({ nav, route, setState }) {
     setFailed(null);
     getCurriculum(p.school, p.course)
       .then((result) => {
-        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games, result.levels, result.picks, result.partner, result.terms, result.partnerExample);
+        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games, result.levels, result.picks, result.partner, result.partnerExample);
         // 이미 입학한 학과는 입학할 때 정한 학년별 수업을 그대로 둔다. 새로 받은 데이터로 바꾸면 진행 중인 학년의 수업이 바뀐다.
         // 제휴 여부는 수업과 상관없으니 새로 받은 값으로 바꾼다.
         setState((s) => ({
@@ -1034,7 +1030,7 @@ export function Detail({ active, nav, state, setState }) {
       </T>
       <T y={472.5} size={14} lh={20} left={33} clip={340} className="a-up text-slate/90" style={delay(0.2)}>
         {`${d.curriculum.slice(0, 3).join(", ")} 등 교과목 ${d.curriculum.length}개\n${
-          d.options ? "학교 홈페이지의 학기별 편성에서 과목을 골라요" : d.lessonsFromYears ? "학교 홈페이지의 학년별 편성을 따랐어요" : "학년 배치는 실제 편성과 다를 수 있어요"
+          d.lessonsFromYears ? "학교 홈페이지의 학년별 편성을 따랐어요" : "학년 배치는 실제 편성과 다를 수 있어요"
         }`}
       </T>
       {subjects && (
@@ -1175,19 +1171,6 @@ export function Grades({ active, nav, state }) {
             ))}
           </ul>
         )}
-        {/* 학기별 학과는 학기마다 고른 과목을 적는다. */}
-        {!missed && d.options && (
-          <ul className="a-fade absolute left-[170px] top-[152px] w-[92px]" style={delay(0.7)} aria-label="학기별 이수 과목">
-            {d.options.map((items, i) =>
-              items ? (
-                <li key={i} className="flex gap-[5px] text-[9.5px] leading-[16px] text-gray">
-                  <span className="shrink-0 tabular-nums text-mint-deep">{shortStage(d, i)}</span>
-                  <span className="min-w-0 truncate">{d.lessons[i]}</span>
-                </li>
-              ) : null,
-            )}
-          </ul>
-        )}
         <BottomSign d={d} wait={0.7} />
         <SchoolSeal d={d} className="a-fade" style={delay(0.8)} />
         {!missed && (
@@ -1300,7 +1283,7 @@ export function Welcome({ active, nav, state }) {
           {`${stageLabel(d, 0)} · ${d.lessons[0]}`}
         </T>
         <T y={62.5} size={13.5} lh={20} center className="text-ink-3">
-          {d.options ? "학기마다 편성 과목을 골라 체험하고\n마지막 학년에는 졸업 과제에 도전해요." : "학년마다 수업을 하나씩 체험하고\n마지막 학년에는 졸업 과제에 도전해요."}
+          {"학년마다 수업을 하나씩 체험하고\n마지막 학년에는 졸업 과제에 도전해요."}
         </T>
       </div>
     </Screen>
@@ -1375,7 +1358,6 @@ function TabBar({ active, nav }) {
 /** 과제 하나가 어떤 활동인지 한 줄로. */
 function taskKind(d, index) {
   if (index === d.lessons.length - 1) return "졸업 과제";
-  if (d.options?.[index] && !d.chosen?.[index]) return `편성 과목 ${d.options[index].length}개 중 하나를 골라요`;
   const id = d.games?.[index];
   if (typeof id === "string" && id.startsWith("group:") && d.practice) return `전공 실습(${templates[d.practice.template].title})`;
   return lessonTypes[id]?.title || "직접 해보고 느낀 점 기록하기";
@@ -1446,9 +1428,7 @@ export function Home({ active, nav, state, setState }) {
     window.clearTimeout(hintTimer.current);
     hintTimer.current = window.setTimeout(() => setHint(null), 2400);
   };
-  // 학기 자리에서 아직 과목을 고르지 않았으면 과목 고르기부터 한다.
-  const choosing = !finished && !!d.options?.[index] && !d.chosen?.[index];
-  const open = () => (finished ? nav.push("graduation") : nav.push(choosing ? "choose" : "lesson"));
+  const open = () => nav.push(finished ? "graduation" : "lesson");
   const label = stageLabel(d, index);
   // 지금 과제 다음에 남은 과제(최대 2개).
   const upcoming = finished ? [] : d.lessons.map((lesson, i) => ({ lesson, i })).slice(index + 1, index + 3);
@@ -1514,7 +1494,7 @@ export function Home({ active, nav, state, setState }) {
       >
         <span className="loop pointer-events-none absolute inset-0 rounded-[14px]" style={{ animation: "glow 2.4s ease-in-out 1.6s infinite" }} />
         <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-          {finished ? "졸업 리포트 보기" : choosing ? `${label} 과목 고르기` : `${d.lessons[index]} ${completed ? "이어하기" : "시작하기"}`}
+          {finished ? "졸업 리포트 보기" : `${d.lessons[index]} ${completed ? "이어하기" : "시작하기"}`}
         </span>
       </button>
       {subjects && (
@@ -1647,8 +1627,6 @@ export function Lesson({ active, nav, route, state, setState }) {
   const key = ok ? `${v.d.id}-${v.index}` : "";
   const subject = ok ? v.d.lessons[v.index] : "";
   const isFinal = ok && v.index === v.total - 1;
-  // 학기 자리에서 과목을 아직 고르지 않았으면(새로고침 등) 과목 고르기로 보낸다.
-  const unchosen = ok && !!v.d.options?.[v.index] && !v.d.chosen?.[v.index];
   const game = ok && !isFinal ? v.d.games?.[v.index] || null : null;
   // 학과군 전공 실습이면 그 체험 데이터. 아니면 연습 문제 유형(이론 수업)이거나 null(기본 체험).
   const practice = typeof game === "string" && game.startsWith("group:") ? v.d.practice : null;
@@ -1667,9 +1645,6 @@ export function Lesson({ active, nav, route, state, setState }) {
   const heading = useRef(null);
   const moved = useRef(false);
   useGuard(ok, nav, active);
-  useEffect(() => {
-    if (active && unchosen) nav.replace("choose");
-  }, [active, unchosen, nav]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   // 연습 문제를 받을 수 없으면 기본 체험으로 진행하고, 체험을 마친 것으로 기록해 수업을 끝낼 수 있게 한다.
   useEffect(() => {
@@ -1682,11 +1657,11 @@ export function Lesson({ active, nav, route, state, setState }) {
     if (scroller.current) scroller.current.scrollTop = 0;
     heading.current?.focus({ preventScroll: true });
   }, [step]);
-  if (!ok || unchosen) return null;
+  if (!ok) return null;
 
   const { d, index, total, year, final, retake } = v;
   const label = stageLabel(d, index);
-  const before = d.semesters ? "앞 학기" : "앞 학년";
+  const before = "앞 학년";
   const header = <Header title={`${label} · ${subject}`} count={`${index + 1}/${total}`} onBack={nav.back} />;
   // 휴강: 미이수로 기록하고 다음 자리로 넘어간다. 쓰던 기록은 다시 들을 때 이어서 쓰도록 남긴다.
   const skip = () => {
@@ -1818,11 +1793,6 @@ export function Lesson({ active, nav, route, state, setState }) {
           >
             <p style={delay(0.12)}>{task}</p>
           </MintCard>
-        )}
-        {d.options?.[index] && !state.plays[key] && !retake && (
-          <button className="text-button a-up mt-[14px]" onClick={() => nav.replace("choose")} style={delay(0.16)}>
-            다른 과목 고르기 →
-          </button>
         )}
       </>
     );
@@ -1991,79 +1961,6 @@ export function Lesson({ active, nav, route, state, setState }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 12-1 · 학기 과목 고르기 (제휴 대학의 학기별 편성이 있는 학과)         */
-/* ------------------------------------------------------------------ */
-
-export function Choose({ active, nav, state, setState }) {
-  const v = view(state);
-  const options = v?.journey && !v.finished && !v.journey.paused ? v.d.options?.[v.index] : null;
-  useGuard(!!options, nav, active);
-  if (!options) return null;
-  const { d, index, total } = v;
-  const label = stageLabel(d, index);
-  const current = state.choices[`${d.id}-${index}`] || null;
-  // 다른 학기에 이미 고른 과목은 다시 고를 수 없다.
-  const taken = new Set(d.options.map((items, i) => (items && i !== index ? state.choices[`${d.id}-${i}`] : null)).filter(Boolean));
-  // 연습 문제가 있는 과목을 먼저, 고를 수 없는 과목을 맨 뒤에 둔다. 그 안에서는 편성표 순서다.
-  const items = options
-    .map((subject) => ({ subject, type: gameFor(subject, d.lessonGames), taken: taken.has(subject) }))
-    .sort((a, b) => a.taken - b.taken || !a.type - !b.type);
-  const quizzes = items.filter((item) => item.type && !item.taken).length;
-  // 예시 제휴 대학이면 첫 학기 과목 고르기에서 한 번만 예시라고 알린다.
-  const exampleNote = d.partnerExample && d.options.findIndex(Boolean) === index;
-  const pick = (subject) => {
-    setState((s) => chooseSubject(s, d.id, index, subject));
-    nav.replace("lesson");
-  };
-  return (
-    <Screen>
-      <Header title={`${label} · 과목 고르기`} count={`${index + 1}/${total}`} onBack={nav.back} />
-      <div className="flow no-scrollbar absolute bottom-0 left-0 top-[100px] w-full overflow-y-auto px-[20px] pb-[32px] pt-[12px]">
-        <h1 className="a-up whitespace-pre-line text-[24px] font-bold leading-[34px] text-navy">{`${label}에 들을 과목을\n하나 골라요`}</h1>
-        <p className="a-up mt-[8px] text-[13.5px] leading-[21px] text-gray" style={delay(0.06)}>
-          {`${d.school} 편성표의 ${label} 과목 ${options.length}개예요. `}
-          {quizzes
-            ? `‘연습 문제’ 표시가 있는 ${quizzes}개 과목은 문제를 풀어 보고, 나머지는 관찰 과제로 체험해요.`
-            : "이 학기 과목은 모두 관찰 과제로 체험해요."}
-        </p>
-        {exampleNote && (
-          <p className="a-up mt-[12px] rounded-[12px] border border-mint bg-mint-soft px-[14px] py-[10px] text-[12.5px] leading-[19px] text-mint-deep" style={delay(0.08)}>
-            제휴 학교는 이렇게 학기별로 과목을 골라 체험할 수 있어요 (서비스 예시)
-          </p>
-        )}
-        <ul className="mt-[18px] grid gap-[10px]">
-          {items.map(({ subject, type, taken: used }, i) => (
-            <li key={subject} className="a-up" style={delay(0.1 + Math.min(i, 8) * 0.03)}>
-              <button
-                onClick={() => pick(subject)}
-                disabled={used}
-                aria-pressed={current === subject}
-                className={`pressable flex min-h-[62px] w-full items-center gap-[10px] rounded-[14px] border px-[16px] py-[10px] text-left ${
-                  used ? "border-faint bg-chalk opacity-60" : current === subject ? "border-mint bg-mint-soft" : "border-cream-line bg-cream active:bg-cream-2"
-                }`}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold leading-[22px] text-ink-2">{subject}</span>
-                  <span className="block text-[12px] leading-[18px] text-gray">
-                    {used ? "다른 학기에 고른 과목이에요" : type ? `${lessonTypes[type].title}로 연습해요` : "관찰 과제로 체험해요"}
-                    {current === subject ? " · 지금 고른 과목" : ""}
-                  </span>
-                </span>
-                {type && !used && (
-                  <span className="flex h-[22px] shrink-0 items-center rounded-full border border-mint bg-white px-[8px] text-[11px] font-semibold text-mint-deep">
-                    연습 문제
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </Screen>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* 15 · 졸업                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -2144,8 +2041,8 @@ export function Graduation({ active, nav, state }) {
           </T>
           <div className="report-text absolute left-[20.5px] top-[124px] w-[360px] text-[12px] leading-[18px] text-ink-2" style={{ WebkitLineClamp: 2 }}>
             {d.lessons
-              .map((lesson, i) => `${d.options ? `${shortStage(d, i)} ` : ""}${lesson}${skipped.includes(i) ? "(미이수)" : ""}`)
-              .join(d.options ? " · " : " → ")}
+              .map((lesson, i) => `${lesson}${skipped.includes(i) ? "(미이수)" : ""}`)
+              .join(" → ")}
           </div>
         </div>
         <div className="a-up pointer-events-none absolute inset-0" style={delay(0.85)}>
@@ -2301,7 +2198,6 @@ export const SCREENS = {
   welcome: Welcome,
   home: Home,
   lesson: Lesson,
-  choose: Choose,
   grades: Grades,
   diploma: Diploma,
   graduation: Graduation,

@@ -1,15 +1,17 @@
-"""학년별 교육과정 수집 파이프라인.
+"""학과별 과목의 학년 수집 파이프라인.
 
-학교 홈페이지의 교육과정 페이지(HTML·PDF)를 받아 학년·학기별 교과목을 추출하고,
-이미 가진 교과목 목록과 대조해 검증한 뒤 `data/year_curricula.json`에 저장한다.
+학교 홈페이지의 교육과정 페이지(HTML·PDF)를 받아 과목마다 권장 학년을 추출하고, 과목명을 원본 교과목명
+(`courses.csv.gz`)에 맞춘 뒤 검증해 `data/year_curricula.json`에 저장한다. 학기는 구분하지 않는다.
 
-    python -m backend.pipeline collect            # 출처 목록 전체: 받기 → 바뀐 것만 추출
-    python -m backend.pipeline collect --school 경희대학교
-    python -m backend.pipeline status             # 수집 현황
-    python -m backend.pipeline approve 학교 학과   # 검토 대기 항목을 사람이 확인하고 공개
-    python -m backend.pipeline import 파일.csv     # 직접 정리한 편성표 넣기
+    python -m backend.pipeline collect 경희대학교             # 그 학교의 출처가 있는 학과 전체(이미 수집한 학과는 건너뜀)
+    python -m backend.pipeline collect 경희대학교 --limit 3   # 아직 수집하지 않은 학과 중 3개만
+    python -m backend.pipeline collect 경희대학교 --force     # 이미 수집한 학과도 다시
+    python -m backend.pipeline report 경희대학교              # 학과별 결과 리포트(data/year_reports/학교.csv)
+    python -m backend.pipeline status                         # 수집 현황
+    python -m backend.pipeline approve 학교 학과              # 검토 대기 항목을 사람이 확인하고 공개
+    python -m backend.pipeline import 파일.csv                # 직접 정리한 학년표 넣기
 
-출처 목록은 `data/year_sources.csv`(school,course,url)에 한 줄씩 적는다.
+출처 목록은 `data/year_sources.csv`(school,course,url)에 한 줄씩 적는다. 출처를 못 찾은 학과는 url을 비워 둔다.
 """
 
 import argparse
@@ -22,6 +24,7 @@ import re
 import sys
 import time
 import urllib.request
+from collections import Counter
 from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
@@ -32,49 +35,55 @@ from backend.main import catalog, compact
 DATA = Path(__file__).parent / "data"
 SOURCES_PATH = DATA / "year_sources.csv"
 RESULTS_PATH = DATA / "year_curricula.json"
+REPORT_DIR = DATA / "year_reports"
 SNAPSHOT_DIR = Path(__file__).parent / ".cache" / "snapshots"
 MODEL = "claude-opus-5-5"
+# 100만 토큰당 달러(입력, 출력). 리포트의 비용 계산에만 쓴다. 다른 모델이 응답하면(서버 쪽 대체) 비용은 비워 둔다.
+PRICES = {"claude-opus-5-5": (4.0, 20.0)}
 MAX_BYTES = 20 * 1024 * 1024
 MAX_TEXT_CHARS = 400_000
 MIN_SUBJECTS = 5
-# 추출한 과목 중 기존 교과목 목록에도 있는 비율이 이보다 낮으면 사람이 확인하기 전까지 공개하지 않는다.
+# 추출한 과목 중 원본 교과목에 맞춘 비율이 이보다 낮으면 사람이 확인하기 전까지 공개하지 않는다.
 AUTO_VERIFY_RATIO = 0.5
+# 다시 돌리지 않는 상태. 오류(error)는 다음 수집 때 다시 시도한다.
+DONE = {"verified", "review", "not_found"}
+OUTCOMES = {"verified": "성공", "review": "부분 성공", "not_found": "실패", "error": "실패"}
 
 SCHEMA = {
     "type": "object",
     "properties": {
         "found": {"type": "boolean"},
         "reason": {"type": "string"},
-        "terms": {
+        "curriculum_year": {"type": "integer"},
+        "subjects": {
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
-                    "year": {"type": "integer"},
-                    "semester": {"type": "integer"},
-                    "subjects": {"type": "array", "items": {"type": "string"}},
+                    "name": {"type": "string"},
+                    "years": {"type": "array", "items": {"type": "integer"}},
                 },
-                "required": ["year", "semester", "subjects"],
+                "required": ["name", "years"],
                 "additionalProperties": False,
             },
         },
     },
-    "required": ["found", "reason", "terms"],
+    "required": ["found", "reason", "curriculum_year", "subjects"],
     "additionalProperties": False,
 }
 
-PROMPT = """이 문서는 {school} {course}의 교육과정 페이지로 등록된 자료입니다. 학부 과정의 전공 교과목을 학년·학기별로 정리해 주세요.
+PROMPT = """이 문서는 {school} {course}의 교육과정 페이지로 등록된 자료입니다. 학부 과정의 전공 교과목마다 권장 학년을 정리해 주세요.
 
-이 결과는 진학을 고민하는 학생에게 "이 학과는 몇 학년에 무엇을 배운다"고 보여주는 데 쓰입니다. 틀린 편성을 보여주면 학생의 판단을 그르치므로, 문서에 적힌 그대로만 옮기는 것이 가장 중요합니다.
+이 결과는 진학을 고민하는 학생에게 "이 학과는 몇 학년에 무엇을 배운다"고 보여주는 데 쓰입니다. 틀린 학년을 보여주면 학생의 판단을 그르치므로, 문서에 적힌 그대로만 옮기는 것이 가장 중요합니다.
 
-- 문서가 과목마다 학년을 명시한 경우에만 옮깁니다. 학년이 적혀 있지 않은 과목은 과목명이나 일반적인 관행으로 학년을 짐작해 넣지 말고 빼 주세요.
-- 학기가 적혀 있으면 1 또는 2, 학기 구분이 없으면 0으로 적습니다.
+- 문서가 과목마다 학년(이수학년, 권장 학년, 편성 학년)을 명시한 경우에만 옮깁니다. 학년이 적혀 있지 않은 과목은 과목명이나 일반적인 관행으로 학년을 짐작해 넣지 말고 빼 주세요.
+- 학기는 구분하지 않습니다. 같은 과목이 여러 학년에 편성돼 있거나 "3-4학년"처럼 범위로 적혀 있으면 해당 학년을 모두 years에 적습니다.
 - 과목명은 문서의 표기를 그대로 씁니다. 학점, 시수, 이수구분, 과목코드, 영문 병기는 빼고 과목명만 남깁니다.
 - 교양 과목과 대학원 과목은 빼고 전공 과목(전공기초, 전공필수, 전공선택)만 넣습니다.
 - 문서에 여러 학과나 전공이 섞여 있으면 {course}에 해당하는 것만 넣습니다.
-- 여러 입학년도의 편성표가 함께 있으면 가장 최근 것만 넣습니다.
+- 여러 입학년도의 편성표가 함께 있으면 가장 최근 것만 넣습니다. curriculum_year에는 그 교육과정의 적용 연도(예: 2026학년도 교육과정이면 2026)를 적고, 문서에 없으면 0을 적습니다.
 
-다음 경우에는 found를 false로 하고 terms는 비운 뒤, reason에 이유를 한 문장으로 적어 주세요: 문서가 {school} {course}의 것이 아닌 경우, 학년별 편성이 없는 경우(과목 설명만 있거나 트랙별 목록만 있는 경우 등), 대학원 과정만 있는 경우, 내용을 읽을 수 없는 경우. found가 true일 때 reason에는 문서의 어느 부분에서 편성을 가져왔는지 한 문장으로 적습니다."""
+다음 경우에는 found를 false로 하고 subjects는 비운 뒤, reason에 이유를 한 문장으로 적어 주세요: 문서가 {school} {course}의 것이 아닌 경우, 과목별 학년이 없는 경우(과목 설명만 있거나 트랙별 목록만 있는 경우 등), 대학원 과정만 있는 경우, 내용을 읽을 수 없는 경우. found가 true일 때 reason에는 문서의 어느 부분에서 학년을 가져왔는지 한 문장으로 적습니다."""
 
 
 class PageText(HTMLParser):
@@ -178,8 +187,15 @@ def fetch(url):
     return raw, kind, content_type
 
 
+def usage_of(model, input_tokens, output_tokens):
+    """토큰 수와 비용(달러). 단가를 모르는 모델이면 비용은 None."""
+    price = PRICES.get(model)
+    cost = round((input_tokens * price[0] + output_tokens * price[1]) / 1_000_000, 4) if price else None
+    return {"model": model, "input_tokens": input_tokens, "output_tokens": output_tokens, "cost_usd": cost}
+
+
 def extract_with_claude(school, course, raw, kind, content_type):
-    """문서에서 학년별 편성을 뽑는다. `ANTHROPIC_API_KEY`가 필요하다."""
+    """문서에서 과목별 학년을 뽑는다. `ANTHROPIC_API_KEY`가 필요하다. 결과의 usage에 토큰 수와 비용을 담는다."""
     import anthropic
 
     instructions = PROMPT.format(school=school, course=course)
@@ -203,7 +219,9 @@ def extract_with_claude(school, course, raw, kind, content_type):
     )
     if response.stop_reason != "end_turn":
         raise ValueError(f"추출이 끝나지 않았습니다(stop_reason={response.stop_reason}).")
-    return json.loads(next(block.text for block in response.content if block.type == "text"))
+    extracted = json.loads(next(block.text for block in response.content if block.type == "text"))
+    extracted["usage"] = usage_of(response.model, response.usage.input_tokens, response.usage.output_tokens)
+    return extracted
 
 
 def normalize(subject):
@@ -222,34 +240,71 @@ def max_year(duration):
     return math.ceil(float(number.group()))
 
 
-def validate(school, course, terms):
-    """추출 결과를 정리하고 검증한다. (terms, match_ratio)를 돌려주고, 쓸 수 없으면 ValueError를 낸다."""
+def match_subjects(names, curriculum):
+    """추출한 과목명마다 원본 교과목명을 찾는다: 이름 → 원본 이름(못 찾으면 None).
+    띄어쓰기·대소문자만 다르면 바로 맞추고, 표기 차이(normalize)로만 같으면 양쪽에 그런 이름이 하나뿐일 때만 맞춘다.
+    "몰입심화학습(AI로봇)"과 "몰입심화학습(AI아트테크)"처럼 괄호를 지우면 같아지는 이름이 여럿이면 어느 것도 맞추지 않는다."""
+    spaced = {compact(original): original for original in curriculum}
+    loose = {}
+    for original in curriculum:
+        loose.setdefault(normalize(original), []).append(original)
+    extracted = Counter(normalize(name) for name in names)
+    matched = {}
+    for name in names:
+        candidates = loose.get(normalize(name), [])
+        if compact(name) in spaced:
+            matched[name] = spaced[compact(name)]
+        elif len(candidates) == 1 and extracted[normalize(name)] == 1:
+            matched[name] = candidates[0]
+        else:
+            matched[name] = None
+    return matched
+
+
+def validate(school, course, subjects):
+    """추출 결과를 정리·매칭·검증한다. 원본 교과목명 → 학년(여러 학년이면 가장 낮은 학년)과 판정을 돌려주고,
+    쓸 수 없으면 ValueError를 낸다."""
     program = catalog().programs.get((school, course))
     if not program:
         raise ValueError("제공 대상(학부·교과목 등록)에 없는 학교·학과입니다.")
     limit = max_year(program["duration"])
-    merged, seen = {}, set()
-    for term in terms:
-        year, semester = term.get("year"), term.get("semester")
-        if not isinstance(year, int) or isinstance(year, bool) or not 1 <= year <= limit:
-            raise ValueError(f"학년 값이 범위를 벗어났습니다: {year!r} (수업연한 {program['duration']})")
-        if semester not in (0, 1, 2):
-            raise ValueError(f"학기 값이 올바르지 않습니다: {semester!r}")
-        for subject in term.get("subjects", []):
-            name = " ".join(str(subject).split())
-            # 괄호 안까지 견줘서 거른다. normalize는 괄호를 지워 "몰입심화학습(딥엑스)"와 "몰입심화학습(알체라)"를 같은 과목으로 본다.
-            key = compact(name)
-            if not normalize(name) or len(name) > 100 or (year, semester, key) in seen:
-                continue
-            seen.add((year, semester, key))
-            merged.setdefault((year, semester), []).append(name)
-    subjects = [name for names in merged.values() for name in names]
-    if len(subjects) < MIN_SUBJECTS:
-        raise ValueError(f"추출된 과목이 너무 적습니다({len(subjects)}개).")
-    known = {normalize(name) for name in program["curriculum"]}
-    ratio = sum(normalize(name) in known for name in subjects) / len(subjects)
-    cleaned = [{"year": year, "semester": semester, "subjects": names} for (year, semester), names in sorted(merged.items())]
-    return cleaned, round(ratio, 3)
+    found, names = {}, {}
+    for item in subjects:
+        name = " ".join(str(item.get("name", "")).split())
+        years = item.get("years")
+        if not isinstance(years, list):
+            raise ValueError(f"학년 목록이 올바르지 않습니다: {name} {years!r}")
+        for year in years:
+            if not isinstance(year, int) or isinstance(year, bool) or not 1 <= year <= limit:
+                raise ValueError(f"학년 값이 범위를 벗어났습니다: {name} {year!r} (수업연한 {program['duration']})")
+        if not years or not normalize(name) or len(name) > 100:
+            continue
+        # 같은 과목이 여러 번 나오면(학기마다 편성 등) 학년을 합친다. 괄호 안까지 견줘서 다른 과목은 따로 둔다.
+        key = compact(name)
+        names.setdefault(key, name)
+        found.setdefault(key, set()).update(years)
+    if len(found) < MIN_SUBJECTS:
+        raise ValueError(f"추출된 과목이 너무 적습니다({len(found)}개).")
+    matched = match_subjects([names[key] for key in found], program["curriculum"])
+    spans, unmatched = {}, []
+    for key, years in found.items():
+        original = matched[names[key]]
+        if original is None:
+            unmatched.append({"name": names[key], "year": min(years)})
+        else:
+            spans.setdefault(original, set()).update(years)
+    ordered = [subject for subject in program["curriculum"] if subject in spans]
+    ratio = round((len(found) - len(unmatched)) / len(found), 3)
+    # 마지막 학년은 졸업 과제 자리라 과목이 없어도 된다. 그 앞 학년이 비면 학년별 체험을 만들 수 없다.
+    missing = [year for year in range(1, limit) if not any(min(spans[subject]) == year for subject in ordered)]
+    return {
+        "status": "verified" if ratio >= AUTO_VERIFY_RATIO and not missing else "review",
+        "match_ratio": ratio,
+        "subjects": {subject: min(spans[subject]) for subject in ordered},
+        "multi_year": [subject for subject in ordered if len(spans[subject]) > 1],
+        "unmatched": unmatched,
+        "missing_years": missing,
+    }
 
 
 def load_results(path=None):
@@ -268,85 +323,173 @@ def key_of(school, course):
 
 
 def load_sources(path=None):
+    """출처 목록. url이 빈 줄(출처를 못 찾은 학과)도 돌려준다."""
     path = path or SOURCES_PATH
     if not path.exists():
         return []
     with path.open(encoding="utf-8-sig", newline="") as file:
-        return [{name: (row.get(name) or "").strip() for name in ("school", "course", "url")} for row in csv.DictReader(file) if (row.get("url") or "").strip()]
+        return [{name: (row.get(name) or "").strip() for name in ("school", "course", "url")} for row in csv.DictReader(file) if (row.get("school") or "").strip()]
 
 
-def collect(sources, results, extractor=extract_with_claude, fetcher=fetch, force=False, today=None, log=print):
-    """출처를 하나씩 받아 내용이 바뀐 것만 다시 추출한다. 한 건의 실패가 나머지를 막지 않는다."""
+def empty(status):
+    return {"status": status, "match_ratio": 0, "subjects": {}, "multi_year": [], "unmatched": [], "missing_years": []}
+
+
+def collect(sources, results, extractor=extract_with_claude, fetcher=fetch, force=False, limit=None, today=None, log=print, clock=time.monotonic):
+    """출처를 하나씩 받아 추출한다. 이미 수집한 학과(같은 주소로 공개·검토 대기·편성 없음)는 force가 아니면 건너뛴다.
+    limit이 있으면 새로 처리하는 학과를 그 수만큼만 돌린다. 한 건의 실패가 나머지를 막지 않는다."""
     today = today or date.today().isoformat()
     last_host = {}
+    done = 0
     for source in sources:
         school, course, url = source["school"], source["course"], source["url"]
         key, label = key_of(school, course), f"{school} {course}"
         previous = results.get(key, {})
+        if not url:
+            continue
+        if not force and previous.get("url") == url and previous.get("status") in DONE and not previous.get("error"):
+            log(f"이미 수집함  {label}")
+            continue
+        if limit is not None and done >= limit:
+            break
+        done += 1
+        usage = None
         try:
             if (school, course) not in catalog().programs:
                 raise ValueError("제공 대상(학부·교과목 등록)에 없는 학교·학과입니다.")
             host = urlparse(url).netloc
-            wait = 2 - (time.monotonic() - last_host.get(host, -10))
+            wait = 2 - (clock() - last_host.get(host, -10))
             if wait > 0 and fetcher is fetch:
                 time.sleep(wait)
+            started = clock()
             raw, kind, content_type = fetcher(url)
-            last_host[host] = time.monotonic()
+            last_host[host] = clock()
             digest = hashlib.sha256(raw).hexdigest()
-            if not force and previous.get("content_hash") == digest and previous.get("url") == url:
-                results[key] = {**previous, "checked_at": today}
-                log(f"변경 없음  {label}")
-                continue
             SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
             (SNAPSHOT_DIR / f"{digest}.{kind}").write_bytes(raw)
             extracted = extractor(school, course, raw, kind, content_type)
-            entry = {"school": school, "course": course, "url": url, "content_hash": digest, "fetched_at": today, "checked_at": today, "note": str(extracted.get("reason", ""))[:300]}
+            usage = {**(extracted.get("usage") or {}), "seconds": round(clock() - started, 1)}
+            year = extracted.get("curriculum_year")
+            entry = {
+                "school": school, "course": course, "url": url,
+                "curriculum_year": year if isinstance(year, int) and not isinstance(year, bool) and 2000 <= year <= 2100 else None,
+                "content_hash": digest, "fetched_at": today, "checked_at": today,
+                "note": str(extracted.get("reason", ""))[:300], "usage": usage,
+            }
             if not extracted.get("found"):
-                results[key] = {**entry, "status": "not_found", "match_ratio": 0, "years": []}
+                results[key] = {**entry, **empty("not_found")}
                 log(f"편성 없음  {label}: {entry['note']}")
                 continue
-            years, ratio = validate(school, course, extracted.get("terms", []))
-            status = "verified" if ratio >= AUTO_VERIFY_RATIO else "review"
-            changed = bool(previous.get("years")) and previous["years"] != years
-            results[key] = {**entry, "status": status, "match_ratio": ratio, "years": years}
-            log(f"{'공개' if status == 'verified' else '검토 필요'}  {label}: 과목 {sum(len(term['subjects']) for term in years)}개, 기존 목록 일치 {ratio:.0%}{' (이전 수집본에서 바뀜)' if changed else ''}")
-        except Exception as error:  # 한 학교의 실패(접속 불가, 형식 오류 등)를 기록하고 다음으로 넘어간다.
+            checked = validate(school, course, extracted.get("subjects", []))
+            results[key] = {**entry, **checked}
+            log(
+                f"{OUTCOMES[checked['status']]}  {label}: 과목 {len(checked['subjects'])}개, 매칭률 {checked['match_ratio']:.0%}"
+                + (f", 미매칭 {len(checked['unmatched'])}개" if checked["unmatched"] else "")
+                + (f", 빈 학년 {checked['missing_years']}" if checked["missing_years"] else "")
+            )
+        except Exception as error:  # 한 학과의 실패(접속 불가, 형식 오류 등)를 기록하고 다음으로 넘어간다.
+            # 이전에 공개한 결과가 있으면 그대로 두고 오류만 남긴다.
             results[key] = {**previous, "school": school, "course": course, "url": url, "error": f"{type(error).__name__}: {error}"[:300], "checked_at": today}
-            if "status" not in results[key]:
-                results[key].update(status="error", years=[], match_ratio=0)
+            if usage:
+                results[key]["usage"] = usage
+            if "status" not in previous:
+                results[key].update(empty("error"))
             log(f"실패  {label}: {error}")
     return results
 
 
+def outcome(entry, url):
+    if not url:
+        return "출처 없음"
+    if not entry or entry.get("url") != url:
+        return "수집 전"
+    if entry.get("error"):
+        return "실패"
+    return OUTCOMES.get(entry.get("status"), "실패")
+
+
+def report_rows(school, sources, results):
+    """학교의 모든 학과(제공 대상)를 학과별 결과 한 줄씩으로 정리한다."""
+    urls = {source["course"]: source["url"] for source in sources if source["school"] == school}
+    rows = []
+    for (name, course) in sorted(program for program in catalog().programs if program[0] == school):
+        entry = results.get(key_of(name, course), {})
+        url = urls.get(course, "")
+        usage = entry.get("usage") or {}
+        rows.append({
+            "course": course,
+            "result": outcome(entry, url),
+            "match_ratio": entry.get("match_ratio", "") if url else "",
+            "subjects": len(entry.get("subjects", {})) if url else "",
+            "unmatched": len(entry.get("unmatched", [])) if url else "",
+            "multi_year": len(entry.get("multi_year", [])) if url else "",
+            "missing_years": " ".join(map(str, entry.get("missing_years", []))) if url else "",
+            "curriculum_year": entry.get("curriculum_year") or "",
+            "input_tokens": usage.get("input_tokens", ""),
+            "output_tokens": usage.get("output_tokens", ""),
+            "cost_usd": usage.get("cost_usd", "") if usage.get("cost_usd") is not None else "",
+            "seconds": usage.get("seconds", ""),
+            "url": url,
+            "note": entry.get("error") or entry.get("note", ""),
+        })
+    return rows
+
+
+def write_report(school, rows, folder=None):
+    folder = folder or REPORT_DIR
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{school}.csv"
+    with path.open("w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=list(rows[0]) if rows else ["course"])
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def summarize(rows):
+    counts = Counter(row["result"] for row in rows)
+    cost = sum(row["cost_usd"] for row in rows if isinstance(row["cost_usd"], (int, float)))
+    seconds = sum(row["seconds"] for row in rows if isinstance(row["seconds"], (int, float)))
+    order = ["성공", "부분 성공", "실패", "수집 전", "출처 없음"]
+    return f"학과 {len(rows)}개 · " + " · ".join(f"{name} {counts[name]}" for name in order if counts[name]) + f" · 비용 ${cost:.2f} · 시간 {seconds:.0f}초"
+
+
 def import_rows(rows, results, today=None):
-    """직접 정리한 편성표(school,course,year,semester,subject)를 넣는다. 사람이 확인한 자료로 보고 바로 공개한다."""
+    """직접 정리한 학년표(school,course,year,subject, 선택: url, curriculum_year)를 넣는다. 사람이 확인한 자료로 보고 바로 공개한다."""
     today = today or date.today().isoformat()
-    grouped = {}
+    grouped, meta = {}, {}
     for number, row in enumerate(rows, start=2):
         try:
             school, course = row["school"].strip(), row["course"].strip()
-            term = (int(row["year"]), int(row.get("semester") or 0))
-            grouped.setdefault((school, course), {}).setdefault(term, []).append(row["subject"])
+            grouped.setdefault((school, course), []).append({"name": row["subject"], "years": [int(row["year"])]})
+            year = (row.get("curriculum_year") or "").strip()
+            meta.setdefault((school, course), {"url": (row.get("url") or "").strip(), "curriculum_year": int(year) if year else None})
         except (KeyError, ValueError, AttributeError) as error:
             raise ValueError(f"{number}번째 줄을 읽을 수 없습니다: {error}") from error
-    for (school, course), terms in grouped.items():
-        years, ratio = validate(school, course, [{"year": year, "semester": semester, "subjects": subjects} for (year, semester), subjects in terms.items()])
-        results[key_of(school, course)] = {"school": school, "course": course, "url": "", "content_hash": "", "fetched_at": today, "checked_at": today, "note": "직접 입력", "status": "verified", "match_ratio": ratio, "years": years}
+    for (school, course), subjects in grouped.items():
+        checked = validate(school, course, subjects)
+        results[key_of(school, course)] = {
+            "school": school, "course": course, **meta[(school, course)], "content_hash": "",
+            "fetched_at": today, "checked_at": today, "note": "직접 입력", **checked, "status": "verified",
+        }
     return len(grouped)
 
 
 def published(results):
     """서비스에 내보낼 수 있는(검증된) 항목만 (학교, 학과) → 항목으로 돌려준다."""
-    return {(entry["school"], entry["course"]): entry for entry in results.values() if entry.get("status") == "verified" and entry.get("years")}
+    return {(entry["school"], entry["course"]): entry for entry in results.values() if entry.get("status") == "verified" and entry.get("subjects")}
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="학년별 교육과정 수집")
+    parser = argparse.ArgumentParser(description="학과별 과목의 학년 수집")
     commands = parser.add_subparsers(dest="command", required=True)
-    collecting = commands.add_parser("collect", help="출처를 받아 바뀐 것만 추출")
-    collecting.add_argument("--school")
+    collecting = commands.add_parser("collect", help="학교의 출처를 받아 아직 수집하지 않은 학과를 추출")
+    collecting.add_argument("school")
     collecting.add_argument("--course")
-    collecting.add_argument("--force", action="store_true", help="내용이 그대로여도 다시 추출")
+    collecting.add_argument("--limit", type=int, help="새로 처리할 학과 수")
+    collecting.add_argument("--force", action="store_true", help="이미 수집한 학과도 다시 추출")
+    reporting = commands.add_parser("report", help="학교의 학과별 결과 리포트")
+    reporting.add_argument("school")
     commands.add_parser("status", help="수집 현황")
     approving = commands.add_parser("approve", help="검토 대기 항목 공개")
     approving.add_argument("school")
@@ -355,21 +498,28 @@ def main(argv=None):
     importing.add_argument("file")
     args = parser.parse_args(argv)
     results = load_results()
-    if args.command == "collect":
-        sources = [source for source in load_sources() if (not args.school or source["school"] == args.school) and (not args.course or source["course"] == args.course)]
-        if not sources:
-            print(f"수집할 출처가 없습니다. {SOURCES_PATH}에 school,course,url을 적어 주세요.")
+    if args.command in ("collect", "report"):
+        if not any(program[0] == args.school for program in catalog().programs):
+            print(f"제공 대상에 없는 학교입니다: {args.school}")
             return 1
-        collect(sources, results, force=args.force)
-        save_results(results)
+        sources = [source for source in load_sources() if source["school"] == args.school and (args.command == "report" or not args.course or source["course"] == args.course)]
+        if args.command == "collect":
+            if not any(source["url"] for source in sources):
+                print(f"수집할 출처가 없습니다. {SOURCES_PATH}에 school,course,url을 적어 주세요.")
+                return 1
+            collect(sources, results, force=args.force, limit=args.limit)
+            save_results(results)
+            sources = [source for source in load_sources() if source["school"] == args.school]
+        rows = report_rows(args.school, sources, results)
+        path = write_report(args.school, rows)
+        print(summarize(rows))
+        print(f"리포트: {path}")
     elif args.command == "status":
-        counts = {}
-        for entry in results.values():
-            counts[entry.get("status", "error")] = counts.get(entry.get("status", "error"), 0) + 1
+        counts = Counter(entry.get("status", "error") for entry in results.values())
         print(f"전체 {len(results)}건 · " + " · ".join(f"{name} {count}" for name, count in sorted(counts.items())))
         for entry in results.values():
             if entry.get("status") != "verified" or entry.get("error"):
-                print(f"  [{entry.get('status')}] {entry['school']} {entry['course']} · 일치 {entry.get('match_ratio', 0):.0%} · {entry.get('error') or entry.get('note', '')}")
+                print(f"  [{entry.get('status')}] {entry['school']} {entry['course']} · 매칭률 {entry.get('match_ratio', 0):.0%} · {entry.get('error') or entry.get('note', '')}")
     elif args.command == "approve":
         entry = results.get(key_of(args.school, args.course))
         if not entry or entry.get("status") != "review":
@@ -383,7 +533,7 @@ def main(argv=None):
         with open(args.file, encoding="utf-8-sig", newline="") as file:
             count = import_rows(list(csv.DictReader(file)), results)
         save_results(results)
-        print(f"{count}개 학과의 편성표를 넣었습니다.")
+        print(f"{count}개 학과의 학년표를 넣었습니다.")
     return 0
 
 

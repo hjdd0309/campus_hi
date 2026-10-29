@@ -59,20 +59,28 @@ function before(rank, other) {
   return i >= 0 && rank[i] < other[i];
 }
 
-// 이론 수업 학년(years)마다 과목을 하나씩 고른다. 사람이 정해 둔 과목(picks)이 교과목에 있으면 그 과목을 쓰고,
+// 이론 수업 학년(years)마다 과목을 하나씩 고른다. 학교 홈페이지에서 모은 학년(subjectYears: 과목 → 학년)에 그 학년 과목이 있으면
+// 그 과목들 중에서만 고른다. 사람이 정해 둔 과목(picks)이 후보에 있으면(모은 학년과 어긋나지 않으면) 그 과목을 쓰고,
 // 없으면 연습 문제가 있는 과목, 그 학년에 보통 듣는 과목(levels), 앞 학년과 유형이 다른 연습 문제 순서로 고른다.
 // 나머지가 같으면 교과목 목록의 순서를 따르므로 같은 학과는 언제나 같은 과목이 나온다.
-export function pickLessons(curriculum, years = [1, 2], lessonGames = {}, levels = {}, picks = {}) {
+export function pickLessons(curriculum, years = [1, 2], lessonGames = {}, levels = {}, picks = {}, subjectYears = {}) {
   const picked = [];
   for (const year of years) {
-    const chosen = (picks[year] || []).find((subject) => curriculum.includes(subject) && !picked.some((item) => item.subject === subject));
+    // 교과목 목록 순서로(목록에 없는 과목은 뒤로) 두어 데이터의 키 순서와 상관없이 같은 과목이 나오게 한다.
+    const order = (subject) => (curriculum.includes(subject) ? curriculum.indexOf(subject) : curriculum.length);
+    const ofYear = Object.keys(subjectYears)
+      .filter((subject) => subjectYears[subject] === year)
+      .sort((a, b) => order(a) - order(b));
+    const pool = ofYear.length ? ofYear : curriculum;
+    const fits = (subject) => !Object.hasOwn(subjectYears, subject) || subjectYears[subject] === year;
+    const chosen = (picks[year] || []).find((subject) => pool.includes(subject) && fits(subject) && !picked.some((item) => item.subject === subject));
     if (chosen) {
       picked.push({ subject: chosen, game: gameFor(chosen, lessonGames) });
       continue;
     }
     let best = null;
-    curriculum.forEach((subject, index) => {
-      if (picked.some((item) => item.subject === subject)) return;
+    pool.forEach((subject, index) => {
+      if (!fits(subject) || picked.some((item) => item.subject === subject)) return;
       const game = gameFor(subject, lessonGames);
       const level = Object.hasOwn(levels, subject) ? levels[subject] : null;
       const rank = [game ? 0 : 1, distance(year, level), game && picked.some((item) => item.game === game) ? 1 : 0, index];

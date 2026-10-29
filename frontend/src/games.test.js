@@ -55,26 +55,29 @@ test("학과군 실습은 체험을 마쳐야 완료된다", () => {
 });
 test("게임 결과와 학년별 편성은 형식이 맞는 것만 복구한다", () => {
   const d = createDepartment("심리학과", "가천대학교", ["심리학개론"], "인문사회", {
-    terms: [
-      { year: 1, semester: 1, subjects: ["심리학개론", 3, ""] },
-      { year: 9, semester: 1, subjects: ["범위 밖"] },
-      { year: 2, semester: 5, subjects: ["학기 오류"] },
-      { year: 2, semester: 0, subjects: [] },
-    ],
+    subjects: { 심리학개론: 1, 범위밖: 9, 문자: "2", "": 1 },
     source_url: "javascript:alert(1)",
+    curriculum_year: "2026",
     checked_at: "2026-10-10",
   });
-  assert.deepEqual(d.yearly, {
-    terms: [{ year: 1, semester: 1, subjects: ["심리학개론"] }],
-    source_url: "",
-    checked_at: "2026-10-10",
-  });
+  assert.deepEqual(d.yearly, { subjects: { 심리학개론: 1 }, source_url: "", curriculum_year: null, checked_at: "2026-10-10" });
   assert.equal(cleanYears(null), null);
-  assert.equal(cleanYears({ terms: "x" }), null);
-  assert.equal(cleanYears({ terms: [] }), null);
-  assert.equal(
-    cleanYears({ terms: [{ year: 1, semester: 0, subjects: ["가"] }], source_url: "https://a.ac.kr/c" }).source_url,
-    "https://a.ac.kr/c",
+  assert.equal(cleanYears({ subjects: "x" }), null);
+  assert.equal(cleanYears({ subjects: {} }), null);
+  assert.equal(cleanYears({ subjects: ["가"] }), null);
+  assert.equal(cleanYears({ subjects: { 가: 1 }, source_url: "https://a.ac.kr/c" }).source_url, "https://a.ac.kr/c");
+  // 학기별 편성으로 저장된 예전 기록은 과목마다 가장 낮은 학년으로 합친다.
+  assert.deepEqual(
+    cleanYears({
+      terms: [
+        { year: 2, semester: 1, subjects: ["자료구조", 3, ""] },
+        { year: 1, semester: 2, subjects: ["자료구조", "이산구조"] },
+        { year: 9, semester: 1, subjects: ["범위 밖"] },
+        { year: 2, semester: 0, subjects: "x" },
+      ],
+      checked_at: "2026-10-10",
+    }).subjects,
+    { 자료구조: 1, 이산구조: 1 },
   );
   const restored = loadState({
     getItem: (key) =>

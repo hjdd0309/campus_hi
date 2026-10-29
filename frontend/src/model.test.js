@@ -18,10 +18,7 @@ import {
   recommendationScores,
   completeLesson,
   initialState,
-  withChoices,
-  chooseSubject,
   stageLabel,
-  CHOOSE_TITLE,
   skipLesson,
   isSkipped,
   progressOf,
@@ -95,33 +92,47 @@ test("마지막 학년은 졸업 과제, 그 앞 학년은 학과군 실습, 나
     assert.equal(d.lessons.at(-1), finalOf(d).name);
   }
 });
-test("검증된 학년별 편성이 있으면 그 학년의 과목으로 체험을 만든다", () => {
+test("검증된 과목별 학년이 있으면 그 학년의 과목으로 체험을 만든다", () => {
   const years = {
-    terms: [
-      { year: 1, semester: 1, subjects: ["프로그래밍기초", "이산수학"] },
-      { year: 2, semester: 1, subjects: ["컴퓨터구조"] },
-      { year: 2, semester: 2, subjects: ["자료구조"] },
-      { year: 3, semester: 0, subjects: ["운영체제"] },
-      { year: 4, semester: 1, subjects: ["캡스톤디자인"] },
-    ],
+    subjects: { 프로그래밍기초: 1, 컴퓨터구조: 2, 자료구조: 2, 운영체제: 3 },
     source_url: "https://example.ac.kr/c",
+    curriculum_year: 2026,
     checked_at: "2026-10-10",
   };
-  const curriculum = ["알고리즘", "프로그래밍기초", "자료구조", "운영체제"];
+  const curriculum = ["알고리즘", "프로그래밍기초", "자료구조", "운영체제", "컴퓨터구조"];
   const d = createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", years, "4년");
   assert.equal(d.lessonsFromYears, true);
   // 이론 학년(1·2학년)은 그 학년의 과목으로, 3학년은 학과군 실습이다(이름은 실습과 이어지는 과목인 알고리즘).
-  assert.deepEqual(d.lessons, ["프로그래밍기초", "컴퓨터구조", "알고리즘", "캡스톤 디자인"]);
+  assert.deepEqual(d.lessons, ["프로그래밍기초", "자료구조", "알고리즘", "캡스톤 디자인"]);
   assert.deepEqual(d.games, [null, null, "group:computing", null]);
-  // 이론 학년 중 하나라도 편성이 비어 있으면 학년을 지어내지 않고 교과목 목록에서 고른다.
-  const partial = { ...years, terms: years.terms.filter((term) => term.year !== 2) };
+  // 이론 학년 중 하나라도 모은 학년이 없으면 학년 배치를 추정한 것으로 보고, 그 학년은 교과목 목록에서 고른다.
+  const partial = { ...years, subjects: { 프로그래밍기초: 1, 운영체제: 3 } };
   const fallback = createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", partial, "4년");
   assert.equal(fallback.lessonsFromYears, false);
-  // 알고리즘은 이론 수업에 썼으므로 실습 학년은 다음 후보인 자료구조다.
-  assert.deepEqual(fallback.lessons, ["알고리즘", "프로그래밍기초", "자료구조", "캡스톤 디자인"]);
-  // 실습 학년의 편성은 없어도 된다.
-  const noThird = { ...years, terms: years.terms.filter((term) => term.year !== 3) };
+  // 2학년은 모은 학년과 어긋나지 않는 과목(1·3학년으로 알려진 과목 제외) 중에서 고른다.
+  assert.deepEqual(fallback.lessons.slice(0, 2), ["프로그래밍기초", "알고리즘"]);
+  // 실습 학년의 학년 정보는 없어도 된다.
+  const noThird = { ...years, subjects: { 프로그래밍기초: 1, 컴퓨터구조: 2 } };
   assert.equal(createDepartment("컴퓨터공학과", "가천대학교", curriculum, "공학", noThird, "4년").lessonsFromYears, true);
+});
+test("과목의 학년은 모은 학년 → 사람이 정한 과목 → 보통 듣는 학년 순서로 쓴다", () => {
+  const curriculum = ["객체지향프로그래밍", "데이터베이스", "컴퓨터구조", "이산구조", "운영체제"];
+  const games = { 데이터베이스: "blank", 컴퓨터구조: "ox", 이산구조: "match" };
+  // 사람이 2학년에 데이터베이스를 먼저 정해 두었고, 보통 듣는 학년도 2학년이다.
+  const picks = { 1: ["객체지향프로그래밍"], 2: ["데이터베이스", "컴퓨터구조"] };
+  const levels = { 데이터베이스: [2, 3], 컴퓨터구조: [2, 2], 이산구조: [1, 2] };
+  const guessed = createDepartment("컴퓨터공학과", "가나대학교", curriculum, "공학", null, "4년", "", games, levels, picks);
+  assert.deepEqual(guessed.lessons.slice(0, 2), ["객체지향프로그래밍", "데이터베이스"]);
+  // 학교 홈페이지에서 데이터베이스가 3학년이라고 모았으면 2학년에 쓰지 않고, 정해 둔 다음 후보(컴퓨터구조)를 쓴다.
+  const years = { subjects: { 객체지향프로그래밍: 1, 이산구조: 1, 컴퓨터구조: 2, 데이터베이스: 3 } };
+  const real = createDepartment("컴퓨터공학과", "가나대학교", curriculum, "공학", years, "4년", "", games, levels, picks);
+  assert.deepEqual(real.lessons.slice(0, 2), ["객체지향프로그래밍", "컴퓨터구조"]);
+  // 정해 둔 과목이 없으면 모은 학년의 과목 중 연습 문제가 있는 과목부터 고른다.
+  const noPicks = createDepartment("컴퓨터공학과", "가나대학교", curriculum, "공학", years, "4년", "", games, levels);
+  assert.deepEqual(noPicks.lessons.slice(0, 2), ["이산구조", "컴퓨터구조"]);
+  // 모은 학년이 있는 학과는 학년 배치를 추정했다고 알리지 않는다.
+  assert.equal(yearSubjects(real).estimated, false);
+  assert.equal(yearSubjects(guessed).estimated, true);
 });
 test("손상된 저장 데이터는 초기 상태로 복구하고 진행률 범위를 제한한다", () => {
   assert.deepEqual(loadState({ getItem: () => "{broken" }), initialState);
@@ -425,30 +436,24 @@ test("제휴 대학 표시는 새로고침 후에도 남고, true가 아닌 값�
   const restored = loadState(only(STORAGE_KEY, { ...structuredClone(initialState), catalog: [d, { ...d, id: "x", school: "가천대학교", partner: "true" }] }));
   assert.deepEqual(restored.catalog.map((item) => item.partner), [true, false]);
 });
-test("예시 제휴는 표시만 다르고 학기별 체험은 실제 제휴와 같으며, 예시 여부가 없는 옛 기록은 모름(null)으로 읽는다", () => {
-  const terms = [
-    { year: 1, semester: 1, subjects: ["자료구조"] },
-    { year: 1, semester: 2, subjects: ["운영체제"] },
-    { year: 2, semester: 1, subjects: ["알고리즘"] },
-    { year: 2, semester: 2, subjects: ["데이터베이스"] },
-  ];
+test("예시 제휴는 표시만 다르고 체험은 실제 제휴·제휴 아님과 같으며, 예시 여부가 없는 옛 기록은 모름(null)으로 읽는다", () => {
+  const years = { subjects: { 자료구조: 1, 운영체제: 2 } };
   const make = (partner, example) =>
-    createDepartment("컴퓨터공학과", "경희대학교", ["자료구조", "운영체제"], "공학", { terms }, "4년", "", null, null, null, partner, terms, example);
+    createDepartment("컴퓨터공학과", "경희대학교", ["자료구조", "운영체제"], "공학", years, "4년", "", null, null, null, partner, example);
   const example = make(true, true);
   const real = make(true, false);
   const none = make(false, true);
   assert.deepEqual([example.partnerExample, real.partnerExample, none.partnerExample], [true, false, false]);
   assert.deepEqual({ ...example, partnerExample: false }, real);
-  assert.equal(none.options, undefined);
+  assert.deepEqual({ ...example, partner: false, partnerExample: false }, none);
   // 저장했다 읽으면 그대로다.
   const restored = loadState(only(STORAGE_KEY, { ...structuredClone(initialState), catalog: [example, real, none] }));
   assert.deepEqual(restored.catalog.map((item) => [item.partner, item.partnerExample]), [[true, true], [true, false], [false, false]]);
-  // 예시 여부를 저장하기 전의 기록: 제휴였으면 모름(null), 아니면 false. 학기 자리는 그대로 다시 만든다.
+  // 예시 여부를 저장하기 전의 기록: 제휴였으면 모름(null), 아니면 false.
   const { partnerExample: _, ...old } = example;
   const before = loadState(only(STORAGE_KEY, { ...structuredClone(initialState), catalog: [old, { ...old, id: "x", partner: false }] }));
   assert.deepEqual(before.catalog.map((item) => item.partnerExample), [null, false]);
   assert.deepEqual(before.catalog[0].lessons, example.lessons);
-  assert.deepEqual(before.catalog[0].options, example.options);
 });
 test("어느 학교·학과든 만들 수 있고 계열에 맞는 기본 구성을 쓴다", () => {
   const d = createDepartment("컴퓨터공학과", "가천대학교", ["자료구조", "운영체제"], "공학", null, "4년");
@@ -485,168 +490,77 @@ test("저장된 학과 목록은 형식이 맞는 것만 복구한다", () => {
   assert.equal(restored.current, "api:가천대학교:컴퓨터공학과");
 });
 
-// 제휴 대학의 학기별 편성(경희대 컴퓨터공학과 편성의 일부).
+// 학기별 체험(2026-10-28~10-29)으로 저장된 제휴 학과: 이론 학년을 학기 자리(1-1·1-2·2-1·2-2)로 나눴었다.
 const TERMS = [
   { year: 1, semester: 1, subjects: ["선형대수", "객체지향프로그래밍", "이산구조"] },
   { year: 1, semester: 2, subjects: ["미분방정식", "객체지향프로그래밍"] },
   { year: 2, semester: 1, subjects: ["자료구조", "컴퓨터구조"] },
   { year: 2, semester: 2, subjects: ["자료구조", "논리회로"] },
-  { year: 3, semester: 1, subjects: ["운영체제", "알고리즘"] },
-  { year: 4, semester: 1, subjects: ["캡스톤디자인"] },
 ];
 const CS = ["알고리즘", "자료구조", "운영체제", "선형대수", "객체지향프로그래밍"];
-const GAMES = { 선형대수: "match", 객체지향프로그래밍: "match", 자료구조: "sort", 미분방정식: "match" };
-const semesterDept = (terms = TERMS, partner = true) =>
-  createDepartment("컴퓨터공학과", "경희대학교", CS, "공학", { terms }, "4년", "경기도", GAMES, null, null, partner, terms);
+const GAMES = { 선형대수: "match", 객체지향프로그래밍: "match", 자료구조: "sort" };
+const ID = "api:경희대학교:컴퓨터공학과";
+const semesterRecord = () => ({
+  id: ID,
+  name: "컴퓨터공학과",
+  school: "경희대학교",
+  curriculum: CS,
+  category: "공학",
+  duration: "4년",
+  region: "경기도",
+  yearly: { terms: TERMS, source_url: "https://ce.khu.ac.kr/c.pdf", checked_at: "2026-10-28" },
+  terms: TERMS,
+  yearNumbers: [1, 1, 2, 2, 3, 4],
+  semesters: [1, 2, 1, 2, 0, 0],
+  options: [...TERMS.map((term) => term.subjects), null, null],
+  lessons: ["선형대수", "미분방정식", "과목 고르기", "과목 고르기", "알고리즘", "캡스톤 디자인"],
+  games: [null, null, null, null, "group:computing", null],
+  lessonGames: GAMES,
+  partner: true,
+  partnerExample: true,
+});
 
-test("제휴 대학의 학기별 편성이 있으면 이론 학년을 학기 자리로 나누고, 실습·졸업 과제는 학년에 하나씩 둔다", () => {
-  const d = semesterDept();
-  assert.deepEqual(d.yearNumbers, [1, 1, 2, 2, 3, 4]);
-  assert.deepEqual(d.semesters, [1, 2, 1, 2, 0, 0]);
-  assert.deepEqual(d.options, [TERMS[0].subjects, TERMS[1].subjects, TERMS[2].subjects, TERMS[3].subjects, null, null]);
-  assert.deepEqual(d.lessons.slice(0, 4), Array(4).fill(CHOOSE_TITLE));
-  assert.deepEqual(d.games, [null, null, null, null, "group:computing", null]);
-  assert.equal(d.lessons[5], finalOf(d).name);
+test("학기 자리로 저장된 제휴 학과는 학년 자리로 옮기고, 같은 학년의 학기 기록은 합친다", () => {
+  const saved = {
+    ...structuredClone(initialState),
+    catalog: [semesterRecord()],
+    current: ID,
+    studying: ID,
+    // 1-1·1-2·2-1을 지났고(1-2는 휴강), 2-2를 하는 중이었다.
+    journeys: { [ID]: { completed: 3, paused: false, skipped: [1] } },
+    notes: { [`${ID}-0`]: "1-1 기록", [`${ID}-1`]: "1-2 기록", [`${ID}-2`]: "2-1 기록", [`${ID}-4`]: "실습 기록" },
+    drafts: { [`${ID}-3`]: "2-2 쓰던 글" },
+    plays: { [`${ID}-0`]: { game: "match", summary: "4쌍 중 4개" } },
+    choices: { [`${ID}-2`]: "컴퓨터구조" },
+  };
+  const restored = loadState(only(STORAGE_KEY, JSON.parse(JSON.stringify(saved))));
+  const d = restored.catalog[0];
+  assert.deepEqual(d.yearNumbers, [1, 2, 3, 4]);
+  assert.equal(d.semesters, undefined);
+  assert.equal(d.options, undefined);
+  assert.equal(d.lessons.length, 4);
+  assert.deepEqual([0, 1, 2, 3].map((i) => stageLabel(d, i)), ["1학년", "2학년", "3학년", "4학년"]);
+  // 예전 학기별 편성은 과목마다 가장 낮은 학년으로 읽어, 이론 학년은 그 학년의 과목으로 만든다.
   assert.equal(d.lessonsFromYears, true);
-  assert.deepEqual([0, 1, 4, 5].map((i) => stageLabel(d, i)), ["1학년 1학기", "1학년 2학기", "3학년", "4학년"]);
-  // 3년제는 이론 학년이 1학년뿐이다.
-  const three = createDepartment("컴퓨터공학과", "경희대학교", CS, "공학", null, "3년", "", GAMES, null, null, true, TERMS);
-  assert.deepEqual(three.yearNumbers, [1, 1, 2, 3]);
-  // 학기 구분이 없는 과목(0)은 그 학년의 모든 학기에 들어가고, 학기 구분이 없는 학년은 자리 하나다.
-  const mixed = semesterDept([
-    { year: 1, semester: 0, subjects: ["이산구조"] },
-    { year: 1, semester: 2, subjects: ["미분방정식"] },
-    { year: 2, semester: 0, subjects: ["자료구조", "논리회로"] },
-  ]);
-  assert.deepEqual(mixed.yearNumbers, [1, 2, 3, 4]);
-  assert.deepEqual(mixed.semesters, [2, 0, 0, 0]);
-  assert.deepEqual(mixed.options.slice(0, 2), [["미분방정식", "이산구조"], ["자료구조", "논리회로"]]);
-  assert.equal(stageLabel(mixed, 1), "2학년");
-});
-
-test("학기별 편성이 없거나 제휴 대학이 아니면 지금과 똑같은 학년별 체험이다", () => {
-  const plain = createDepartment("컴퓨터공학과", "경희대학교", CS, "공학", { terms: TERMS }, "4년", "경기도", GAMES);
-  // 제휴 대학이 아니면 편성을 받아도 쓰지 않는다.
-  assert.deepEqual(semesterDept(TERMS, false), plain);
-  // 편성이 없는 제휴 대학은 제휴 표시만 다르다.
-  const noTerms = createDepartment("컴퓨터공학과", "경희대학교", CS, "공학", { terms: TERMS }, "4년", "경기도", GAMES, null, null, true, null);
-  assert.deepEqual({ ...noTerms, partner: false }, plain);
-  assert.equal(noTerms.options, undefined);
-  assert.equal(noTerms.semesters, undefined);
-  assert.equal(stageLabel(plain, 0), "1학년");
-  // 이론 학년 중 하나라도 편성이 비어 있으면 학기 자리를 만들지 않는다.
-  const partial = semesterDept(TERMS.filter((term) => term.year !== 2));
-  assert.equal(partial.options, undefined);
-  assert.deepEqual(partial.yearNumbers, [1, 2, 3, 4]);
-  // 고른 과목을 반영해도 학기 자리가 없는 학과는 그대로다.
-  assert.equal(withChoices(plain, { [`${plain.id}-0`]: "자료구조" }), plain);
-});
-
-const enrolledState = (d, extra = {}) => ({
-  ...structuredClone(initialState),
-  catalog: [d],
-  current: d.id,
-  journeys: { [d.id]: { completed: 0, paused: false } },
-  ...extra,
-});
-
-test("학기 자리에서는 그 학기 편성 과목 중 하나를 고르고, 다른 학기에 고른 과목은 다시 고를 수 없다", () => {
-  const d = semesterDept();
-  let state = enrolledState(d);
-  // 편성에 없는 과목, 지금 자리가 아닌 자리는 고를 수 없다.
-  assert.equal(chooseSubject(state, d.id, 0, "운영체제"), state);
-  assert.equal(chooseSubject(state, d.id, 1, "미분방정식"), state);
-  state = chooseSubject(state, d.id, 0, "객체지향프로그래밍");
-  assert.deepEqual(state.choices, { [`${d.id}-0`]: "객체지향프로그래밍" });
-  const resolved = withChoices(d, state.choices);
-  assert.equal(resolved.lessons[0], "객체지향프로그래밍");
-  assert.equal(resolved.games[0], "match");
-  assert.deepEqual(resolved.chosen, [true, false, false, false, null, null]);
-  // 과목을 바꾸면 그 자리에서 해 둔 체험과 쓰던 기록을 지운다.
-  state = { ...state, plays: { [`${d.id}-0`]: { game: "match", summary: "4쌍 중 4개" } }, drafts: { [`${d.id}-0`]: "쓰던 글" } };
-  state = chooseSubject(state, d.id, 0, "이산구조");
-  assert.deepEqual([state.choices[`${d.id}-0`], state.plays, state.drafts], ["이산구조", {}, {}]);
-  assert.equal(withChoices(d, state.choices).games[0], null);
-  state = chooseSubject(state, d.id, 0, "객체지향프로그래밍");
-  state = { ...state, plays: { [`${d.id}-0`]: { game: "match", summary: "다 맞힘" } } };
-  state = completeLesson(state, d.id, 0, "");
-  assert.equal(state.journeys[d.id].completed, 1);
-  // 마친 자리의 과목은 바꿀 수 없다.
-  assert.equal(chooseSubject(state, d.id, 0, "선형대수"), state);
-  // 1학년 2학기에도 객체지향프로그래밍이 있지만 1학기에 골랐으므로 고를 수 없다.
-  assert.equal(chooseSubject(state, d.id, 1, "객체지향프로그래밍"), state);
-  assert.equal(chooseSubject(state, d.id, 1, "미분방정식").choices[`${d.id}-1`], "미분방정식");
-});
-
-test("학기 자리는 과목을 골라야 완료되고, 연습 문제가 있는 과목은 풀어야 완료된다", () => {
-  const d = semesterDept();
-  let state = enrolledState(d);
-  assert.equal(completeLesson(state, d.id, 0, ""), state);
-  state = chooseSubject(state, d.id, 0, "선형대수");
-  assert.equal(completeLesson(state, d.id, 0, "").journeys[d.id].completed, 0);
-  state = { ...state, plays: { [`${d.id}-0`]: { game: "match", summary: "4쌍 중 3개" } } };
-  assert.equal(completeLesson(state, d.id, 0, "행렬").journeys[d.id].completed, 1);
-  // 연습 문제가 없는 과목(이산구조)은 기본 체험으로 바로 완료할 수 있다.
-  let basic = chooseSubject(enrolledState(d), d.id, 0, "이산구조");
-  basic = completeLesson(basic, d.id, 0, "");
-  assert.equal(basic.journeys[d.id].completed, 1);
-});
-
-test("학기별 체험으로 입학부터 졸업까지 갈 수 있다", () => {
-  const d = semesterDept();
-  let state = enrolledState(d);
-  const picks = ["이산구조", "미분방정식", "컴퓨터구조", "논리회로"];
-  picks.forEach((subject, i) => {
-    state = chooseSubject(state, d.id, i, subject);
-    const game = withChoices(d, state.choices).games[i];
-    if (game) state = { ...state, plays: { ...state.plays, [`${d.id}-${i}`]: { game, summary: "다 풀었어요" } } };
-    state = completeLesson(state, d.id, i, `${i}학기 기록`);
-  });
-  assert.equal(state.journeys[d.id].completed, 4);
-  state = { ...state, plays: { ...state.plays, [`${d.id}-4`]: { game: "group:computing", summary: "정렬 완료" } } };
-  state = completeLesson(state, d.id, 4, "");
-  assert.equal(state.journeys[d.id].completed, 5);
-  // 졸업 과제는 마쳐야 완료된다.
-  assert.equal(completeLesson(state, d.id, 5, "").journeys[d.id].completed, 5);
-  state = finalOf(d).kind === "plan"
-    ? { ...state, capstones: { [d.id]: { topic: "주제", reason: "이유", method: "방법" } } }
-    : { ...state, artworks: { [d.id]: true } };
-  state = completeLesson(state, d.id, 5, "마치며");
-  assert.equal(state.journeys[d.id].completed, 6);
-  assert.deepEqual(withChoices(d, state.choices).lessons.slice(0, 4), picks);
-});
-
-test("학기별 학과와 고른 과목은 새로고침 뒤에도 그대로이고, 예전 v4 기록은 학년별 그대로 읽는다", () => {
-  const d = semesterDept();
-  const state = chooseSubject(enrolledState(d), d.id, 0, "선형대수");
-  const saved = JSON.parse(JSON.stringify(state));
-  const restored = loadState(only(STORAGE_KEY, saved));
-  assert.deepEqual(restored.catalog[0].yearNumbers, d.yearNumbers);
-  assert.deepEqual(restored.catalog[0].options, d.options);
-  assert.deepEqual(restored.choices, { [`${d.id}-0`]: "선형대수" });
-  // 편성에 없는 과목, 자리가 없는 번호, 다른 자리와 겹치는 과목, 문자열이 아닌 값은 버린다.
-  const broken = loadState(only(STORAGE_KEY, {
-    ...saved,
-    choices: { [`${d.id}-0`]: "선형대수", [`${d.id}-1`]: "없는과목", [`${d.id}-4`]: "운영체제", [`${d.id}-2`]: 3, "없는학과-0": "자료구조" },
-  }));
-  assert.deepEqual(broken.choices, { [`${d.id}-0`]: "선형대수" });
-  // 이 기능 전에 저장된 v4 기록(학과에 terms·choices가 없음)은 제휴 대학이어도 학년별 체험 그대로다.
-  const old = createDepartment("컴퓨터공학과", "경희대학교", CS, "공학", { terms: TERMS }, "4년", "경기도", GAMES, null, null, true);
-  const { terms, choices, ...before } = structuredClone(initialState);
-  const legacy = loadState(only(STORAGE_KEY, {
-    ...before,
-    catalog: [JSON.parse(JSON.stringify(old))],
-    current: old.id,
-    journeys: { [old.id]: { completed: 2, paused: false } },
-    notes: { [`${old.id}-1`]: "2학년 기록" },
-  }));
-  assert.equal(terms, undefined);
-  assert.ok(choices);
-  assert.deepEqual(legacy.catalog[0].lessons, old.lessons);
-  assert.equal(legacy.catalog[0].options, undefined);
-  assert.equal(legacy.journeys[old.id].completed, 2);
-  assert.deepEqual(legacy.notes, { [`${old.id}-1`]: "2학년 기록" });
-  assert.deepEqual(legacy.choices, {});
+  assert.deepEqual(d.yearly.subjects, { 선형대수: 1, 객체지향프로그래밍: 1, 이산구조: 1, 미분방정식: 1, 자료구조: 2, 컴퓨터구조: 2, 논리회로: 2 });
+  // 2학년의 학기를 다 마치지 않았으므로 1학년까지 마친 것으로 본다. 휴강한 1-2는 1학년 자리의 미이수로 남는다.
+  assert.deepEqual(restored.journeys[ID], { completed: 1, paused: false, skipped: [0] });
+  assert.deepEqual(restored.notes, { [`${ID}-0`]: "1-1 기록\n\n1-2 기록", [`${ID}-1`]: "2-1 기록", [`${ID}-2`]: "실습 기록" });
+  assert.deepEqual(restored.drafts, { [`${ID}-1`]: "2-2 쓰던 글" });
+  assert.deepEqual(restored.plays, { [`${ID}-0`]: { game: "match", summary: "4쌍 중 4개" } });
+  assert.equal("choices" in restored, false);
+  assert.equal(restored.current, ID);
+  // 졸업한 기록은 졸업 그대로, 첫 학기를 하던 기록은 처음 그대로다.
+  const graduated = loadState(only(STORAGE_KEY, { ...saved, journeys: { [ID]: { completed: 6, paused: false } } }));
+  assert.equal(graduated.journeys[ID].completed, 4);
+  const fresh = loadState(only(STORAGE_KEY, { ...saved, journeys: { [ID]: { completed: 0, paused: true } } }));
+  assert.deepEqual(fresh.journeys[ID], { completed: 0, paused: true });
+  // 학기 자리의 실습(4번)을 하던 기록은 실습 학년(2번)을 하던 것으로 옮긴다.
+  const practicing = loadState(only(STORAGE_KEY, { ...saved, journeys: { [ID]: { completed: 4, paused: false } } }));
+  assert.equal(practicing.journeys[ID].completed, 2);
+  // 학년 자리로 옮긴 기록을 다시 저장했다 읽어도 그대로다.
+  const again = loadState(only(STORAGE_KEY, JSON.parse(JSON.stringify(restored))));
+  assert.deepEqual([again.catalog[0].lessons, again.journeys, again.notes], [d.lessons, restored.journeys, restored.notes]);
 });
 
 test("휴강하면 미이수로 남기고 다음 자리로 넘어가며, 쓰던 기록과 체험은 그대로 둔다", () => {
@@ -701,21 +615,6 @@ test("미이수 과목은 다시 들어 완료하면 이수로 바뀌고, 진행
   assert.equal(done.journeys.design.completed, TOTAL);
 });
 
-test("학기 자리는 과목을 고른 뒤에만 휴강할 수 있고, 다시 들을 때도 고른 과목 그대로다", () => {
-  const d = semesterDept();
-  let state = enrolledState(d);
-  assert.equal(skipLesson(state, d.id, 0), state);
-  state = chooseSubject(state, d.id, 0, "이산구조");
-  state = skipLesson(state, d.id, 0);
-  assert.deepEqual(state.journeys[d.id].skipped, [0]);
-  assert.equal(state.choices[`${d.id}-0`], "이산구조");
-  const game = withChoices(d, state.choices).games[0];
-  if (game) state = { ...state, plays: { ...state.plays, [`${d.id}-0`]: { game, summary: "다 풀었어요" } } };
-  state = completeLesson(state, d.id, 0, "");
-  assert.deepEqual(state.journeys[d.id].skipped, []);
-  assert.equal(state.journeys[d.id].completed, 1);
-});
-
 test("미이수 기록은 새로고침 뒤에도 남고, 이 필드가 없던 예전 기록은 미이수 없이 그대로 읽는다", () => {
   const saved = loadState(only(STORAGE_KEY, { journeys: { design: { completed: 3, paused: false, skipped: [1, 1, 2, 3, -1, "0", 0.5] } } }));
   assert.deepEqual(saved.journeys.design, { completed: 3, paused: false, skipped: [1, 2] });
@@ -751,23 +650,13 @@ test("학년별 과목: 체험하는 과목은 열림, 그 학년의 다른 교�
   assert.equal(new Set(all).size, all.length);
   const yearOf = (subject) => list.years.find((item) => item.others.includes(subject))?.year;
   for (const subject of all) assert.equal(yearOf(subject), levels[subject][0]);
-  // 학년별 편성을 확보한 학과는 그 편성의 학년을 그대로 쓴다.
-  const years = { terms: [{ year: 1, semester: 1, subjects: ["프로그래밍기초", "미적분학"] }, { year: 2, semester: 1, subjects: ["컴퓨터구조", "확률통계"] }] };
+  // 학교 홈페이지에서 모은 학년이 있는 학과는 그 학년을 그대로 쓴다.
+  const years = { subjects: { 프로그래밍기초: 1, 미적분학: 1, 컴퓨터구조: 2, 확률통계: 2 } };
   const exact = createDepartment("컴퓨터공학과", "가나대학교", ["프로그래밍기초", "미적분학", "컴퓨터구조", "확률통계"], "공학", years, "4년");
   const exactList = yearSubjects(exact);
   assert.equal(exactList.estimated, false);
   assert.deepEqual(exactList.years[0].others, ["미적분학"]);
   assert.deepEqual(exactList.years[1].others, ["확률통계"]);
-  // 학기마다 과목을 고르는 제휴 학과는 학기별 편성의 과목을 학년마다 보여주고, 아직 고르지 않은 자리("과목 고르기")는 넣지 않는다.
-  const semester = semesterDept();
-  const semesterList = yearSubjects(semester);
-  assert.equal(semesterList.estimated, false);
-  assert.deepEqual(semesterList.years[0], { year: 1, open: [], others: ["선형대수", "객체지향프로그래밍", "이산구조", "미분방정식"] });
-  assert.ok(!semesterList.years.flatMap((item) => item.open).some((item) => item.title === CHOOSE_TITLE));
-  // 고른 과목은 체험 과목으로 먼저 나오고, 다른 과목 목록에서는 빠진다.
-  const picked = withChoices(semester, { [`${semester.id}-0`]: "이산구조" });
-  assert.deepEqual(yearSubjects(picked).years[0].open, [{ index: 0, title: "이산구조" }]);
-  assert.ok(!yearSubjects(picked).years[0].others.includes("이산구조"));
 });
 
 test("궁금해요는 학교·학과·과목마다 한 번만 남고, 저장했다 불러와도 형식이 맞는 것만 남는다", () => {
@@ -824,7 +713,7 @@ test("서비스 예시 안내는 예시 제휴 학교가 하나라도 보일 때
   assert.equal(showsExampleNote([plain, example]), true);
   assert.equal(showsExampleNote([{ partner: true, partnerExample: null }]), false);
   // 저장된 학과(학과 상세)도 같은 기준이다.
-  const d = createDepartment("간호학과", "경희대학교", ["기본간호학"], "", null, "4년", "", null, null, null, true, null, true);
+  const d = createDepartment("간호학과", "경희대학교", ["기본간호학"], "", null, "4년", "", null, null, null, true, true);
   assert.equal(showsExampleNote([d]), true);
   assert.equal(partnerBadge(d.partner, d.partnerExample), "제휴 학교");
 });
@@ -861,17 +750,13 @@ test("홈의 이 학년 과목은 2·3·4·6년제 모두 학년이 맞고, 다�
       if (year > 4) assert.deepEqual(home.others, []);
     });
   }
-  // 학기마다 과목을 고르는 제휴 학과는 지금 과목만 보여준다.
-  const partner = homeSubjects(semesterDept(), { completed: 0, paused: false });
-  assert.equal(partner.others.length, 0);
-  assert.equal(partner.main.index, 0);
   assert.equal(homeSubjects(null, null), null);
 });
 
 test("제휴 학교도 학과 상세에는 학년별 과목을 보여주지만, 홈에는 '제휴하면 열리는' 과목을 두지 않는다", () => {
   const levels = { 약물학: [2, 3], 생화학: [1, 2], 약제학: [2, 2], 유기화학: [1, 1], 물리약학: [1, 2], 약품분석학: [2, 2], 생리학: [1, 1], 미생물학: [2, 2] };
   const curriculum = ["약물학", "생화학", "약제학", "약학개론", "유기화학", "물리약학", "약품분석학", "생리학", "미생물학"];
-  const partner = createDepartment("약학과", "경희대학교", curriculum, "의학", null, "6년", "", null, levels, null, true, null, true);
+  const partner = createDepartment("약학과", "경희대학교", curriculum, "의학", null, "6년", "", null, levels, null, true, true);
   assert.ok(yearSubjects(partner).years.some((item) => item.others.length > 0));
   assert.deepEqual(homeSubjects(partner, { completed: 1, paused: false }).others, []);
   const plain = createDepartment("약학과", "가나대학교", curriculum, "의학", null, "6년", "", null, levels);

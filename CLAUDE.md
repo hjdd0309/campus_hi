@@ -56,7 +56,7 @@
 
 서비스 이름은 캠퍼스하이다. 대학 학과·학교·교과과정을 탐색하고 학년별 체험으로 전공을 미리 경험하는 웹 서비스다.
 
-체험은 학과의 수업연한만큼 학년마다 하나씩 있다(4년제 1~4학년, 2년제 1~2학년, 전공심화는 4학년에서 끝남). 마지막 학년은 졸업 과제, 그 바로 앞 학년은 학과군 전공 실습, 나머지 학년은 이론 수업(과목 하나)이다(`frontend/src/model.js`의 `createDepartment`). 학과는 학과명 규칙으로 16개 학과군에 들어가고(`groups.js`), 실습과 졸업 과제는 학과군 데이터(`groupData.js`)로 정한다. 실습 학년은 교과목에 실습과 이어지는 과목(`groups.js`의 `PRACTICE_SUBJECTS`, 예: 컴퓨터·AI → 알고리즘·자료구조)이 있으면 그 과목 이름으로 보여주고, 하는 활동은 학과군 실습 그대로다. 학과군 데이터가 공개(verified)되지 않았으면 실습 자리도 이론 수업으로, 졸업 과제는 계열에 맞는 기본 과제(`finals`)로 채운다. 이론 수업은 검증된 학년별 편성이 있으면 그 학년의 과목을, 없으면 교과목 목록에서 연습 문제가 있는 과목 중 그 학년에 보통 듣는 과목(`data/subject_levels.json`의 학년 범위)부터 고르고 화면에 실제 학년과 다를 수 있다고 알린다. 특정 학과의 이론 수업 과목을 사람이 정해야 하면 코드가 아니라 `backend/data/lesson_picks.json`에 넣는다(규칙보다 먼저 쓰인다). 이미 입학한 학과는 입학할 때 정한 수업을 바꾸지 않는다. 제휴 대학은 `backend/data/partners.json`에 있다. 경희대학교는 "제휴하면 이렇게 보인다"는 예시(`example: true`, 화면 뱃지는 "제휴 학교"이고 "* 제휴 학교 표시는 서비스 예시입니다" 안내를 함께 띄움)이고, 실제 제휴 대학은 `example` 없이 추가한다. 예시도 검색 맨 위 배치·학기별 편성·과목 고르기는 실제 제휴와 똑같이 동작한다. 제휴 대학이고 학기별 편성(`terms`)이 있는 학과는 이론 학년을 학기 자리로 나누고(4년제면 1-1·1-2·2-1·2-2, 실습·졸업 과제는 학년에 하나씩), 학기마다 그 학기 편성 과목 중 하나를 사용자가 고른다(`model.js`의 `semesterSlots`·`chooseSubject`, 고른 과목은 `state.choices`).
+체험은 학과의 수업연한만큼 학년마다 하나씩 있다(4년제 1~4학년, 2년제 1~2학년, 전공심화는 4학년에서 끝남). 마지막 학년은 졸업 과제, 그 바로 앞 학년은 학과군 전공 실습, 나머지 학년은 이론 수업(과목 하나)이다(`frontend/src/model.js`의 `createDepartment`). 학과는 학과명 규칙으로 16개 학과군에 들어가고(`groups.js`), 실습과 졸업 과제는 학과군 데이터(`groupData.js`)로 정한다. 실습 학년은 교과목에 실습과 이어지는 과목(`groups.js`의 `PRACTICE_SUBJECTS`, 예: 컴퓨터·AI → 알고리즘·자료구조)이 있으면 그 과목 이름으로 보여주고, 하는 활동은 학과군 실습 그대로다. 학과군 데이터가 공개(verified)되지 않았으면 실습 자리도 이론 수업으로, 졸업 과제는 계열에 맞는 기본 과제(`finals`)로 채운다. 이론 수업의 과목 학년은 학교 홈페이지에서 모은 과목별 학년(`data/year_curricula.json`, 학기 구분 없음) → 사람이 정한 과목(`backend/data/lesson_picks.json`) → 보통 듣는 학년(`data/subject_levels.json`) 순서로 쓴다(`games.js`의 `pickLessons`). 모은 학년이 이론 학년을 모두 채우지 못하면 화면에 실제 학년과 다를 수 있다고 알린다. 특정 학과의 이론 수업 과목을 사람이 정해야 하면 코드가 아니라 `lesson_picks.json`에 넣는다. 이미 입학한 학과는 입학할 때 정한 수업을 바꾸지 않는다. 제휴 대학은 `backend/data/partners.json`에 있다. 경희대학교는 "제휴하면 이렇게 보인다"는 예시(`example: true`, 화면 뱃지는 "제휴 학교"이고 "* 제휴 학교 표시는 서비스 예시입니다" 안내를 함께 띄움)이고, 실제 제휴 대학은 `example` 없이 추가한다. 예시도 검색 맨 위 배치는 실제 제휴와 똑같이 동작한다. 학기별 과목 고르기는 2026-10-29에 없앴고(사용자 결정), 그때 학기 자리로 저장된 기록은 불러올 때 학년 자리로 옮긴다(`loadState`).
 
 대상은 전국 학부 과정 전체다(대학원 제외, 교과목이 등록된 학교·학과만. 자유·자율전공, 교양 과정, 1년 과정은 학년별 체험을 만들 수 없어 제외). 데이터에는 학년 정보가 없으므로, 학년별 수업은 실제 학년 편성 데이터를 확보한 학교·학과에만 표시하고 추정으로 채우지 않는다. 데이터 범위와 API 형식은 `backend/SOURCE.md`에 있다.
 
@@ -65,7 +65,7 @@
   - 화면은 402×874 아트보드에 절대 좌표로 배치하고, 창 크기에 맞게 통째로 확대·축소한다. 휴대폰(폭 520px 미만)에서는 폭을 꽉 채우고 아트보드 높이가 화면에 따라 달라지므로(`App.jsx`의 `fit`), 아래에 붙는 버튼·탭바는 `Screen`의 `footer`로, 가운데에 둘 것은 `Center`로 넘기고, 내용이 길면 `h`를 줘서 스크롤되게 한다(`ui.jsx`). 새 화면을 만들 때도 시안의 부품(`T`, `OutlineButton`, `Header` 등)과 등장 모션 클래스(`a-up`, `a-pop`, `a-fade`, `a-drop`, `a-shake`)를 쓴다. 길이를 알 수 없는 글(학교·학과 이름)은 `T`의 `clip`으로 자른다.
   - 시안에 있던 가짜 요소는 넣지 않는다: 기기 상태바(9:41), 홈 인디케이터, "김이름" 같은 고정 이름, 고정된 진행률·리포트 문구. 실제 데이터로 채운다.
 - `backend/`: FastAPI. `main.py` 하나에 API가 있고, 데이터는 `data/courses.csv.gz`를 읽는다. 데이터 출처는 `backend/SOURCE.md`에 있다.
-- `backend/pipeline.py`: 학교 홈페이지에서 학년별 편성을 모아 `data/year_curricula.json`에 저장하는 수집 도구. 서버는 이 파일의 검증된 항목만 내보낸다.
+- `backend/pipeline.py`: 학교 이름을 받아 그 학교 학과들의 교육과정 페이지에서 과목별 학년을 모으고, 원본 교과목명에 맞춰 `data/year_curricula.json`에 저장하는 수집 도구(출처는 `data/year_sources.csv`, 리포트는 `data/year_reports/`). 서버는 이 파일의 검증된 항목만 내보낸다.
 - `frontend/src/experiences.js`, `Templates.jsx`: 체험 틀(A 문지르기, B 순서, C 분류, D 반응 실험, F 계획 조립, G AI 가르치기)의 형식 검사·채점과 화면, 그리고 학과군 데이터가 바탕으로 쓰는 체험(버블 정렬, 분개, 졸업 과제 5종). G는 컴퓨터·AI 졸업 과제로, 그림 카드로 작은 AI(결정 그루터기)를 실제로 학습시키며 결과를 미리 정해 두지 않는다. 체험은 틀을 늘리지 않고 데이터를 더해 늘린다.
 - `frontend/src/groups.js`, `groupData.js`: 학과 → 학과군(16개) 분류 규칙과 학과군별 실습·졸업 과제 데이터. 체험 내용(응급도 분류 기준, 법 분야, 회계 처리 등)은 사실과 맞아야 하므로 고칠 때 근거를 확인하고, AI가 쓴 데이터는 쓰지 않은 별도 에이전트의 검토를 통과한 뒤에만 `status: "verified"`로 바꾼다. `games.js`는 이론 수업에 쓸 과목 고르기다.
 - `frontend/src/lessonGames.js`, `TypedGames.jsx`, `backend/lesson_games.py`: 이론 수업에 붙는 유형별 연습 문제(빈칸 채우기, OX, 순서 맞추기, 짝 맞추기, 분류하기). 문제는 미리 만들어 `backend/data/lesson_games.jsonl`에 넣고 서버는 검증된 것만 내보낸다. 연습 문제가 없거나 받지 못하면 기본 체험(관찰 과제)으로 진행한다.
@@ -79,7 +79,7 @@
 | 환경 준비만 | `npm run setup` |
 | 프론트 테스트 | `npm test` |
 | 백엔드 테스트 | `backend/.venv/Scripts/python -m unittest backend.test_api backend.test_pipeline backend.test_lesson_games backend.test_subject_levels` (`backend/requirements-test.txt`, `backend/requirements-pipeline.txt` 설치 필요) |
-| 학년별 교육과정 수집 | `backend/.venv/Scripts/python -m backend.pipeline collect` (`ANTHROPIC_API_KEY` 필요, 사용법은 `README.md`) |
+| 학년별 교육과정 수집 | `backend/.venv/Scripts/python -m backend.pipeline collect 학교명` (`ANTHROPIC_API_KEY` 필요, 사용법은 `README.md`) |
 | 연습 문제 현황 | `backend/.venv/Scripts/python -m backend.lesson_games status` |
 | 과목 학년 범위 현황 | `backend/.venv/Scripts/python -m backend.subject_levels status` (사용법은 파일 맨 위 설명) |
 | 프로덕션 빌드 | `npm run build` |

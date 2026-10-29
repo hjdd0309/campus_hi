@@ -151,24 +151,26 @@ HTTPS와 요청 빈도 제한은 서버 앞단(호스팅 플랫폼이나 리버�
 
 ## 학년별 교육과정 수집
 
-원본 데이터에는 학년 정보가 없어서, 학교 홈페이지의 교육과정 페이지에서 학년·학기별 편성을 따로 모읍니다. 수집 도구는 `backend/pipeline.py`이고 결과는 `backend/data/year_curricula.json`에 쌓입니다. 검증을 통과한 학과만 화면의 "교육과정" 탭에 학년별 수업으로 나오고, 나머지 학과는 지금처럼 교과목 목록만 보여줍니다.
+원본 데이터에는 학년 정보가 없어서, 학교 홈페이지의 교육과정 페이지에서 과목마다 권장 학년을 따로 모읍니다(학기는 구분하지 않음). 과목명은 원본 교과목명에 맞춰 저장하고, 맞추지 못한 과목은 `unmatched`에, 여러 학년에 걸친 과목은 가장 낮은 학년으로 넣고 `multi_year`에 적습니다. 학과마다 출처 주소, 교육과정 적용 연도, 수집 날짜를 함께 저장합니다. 수집 도구는 `backend/pipeline.py`이고 결과는 `backend/data/year_curricula.json`에 쌓입니다. 검증을 통과한 학과만 화면의 "교육과정" 탭에 학년별 수업으로 나오고, 나머지 학과는 지금처럼 교과목 목록만 보여줍니다.
 
-1. `backend/data/year_sources.csv`에 `school,course,url`을 한 줄씩 적습니다. 학교명과 학과명은 서비스에 나오는 이름과 똑같아야 하고, 주소는 그 학과의 학년별 편성표가 있는 페이지나 PDF여야 합니다.
+1. `backend/data/year_sources.csv`에 `school,course,url`을 한 줄씩 적습니다. 학교명과 학과명은 서비스에 나오는 이름과 똑같아야 하고, 주소는 그 학과의 과목별 학년이 적힌 페이지나 PDF여야 합니다. 출처를 못 찾은 학과는 url을 비워 둡니다(추측해서 넣지 않음).
 2. Anthropic API 키를 `ANTHROPIC_API_KEY` 환경변수로 넣고 수집을 실행합니다.
 
 ```
 backend/.venv/Scripts/python -m pip install -r backend/requirements-pipeline.txt
-backend/.venv/Scripts/python -m backend.pipeline collect      # 전체. --school, --course로 일부만
-backend/.venv/Scripts/python -m backend.pipeline status       # 현황과 실패·검토 대기 목록
+backend/.venv/Scripts/python -m backend.pipeline collect 경희대학교            # 그 학교의 출처가 있는 학과 전체
+backend/.venv/Scripts/python -m backend.pipeline collect 경희대학교 --limit 3  # 아직 수집하지 않은 학과 중 3개만
+backend/.venv/Scripts/python -m backend.pipeline report 경희대학교             # 학과별 리포트만 다시 만들기
+backend/.venv/Scripts/python -m backend.pipeline status                       # 현황과 실패·검토 대기 목록
 ```
 
-수집은 페이지를 받아 내용이 지난번과 같으면 건너뛰고, 바뀐 페이지만 다시 추출합니다. 학교가 편성을 바꾸면 같은 명령을 다시 돌리면 됩니다. 추출한 과목 중 기존 교과목 목록에도 있는 과목이 절반 이상이면 바로 공개(`verified`)하고, 그보다 낮으면 검토 대기(`review`)로 두어 화면에 내보내지 않습니다. 검토 대기 항목은 출처 페이지와 직접 비교한 뒤 공개합니다.
+이미 수집한 학과(공개·검토 대기·편성 없음)는 다시 돌리지 않고, 오류가 난 학과와 출처 주소가 바뀐 학과만 다시 돌립니다. 학교가 편성을 바꿔 다시 뽑으려면 `--force`를 붙입니다. 원본 교과목에 맞춘 비율(매칭률)이 절반 이상이고 마지막 학년 앞의 학년이 모두 채워지면 바로 공개(`verified`, 리포트의 "성공")하고, 아니면 검토 대기(`review`, "부분 성공")로 두어 화면에 내보내지 않습니다. 편성이 없거나 받기·추출에 실패하면 "실패"입니다. 실행이 끝나면 학과별 결과, 매칭률, 토큰 수와 비용, 걸린 시간을 `backend/data/year_reports/학교.csv`에 남기고 요약을 출력합니다. 검토 대기 항목은 출처 페이지와 직접 비교한 뒤 공개합니다.
 
 ```
 backend/.venv/Scripts/python -m backend.pipeline approve 경희대학교 산업디자인학과
 ```
 
-홈페이지에 편성표가 없거나 읽을 수 없는 학과는 직접 정리한 CSV(`school,course,year,semester,subject`, 학기 구분이 없으면 0)로 넣을 수 있습니다.
+홈페이지에 편성표가 없거나 읽을 수 없는 학과는 직접 정리한 CSV(`school,course,year,subject`, 선택으로 `url`, `curriculum_year`)로 넣을 수 있습니다.
 
 ```
 backend/.venv/Scripts/python -m backend.pipeline import 편성표.csv

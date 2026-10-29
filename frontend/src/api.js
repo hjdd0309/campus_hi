@@ -116,7 +116,8 @@ export async function getCurriculum(school, course, signal) {
       "교육과정 형식이 올바르지 않아요. 다시 시도해주세요.",
     ),
     category: typeof data.category === "string" ? data.category : "",
-    years: data.years ?? null,
+    // 학교 홈페이지에서 모은 과목별 학년. 없거나 형식이 틀리면 null.
+    years: cleanYears(data.years),
     duration: typeof data.duration === "string" ? data.duration : "",
     region: typeof data.region === "string" ? data.region : "",
     games: cleanLessonGames(data.games),
@@ -124,8 +125,6 @@ export async function getCurriculum(school, course, signal) {
     picks: cleanPicks(data.picks),
     partner: data.partner === true,
     partnerExample: data.partner === true && data.partner_example === true,
-    // 제휴 대학의 학년·학기별 편성. 제휴 대학이 아니거나 편성 데이터가 없으면 null.
-    terms: cleanYears({ terms: data.terms })?.terms ?? null,
   };
 }
 // 과목의 연습 문제를 받는다. 문제가 없으면 404, 받은 문제의 형식이 맞지 않으면 422 오류를 낸다.

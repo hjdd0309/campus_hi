@@ -191,43 +191,36 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response.json()
 
-    def test_partner_with_terms_gets_year_and_semester_subjects(self):
+    def test_verified_department_gets_subject_years(self):
         result = self.curriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과")
-        self.assertIs(result["partner"], True)
-        terms = result["terms"]
-        self.assertGreater(len(terms), 0)
-        for term in terms:
-            self.assertEqual(set(term), {"year", "semester", "subjects"})
-            self.assertTrue(1 <= term["year"] <= 4)
-            self.assertIn(term["semester"], (0, 1, 2))
-            self.assertTrue(term["subjects"] and all(isinstance(subject, str) and subject for subject in term["subjects"]))
-        self.assertEqual([(term["year"], term["semester"]) for term in terms], sorted({(term["year"], term["semester"]) for term in terms}))
-        # 학년별 체험에 쓰는 years와 같은 편성이다.
-        self.assertEqual(result["years"]["terms"], terms)
-        # 편성에만 있는 과목도 연습 문제 유형을 함께 보낸다(화면이 학기마다 연습 문제가 있는 과목을 표시한다).
-        from backend.main import compact, lesson_games
-        planned = {subject for term in terms for subject in term["subjects"]}
-        self.assertEqual({subject for subject in result["games"] if subject in planned}, {subject for subject in planned if compact(subject) in lesson_games()})
-
-    def test_partner_without_terms_works_as_before(self):
-        result = self.curriculum("경희대학교", "산업디자인학과")
-        self.assertIs(result["partner"], True)
+        years = result["years"]
+        self.assertEqual(set(years), {"subjects", "source_url", "curriculum_year", "checked_at"})
+        self.assertTrue(years["source_url"].startswith("https://"))
+        self.assertEqual(years["curriculum_year"], 2026)
+        # 과목명은 원본 교과목명 그대로이고, 학년은 수업연한 안의 정수다. 학기 구분은 없다.
+        self.assertGreater(len(years["subjects"]), 0)
+        self.assertTrue(set(years["subjects"]) <= set(result["curriculum_list"]))
+        self.assertTrue(all(isinstance(year, int) and 1 <= year <= 4 for year in years["subjects"].values()))
+        self.assertEqual((years["subjects"]["객체지향프로그래밍"], years["subjects"]["컴퓨터구조"], years["subjects"]["데이터베이스"]), (1, 2, 3))
         self.assertNotIn("terms", result)
+
+    def test_department_without_year_data_gets_none(self):
+        result = self.curriculum("경희대학교", "산업디자인학과")
         self.assertIsNone(result["years"])
+        self.assertNotIn("terms", result)
         self.assertGreater(len(result["curriculum_list"]), 0)
 
-    def test_non_partner_never_gets_terms(self):
+    def test_year_data_is_sent_regardless_of_partnership_and_only_for_real_subjects(self):
         from unittest import mock
-        result = self.curriculum("서울대학교", "전기·정보공학부")
-        self.assertIs(result["partner"], False)
-        self.assertNotIn("terms", result)
-        # 검증된 편성이 있어도 제휴 대학이 아니면 terms는 보내지 않는다(학년별 체험용 years는 그대로).
-        entry = {"school": "서울대학교", "course": "전기·정보공학부", "url": "https://example.ac.kr/c", "checked_at": "2026-10-28", "status": "verified", "years": [{"year": 1, "semester": 1, "subjects": ["회로이론"]}]}
+        entry = {"school": "서울대학교", "course": "전기·정보공학부", "url": "https://example.ac.kr/c", "curriculum_year": None, "checked_at": "2026-10-28", "status": "verified", "subjects": {"없는과목": 1}}
         with mock.patch("backend.main.year_curricula", return_value={("서울대학교", "전기·정보공학부"): entry}):
+            # 교과목에 없는 과목만 있으면 보내지 않는다.
+            self.assertIsNone(self.curriculum("서울대학교", "전기·정보공학부")["years"])
+            subject = self.curriculum("서울대학교", "전기·정보공학부")["curriculum_list"][0]
+            entry["subjects"] = {subject: 2, "없는과목": 1}
             result = self.curriculum("서울대학교", "전기·정보공학부")
         self.assertIs(result["partner"], False)
-        self.assertNotIn("terms", result)
-        self.assertEqual(result["years"]["terms"], entry["years"])
+        self.assertEqual(result["years"], {"subjects": {subject: 2}, "source_url": "https://example.ac.kr/c", "curriculum_year": None, "checked_at": "2026-10-28"})
 
     def test_school_and_program_lists_mark_partners(self):
         schools = self.client.post("/api/school_list", json={"course": "산업디자인학과"}).json()["school_list"]
@@ -277,20 +270,13 @@ class ApiTests(unittest.TestCase):
         # 실제 제휴와 예시 제휴 모두 맨 위에 온다(그 안은 이름순).
         self.assertEqual([item["school"] for item in schools[:2]], ["경희대학교", "고려대학교"])
         self.assertEqual([fields(item) for item in schools[:2]], [example, real])
-        # 예시 제휴도 학기별 편성(terms)을 실제 제휴와 똑같이 받는다.
         khu = self.curriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과")
         self.assertEqual(fields(khu), example)
-        self.assertGreater(len(khu["terms"]), 0)
         self.assertEqual(fields(self.curriculum("고려대학교", "컴퓨터학과")), real)
         self.assertEqual(fields(self.curriculum("가천대학교", "컴퓨터공학과")), none)
-        # 같은 편성을 실제 제휴 학교에 두어도 똑같이 보낸다.
-        self.use_partners({"경희대학교": {"since": "2026-10-28"}})
-        same = self.curriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과")
-        self.assertEqual(fields(same), real)
-        self.assertEqual(same["terms"], khu["terms"])
-        # 제휴 목록이 비면 아무도 제휴가 아니고 terms도 없다.
+        # 과목별 학년은 제휴 여부와 상관없이 같다.
         self.use_partners({})
-        self.assertNotIn("terms", self.curriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과"))
+        self.assertEqual(self.curriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과")["years"], khu["years"])
 
     def test_partner_file_drops_bad_entries(self):
         self.use_partners({
