@@ -730,9 +730,9 @@ export function progressOf(journey, total) {
 
 // 학년마다 보여줄 과목: [{ year, open: [{ index, title }], locked: [과목] }]. open은 체험하는 자리, locked는 그 학년의 다른 교과목이다.
 // 학년별 편성을 확보한 학과는 그 편성을, 아니면 과목을 보통 듣기 시작하는 학년(levels)을 쓰고, 학년을 모르는 과목은 넣지 않는다.
-// 학기마다 편성 과목을 고르는 제휴 학과는 잠긴 과목이 없으므로 null이다.
+// 제휴 학교는 "제휴하면 열리는" 과목이 없으므로 null이다(학기마다 편성 과목을 고르는 학과도 여기에 든다).
 export function yearSubjects(d) {
-  if (!d?.school || d.options) return null;
+  if (!d?.school || d.options || d.partner) return null;
   const used = new Set(d.lessons);
   const fromYears = !!d.lessonsFromYears && !!d.yearly;
   const ofYear = (year) =>
@@ -759,6 +759,22 @@ export const partnerBadge = (partner, example) => (partner === true && example !
 export const cardTone = (partner) => (partner === true ? "cream" : "white");
 // 예시 제휴 학교가 하나라도 보이면 안내 문구를 띄운다(실제 제휴만 있으면 띄우지 않는다).
 export const showsExampleNote = (items) => items.some((item) => item?.partner === true && item.partnerExample === true);
+
+// 홈의 "이 학년 때 이런 과목을 들어요": 지금 자리의 학년(year), 지금 체험하는 과목(main, done은 마쳤는지),
+// 같은 학년의 다른 교과목(others, 제휴 대학 전용으로 보여준다). 다른 교과목을 알 수 없으면(학기별 제휴 학과, 5·6학년 등) others는 비어 있다.
+export function homeSubjects(d, journey) {
+  if (!d?.lessons?.length) return null;
+  const { completed, finished } = progressOf(journey, d.lessons.length);
+  const index = Math.min(completed, d.lessons.length - 1);
+  const year = d.yearNumbers[index];
+  const list = yearSubjects(d);
+  return {
+    year,
+    main: { index, title: d.lessons[index], done: finished },
+    others: list?.years.find((item) => item.year === year)?.locked || [],
+    estimated: !!list?.estimated,
+  };
+}
 
 // 잠긴 과목에 남긴 "궁금해요". 같은 학교·학과·과목은 한 번만 남긴다.
 const CURIOUS_LIMIT = 500;

@@ -33,6 +33,7 @@ import {
   partnerBadge,
   cardTone,
   showsExampleNote,
+  homeSubjects,
 } from "./model.js";
 
 const TOTAL = departments[0].lessons.length;
@@ -814,4 +815,53 @@ test("서비스 예시 안내는 예시 제휴 학교가 하나라도 보일 때
   const d = createDepartment("간호학과", "경희대학교", ["기본간호학"], "", null, "4년", "", null, null, null, true, null, true);
   assert.equal(showsExampleNote([d]), true);
   assert.equal(partnerBadge(d.partner, d.partnerExample), "제휴 학교");
+});
+
+test("홈의 이 학년 과목: 지금 체험하는 과목과 같은 학년의 다른 교과목이고, 학년이 올라가면 바뀐다", () => {
+  const curriculum = ["자료구조", "운영체제", "이산수학", "선형대수", "컴퓨터네트워크", "미적분학", "확률통계", "프로그래밍입문", "졸업연구"];
+  const levels = { 자료구조: [2, 3], 운영체제: [3, 4], 이산수학: [1, 2], 선형대수: [1, 1], 컴퓨터네트워크: [3, 3], 미적분학: [1, 1], 확률통계: [1, 2], 프로그래밍입문: [1, 1] };
+  const d = createDepartment("컴퓨터공학과", "가나대학교", curriculum, "공학", null, "4년", "", { 자료구조: "ox", 이산수학: "blank" }, levels);
+  const first = homeSubjects(d, { completed: 0, paused: false });
+  assert.equal(first.year, 1);
+  assert.deepEqual(first.main, { index: 0, title: d.lessons[0], done: false });
+  assert.ok(!first.others.includes(d.lessons[0]));
+  assert.ok(first.others.every((subject) => levels[subject][0] === 1));
+  assert.equal(first.estimated, true);
+  // 학년이 올라가면 그 학년의 과목으로 바뀐다.
+  const second = homeSubjects(d, { completed: 1, paused: false });
+  assert.equal(second.year, 2);
+  assert.equal(second.main.title, d.lessons[1]);
+  assert.ok(second.others.every((subject) => levels[subject][0] === 2));
+  // 졸업하면 마지막 자리가 완료로 남는다.
+  const done = homeSubjects(d, { completed: d.lessons.length, paused: false });
+  assert.deepEqual([done.year, done.main.index, done.main.done], [4, d.lessons.length - 1, true]);
+});
+
+test("홈의 이 학년 과목은 2·3·4·6년제 모두 학년이 맞고, 다른 과목을 모르면 지금 과목만 있다", () => {
+  const levels = { 기본간호학: [1, 1], 성인간호학: [2, 3], 아동간호학: [2, 2] };
+  for (const [duration, years] of [["2년", [1, 2]], ["3년", [1, 2, 3]], ["4년", [1, 2, 3, 4]], ["6년", [1, 2, 3, 4, 5, 6]]]) {
+    const d = createDepartment("간호학과", "가나대학교", ["기본간호학", "성인간호학", "아동간호학", "보건의료법규"], "의학", null, duration, "", null, levels);
+    years.forEach((year, completed) => {
+      const home = homeSubjects(d, { completed, paused: false });
+      assert.equal(home.year, year, `${duration} ${completed}`);
+      assert.equal(home.main.title, d.lessons[completed]);
+      assert.ok(Array.isArray(home.others));
+      if (year > 4) assert.deepEqual(home.others, []);
+    });
+  }
+  // 학기마다 과목을 고르는 제휴 학과는 지금 과목만 보여준다.
+  const partner = homeSubjects(semesterDept(), { completed: 0, paused: false });
+  assert.equal(partner.others.length, 0);
+  assert.equal(partner.main.index, 0);
+  assert.equal(homeSubjects(null, null), null);
+});
+
+test("제휴 학교는 학기별 편성이 없어도 '제휴하면 열리는' 잠긴 과목을 보여주지 않는다", () => {
+  const levels = { 약물학: [2, 3], 생화학: [1, 2], 약제학: [2, 2], 유기화학: [1, 1], 물리약학: [1, 2], 약품분석학: [2, 2], 생리학: [1, 1], 미생물학: [2, 2] };
+  const curriculum = ["약물학", "생화학", "약제학", "약학개론", "유기화학", "물리약학", "약품분석학", "생리학", "미생물학"];
+  const partner = createDepartment("약학과", "경희대학교", curriculum, "의학", null, "6년", "", null, levels, null, true, null, true);
+  assert.equal(yearSubjects(partner), null);
+  assert.deepEqual(homeSubjects(partner, { completed: 1, paused: false }).others, []);
+  const plain = createDepartment("약학과", "가나대학교", curriculum, "의학", null, "6년", "", null, levels);
+  assert.ok(yearSubjects(plain).years.some((item) => item.locked.length > 0));
 });

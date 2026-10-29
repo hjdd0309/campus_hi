@@ -44,6 +44,7 @@ import {
   partnerBadge,
   cardTone,
   showsExampleNote,
+  homeSubjects,
 } from "./model.js";
 import { isLessonType, lessonTypes } from "./lessonGames.js";
 import LessonGame, { useLessonGame } from "./Games.jsx";
@@ -135,7 +136,7 @@ function useLockedSubject(d, state, setState) {
 
 const SHOWN_SUBJECTS = 4;
 /** 학년별 과목 목록. 체험하는 과목은 열림(✅), 그 학년의 다른 교과목은 잠김(🔒)으로 보여준다. 많으면 4개까지 보이고 더 보기로 펼친다. */
-function YearSubjects({ d, years, locked, title = true }) {
+function YearSubjects({ d, years, locked }) {
   const [opened, setOpened] = useState({});
   return (
     <div className="grid gap-[16px]">
@@ -144,12 +145,10 @@ function YearSubjects({ d, years, locked, title = true }) {
         const shown = more ? names.slice(0, SHOWN_SUBJECTS) : names;
         return (
           <section key={year} aria-label={`${year}학년 과목`}>
-            {title && (
-              <span className="inline-flex h-[28px] w-[47px] items-center justify-center rounded-full border border-mint text-[13px] font-semibold text-mint">
-                {year}학년
-              </span>
-            )}
-            <ul className={`grid gap-[6px] ${title ? "mt-[8px]" : ""}`}>
+            <span className="inline-flex h-[28px] w-[47px] items-center justify-center rounded-full border border-mint text-[13px] font-semibold text-mint">
+              {year}학년
+            </span>
+            <ul className="mt-[8px] grid gap-[6px]">
               {open.map(({ index, title: name }) => (
                 <li key={`open-${index}`} className="flex min-h-[44px] items-center gap-[8px] rounded-[12px] border border-mint bg-mint-soft px-[12px] py-[8px]">
                   <span aria-hidden="true">✅</span>
@@ -186,6 +185,61 @@ function YearSubjects({ d, years, locked, title = true }) {
   );
 }
 const ESTIMATED_NOTE = "잠긴 과목의 학년은 보통 듣는 시기를 기준으로 했어요. 실제 편성과 다를 수 있고, 학년을 알 수 없는 과목은 넣지 않았어요.";
+
+/**
+ * 홈의 "이 학년 때 이런 과목을 들어요". 첫 카드는 지금 체험하는 과목(누르면 수업으로), 나머지는 같은 학년의 다른 교과목으로
+ * 제휴 대학 전용(노란 제휴 배지, 누르면 제휴 안내 창)이다. 많으면 4개까지 보이고 더 보기로 펼친다.
+ */
+function HomeSubjects({ subjects, locked, onOpen }) {
+  const [opened, setOpened] = useState(false);
+  const { year, main, others, estimated } = subjects;
+  const more = others.length > SHOWN_SUBJECTS && !opened;
+  const shown = more ? others.slice(0, SHOWN_SUBJECTS) : others;
+  return (
+    <section aria-labelledby="home-subjects">
+      <h2 id="home-subjects" className="text-[15px] font-bold leading-[22px] text-ink-2">
+        {`${year}학년 때 이런 과목을 들어요`}
+      </h2>
+      <ul className="mt-[10px] grid gap-[8px]">
+        <li>
+          <button
+            onClick={onOpen}
+            aria-label={`${main.title}, ${main.done ? "완료" : "체험하기"}`}
+            className="pressable flex min-h-[52px] w-full items-center gap-[10px] rounded-[12px] border border-mint bg-mint-soft px-[14px] py-[8px] text-left"
+          >
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink-2">{main.title}</span>
+            <span className="shrink-0 text-[12.5px] font-semibold text-mint-deep">{main.done ? "완료 ✓" : "체험하기"}</span>
+          </button>
+        </li>
+        {shown.map((name) => {
+          const left = locked.curious(name);
+          return (
+            <li key={name}>
+              <button
+                onClick={() => locked.open(name)}
+                aria-label={`${name}, 제휴 대학 전용 과목${left ? ", 궁금해요 남김" : ""}`}
+                className="pressable flex min-h-[52px] w-full items-center gap-[10px] rounded-[12px] border border-cream-line bg-cream px-[14px] py-[8px] text-left active:bg-cream-2"
+              >
+                <span className="min-w-0 flex-1 truncate text-[14px] text-ink-3">{name}</span>
+                {left ? (
+                  <span className="shrink-0 text-[12px] font-semibold text-mint-deep">궁금해요 남김 ✓</span>
+                ) : (
+                  <span className="flex h-[20px] shrink-0 items-center rounded-full bg-sun px-[8px] text-[11px] font-semibold text-ink-2">제휴</span>
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {more && (
+        <button className="text-button mt-[8px]" onClick={() => setOpened(true)}>
+          {`더 보기 (${others.length - SHOWN_SUBJECTS}개)`}
+        </button>
+      )}
+      {estimated && others.length > 0 && <p className="footnote">학년은 보통 듣는 시기를 기준으로 했어요. 실제 편성과 다를 수 있어요.</p>}
+    </section>
+  );
+}
 
 /** 가장 최근에 입학한 학과의 id. 입학한 학과가 없으면 null. */
 function latestJourney(state) {
@@ -1370,26 +1424,28 @@ function taskKind(d, index) {
   return lessonTypes[id]?.title || "직접 해보고 느낀 점 기록하기";
 }
 
-/** 아직 열리지 않은 과제. 누르면 언제 열리는지 잠깐 알려준다. */
-function TaskCard({ top, title, sub, hint, onClick, d }) {
+/**
+ * 아직 순서가 오지 않은 과제. 누르면 언제 열리는지 잠깐 알려준다.
+ * 제휴 잠금과 헷갈리지 않게 자물쇠 대신 오른쪽에 "{N}학년에 열려요"를 회색 글씨로 적는다.
+ */
+function TaskCard({ top, title, sub, opens, hint, onClick, d }) {
   return (
     <button
       onClick={onClick}
-      aria-label={`${title}, ${sub}, 잠김`}
+      aria-label={`${title}, ${sub}, ${opens}에 열려요`}
       className="pressable a-up absolute left-[21px] h-[69px] w-[365px] rounded-[10px] border border-[#a4acb6] bg-chalk text-left"
       style={{ top, animationDelay: `${d}s` }}
     >
       <Mask src={icon.eye} w={19} h={19} color="#827d76" className="absolute left-[14px] top-[25px]" />
-      <T y={19} size={14} left={45} clip={280} className="font-semibold text-ink-2">
+      <T y={19} size={14} left={45} clip={215} className="font-semibold text-ink-2">
         {title}
       </T>
-      <T key={hint || "sub"} y={41.5} size={10.5} left={45.5} clip={280} className={hint ? "a-shake text-mint-deep" : "text-ink-3"}>
+      <T key={hint || "sub"} y={41.5} size={10.5} left={45.5} clip={hint ? 300 : 215} className={hint ? "a-shake text-mint-deep" : "text-ink-3"}>
         {hint || sub}
       </T>
-      <svg className="absolute right-[16px] top-[25px]" width="15" height="19" viewBox="0 0 15 19" fill="none" aria-hidden="true">
-        <rect x="1" y="8" width="13" height="10" rx="2.5" stroke="#a4acb6" strokeWidth="1.6" />
-        <path d="M4 8V5.5a3.5 3.5 0 0 1 7 0V8" stroke="#a4acb6" strokeWidth="1.6" />
-      </svg>
+      <T y={20.5} size={11} right={14} className="text-gray">
+        {`${opens}에 열려요`}
+      </T>
     </button>
   );
 }
@@ -1412,6 +1468,19 @@ export function Home({ active, nav, state, setState }) {
   const [hint, setHint] = useState(null);
   const hintTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(hintTimer.current), []);
+  // 지금 학년의 과목 목록. 길이가 정해져 있지 않아(더 보기, 긴 이름) 그려진 높이를 재서 아래 목록을 그만큼 내린다.
+  const locked = useLockedSubject(v?.journey ? v.d : null, state, setState);
+  const subjects = v?.journey ? homeSubjects(v.d, v.journey) : null;
+  const section = useRef(null);
+  const [sectionH, setSectionH] = useState(0);
+  useLayoutEffect(() => {
+    if (!section.current) return;
+    const update = () => setSectionH(section.current?.offsetHeight || 0);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(section.current);
+    return () => observer.disconnect();
+  }, [!!subjects]);
   useGuard(!!v?.journey || !!fallback, nav, active);
   if (!v?.journey) return null;
   const { d, total, completed, index, year, finished, skipped, passed } = v;
@@ -1427,13 +1496,16 @@ export function Home({ active, nav, state, setState }) {
   const label = stageLabel(d, index);
   // 지금 과제 다음에 남은 과제(최대 2개).
   const upcoming = finished ? [] : d.lessons.map((lesson, i) => ({ lesson, i })).slice(index + 1, index + 3);
+  // 시작 버튼 아래(524)에 지금 학년의 과목 목록을 두고, 그 아래 목록(남은 과제, 휴강한 과목)은 목록 높이만큼 내린다.
+  const shift = subjects && sectionH ? sectionH + 12 : 0;
   // 남은 과제 아래에 휴강한(미이수) 과목을 다시 들을 수 있게 둔다.
-  const listEnd = upcoming.length ? 565 + upcoming.length * 84 : 615;
+  const listEnd = (upcoming.length ? 565 + upcoming.length * 84 : 615) + shift;
   return (
     <Screen
       h={skipped.length ? listEnd + 52 + skipped.length * 84 : listEnd}
       foot={739}
       veil={false}
+      overlay={locked.overlay}
       footer={<TabBar active="home" nav={nav} />}
     >
       <Mask src={icon.cap} w={24} h={18} color="#087f77" className="absolute left-[23px] top-[59px]" />
@@ -1489,17 +1561,31 @@ export function Home({ active, nav, state, setState }) {
           {finished ? "졸업 리포트 보기" : choosing ? `${label} 과목 고르기` : `${d.lessons[index]} ${completed ? "이어하기" : "시작하기"}`}
         </span>
       </button>
-      <T y={535.5} size={15} left={21} className="a-up font-bold text-ink-2" style={delay(0.36)}>
+      {subjects && (
+        <div ref={section} className="a-up absolute left-[21px] w-[365px]" style={{ top: 524, ...delay(0.33) }}>
+          <HomeSubjects key={`${d.id}-${subjects.year}`} subjects={subjects} locked={locked} onOpen={open} />
+        </div>
+      )}
+      <T y={535.5 + shift} size={15} left={21} className="a-up font-bold text-ink-2" style={delay(0.36)}>
         졸업까지 남은 과제
       </T>
       {upcoming.map(({ lesson, i }, n) => (
-        <TaskCard key={i} top={565 + n * 84} d={0.42 + n * 0.06} title={lesson} sub={`${stageLabel(d, i)} · ${taskKind(d, i)}`} hint={hint?.i === i ? hint.text : ""} onClick={() => tellLocked(i)} />
+        <TaskCard
+          key={i}
+          top={565 + shift + n * 84}
+          d={0.42 + n * 0.06}
+          title={lesson}
+          sub={taskKind(d, i)}
+          opens={stageLabel(d, i)}
+          hint={hint?.i === i ? hint.text : ""}
+          onClick={() => tellLocked(i)}
+        />
       ))}
       <p className="sr-only" role="status">
         {hint?.text}
       </p>
       {upcoming.length === 0 && (
-        <T y={585} size={13} left={21} className="a-up text-ink-3" style={delay(0.42)}>
+        <T y={585 + shift} size={13} left={21} className="a-up text-ink-3" style={delay(0.42)}>
           {finished ? "모든 과제를 마쳤어요." : "지금 하는 과제가 마지막이에요."}
         </T>
       )}
@@ -1620,7 +1706,6 @@ export function Lesson({ active, nav, route, state, setState }) {
   const [shake, setShake] = useState(0);
   // 휴강 확인 창을 띄웠는지.
   const [skipping, setSkipping] = useState(false);
-  const locked = useLockedSubject(ok ? v.d : null, state, setState);
   const timer = useRef(0);
   const scroller = useRef(null);
   const heading = useRef(null);
@@ -1733,10 +1818,6 @@ export function Lesson({ active, nav, route, state, setState }) {
   };
   const next = d.lessons[index + 1];
   const written = !!draft.trim();
-  // 배우기 단계 아래에 보여줄 이 학년의 과목(체험하는 과목은 열림, 다른 교과목은 잠김).
-  const subjects = yearSubjects(d);
-  const found = subjects?.years.find((item) => item.year === year);
-  const yearList = found && { ...found, open: found.open.filter((item) => item.index === index) };
 
   let body;
   let action;
@@ -1786,15 +1867,6 @@ export function Lesson({ active, nav, route, state, setState }) {
           <button className="text-button a-up mt-[14px]" onClick={() => nav.replace("choose")} style={delay(0.16)}>
             다른 과목 고르기 →
           </button>
-        )}
-        {yearList?.locked.length > 0 && (
-          <section className="a-up mt-[26px]" style={delay(0.18)}>
-            <h2 className="text-[15px] font-bold leading-[22px] text-ink-2">{`${year}학년의 다른 과목`}</h2>
-            <div className="mt-[8px]">
-              <YearSubjects d={d} years={[yearList]} locked={locked} title={false} />
-            </div>
-            {subjects.estimated && <p className="footnote">{ESTIMATED_NOTE}</p>}
-          </section>
         )}
       </>
     );
@@ -1915,12 +1987,7 @@ export function Lesson({ active, nav, route, state, setState }) {
   return (
     <Screen
       foot={700}
-      overlay={
-        <>
-          {skipDialog}
-          {locked.overlay}
-        </>
-      }
+      overlay={skipDialog}
       footer={
         <>
           {/* 이전 단계(첫 단계에서는 없음)와 휴강. 주 버튼과 구분되게 글씨 버튼으로 둔다. */}
