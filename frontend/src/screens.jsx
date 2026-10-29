@@ -16,6 +16,7 @@ import {
   T,
   Dialog,
   Toast,
+  SchoolLogo,
 } from "./ui.jsx";
 import { getCurriculum, getProgramList } from "./api.js";
 import {
@@ -905,31 +906,11 @@ export function Schools({ nav, route, setState }) {
 /* 08 · 학과 상세                                                      */
 /* ------------------------------------------------------------------ */
 
-// 교표 이미지는 출처를 확인한 경희대학교 것만 있다. 다른 학교는 이름 첫 글자로 그린다(다른 학교 로고는 넣지 않는다).
-const isKhu = (school) => school.startsWith("경희대학교");
-// 이모지 등 두 칸짜리 문자도 반쪽이 나지 않게 문자 단위로 자른다.
-const initialOf = (school) => (Array.from(school.trim())[0] || "").toUpperCase();
-
-function SchoolLogo({ name }) {
-  if (isKhu(name)) return <img src={img.khuLogo} alt="경희대학교 로고" className="h-full w-full" />;
-  return (
-    <div className="flex h-full w-full items-center justify-center">
-      <div className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-mint/60 text-[26px] font-bold text-mint">
-        {initialOf(name)}
-      </div>
-    </div>
-  );
-}
-
 /** 입학증·성적표·졸업증명서의 도장. 위치와 크기는 세 화면이 같고, 등장 모션은 화면마다 넘겨받는다. */
-function SchoolSeal({ school, className, style }) {
-  const box = `${className} absolute left-[112px] top-[308px] h-[40px] w-[53px]`;
-  if (isKhu(school)) return <img src={img.seal} alt="" className={box} style={style} />;
+function SchoolSeal({ d, className, style }) {
   return (
-    <div aria-hidden="true" className={`${box} flex items-center justify-center`} style={style}>
-      <div className="flex h-[40px] w-[40px] items-center justify-center rounded-full border-2 border-mint/70 text-[18px] font-bold leading-none text-mint">
-        {initialOf(school)}
-      </div>
+    <div className={`${className} absolute left-[112px] top-[308px] h-[40px] w-[53px]`} style={style}>
+      <SchoolLogo school={d.school} partner={d.partner} kind="seal" size={40} />
     </div>
   );
 }
@@ -1008,7 +989,7 @@ export function Detail({ active, nav, state, setState }) {
       <BackButton onClick={nav.back} />
       <div className="a-up absolute left-[20px] top-[116px] h-[112px] w-[362px] rounded-[16px] border border-cream-line bg-cream">
         <div className="absolute left-[11px] top-[21px] h-[72px] w-[108px]">
-          <SchoolLogo name={d.school} />
+          <SchoolLogo school={d.school} partner={d.partner} />
         </div>
         <T y={27} size={d.school.length > 9 ? 16 : 21} left={135.5} className="flex items-center gap-[6px] font-semibold text-slate" style={{ maxWidth: 215 }}>
           <NameWithBadge partner={d.partner} example={d.partnerExample}>{d.school}</NameWithBadge>
@@ -1136,7 +1117,7 @@ export function Enrolled({ active, nav, state }) {
       <Statement y={210} d={0.9}>
         {`위 사람은 ${d.school} ${d.name}의\n진로 체험을 시작할 수 있음을 증명합니다`}
       </Statement>
-      <SchoolSeal school={d.school} className="a-pop" style={delay(1.1)} />
+      <SchoolSeal d={d} className="a-pop" style={delay(1.1)} />
     </CertificateShell>
   );
 }
@@ -1203,7 +1184,7 @@ export function Grades({ active, nav, state }) {
           </ul>
         )}
         <BottomSign d={d} wait={0.7} />
-        <SchoolSeal school={d.school} className="a-fade" style={delay(0.8)} />
+        <SchoolSeal d={d} className="a-fade" style={delay(0.8)} />
         {!missed && (
           <img
             src={img.gradeAplus}
@@ -1247,7 +1228,7 @@ export function Diploma({ active, nav, state }) {
         )}
       </Statement>
       <BottomSign d={d} wait={0.95} />
-      <SchoolSeal school={d.school} className="a-pop" style={delay(1.15)} />
+      <SchoolSeal d={d} className="a-pop" style={delay(1.15)} />
     </CertificateShell>
   );
 }

@@ -1,5 +1,38 @@
-import React, { useEffect, useId, useRef } from "react";
-import { confetti, icon } from "./assets.js";
+import React, { useEffect, useId, useRef, useState } from "react";
+import { confetti, icon, img } from "./assets.js";
+import { avatarColor, logoImage, schoolInitials } from "./logos.js";
+
+/**
+ * 학교 로고. 제휴 학교이고 로고 이미지가 있으면 이미지를, 아니면(또는 이미지를 불러오지 못하면) 원 안에 학교 이름 앞 두 글자를 쓴
+ * 텍스트 아바타를 그린다. 상자 크기는 부르는 쪽이 정하고, size는 아바타 원의 지름이다.
+ * kind가 seal이면 증명서 도장 이미지를 쓰고, 도장은 꾸밈이라 화면 낭독기에 읽히지 않게 둔다.
+ */
+export function SchoolLogo({ school, partner, kind = "logo", size = 64, className = "", style }) {
+  const name = logoImage(school, partner, kind);
+  const src = name ? img[name] : null;
+  // 불러오지 못한 이미지 주소. 학교가 바뀌면 다시 시도한다.
+  const [failed, setFailed] = useState(null);
+  if (src && failed !== src)
+    return (
+      <img
+        src={src}
+        alt={kind === "seal" ? "" : `${school} 로고`}
+        onError={() => setFailed(src)}
+        className={`h-full w-full ${className}`}
+        style={style}
+      />
+    );
+  return (
+    <div aria-hidden="true" className={`flex h-full w-full items-center justify-center ${className}`} style={style}>
+      <div
+        className="flex items-center justify-center rounded-full border border-black/5 font-bold leading-none tracking-[-0.04em] text-ink-2"
+        style={{ width: size, height: size, background: avatarColor(school), fontSize: Math.round(size * 0.34) }}
+      >
+        {schoolInitials(school)}
+      </div>
+    </div>
+  );
+}
 
 /** 뽑아낸 아이콘을 CSS 마스크로 그려 색을 입힐 수 있게 한다. */
 export function Mask({ src, w, h, color = "currentColor", className = "", style }) {
