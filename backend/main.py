@@ -395,7 +395,7 @@ def program_list(body: ProgramRequest):
     found = [(school, course, school_text, course_text) for school, course, school_text, course_text, key, category in data.pairs
              if matches(key, category) and all(word in school_text for word in school_words) and all(word in course_text for word in course_words)]
     school_query, course_query = "".join(school_words), "".join(course_words)
-    # 검색 결과 안의 제휴 대학(예시 포함)을 맨 위에 둔다(화면은 "제휴"·"제휴 예시"를 함께 표시한다). 검색어에 걸리지 않은 제휴 대학을 끼워 넣지는 않는다.
+    # 검색 결과 안의 제휴 대학(예시 포함)을 맨 위에 둔다(화면은 "제휴 학교" 배지를 함께 표시한다). 검색어에 걸리지 않은 제휴 대학을 끼워 넣지는 않는다.
     # 그다음 검색어와 이름이 같은 것, 검색어로 시작하는 것을 먼저 보여준다(학교가 먼저, 그 안에서 학과). 나머지는 원래 순서를 지킨다.
     partner_schools = partners()
     found.sort(key=lambda item: (

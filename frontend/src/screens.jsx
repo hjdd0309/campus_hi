@@ -39,6 +39,11 @@ import {
   yearSubjects,
   addCurious,
   isCurious,
+  PARTNER_LABEL,
+  PARTNER_EXAMPLE_NOTE,
+  partnerBadge,
+  cardTone,
+  showsExampleNote,
 } from "./model.js";
 import { isLessonType, lessonTypes } from "./lessonGames.js";
 import LessonGame, { useLessonGame } from "./Games.jsx";
@@ -467,14 +472,13 @@ function TagPill({ children }) {
   );
 }
 
-// 제휴 대학 표시. 제휴 대학은 검색 결과 맨 위에 오므로, 왜 위에 있는지 보이도록 이름 옆에 늘 붙인다.
-// 예시 제휴는 실제 제휴로 오해하지 않게 "제휴 예시"로 적는다.
-function PartnerBadge({ example }) {
+// 제휴 학교 표시. 제휴 학교는 검색 결과 맨 위에 오므로, 왜 위에 있는지 보이도록 이름 옆에 늘 붙인다.
+// 글은 하나만 둔다(보이는 글과 읽어 주는 글을 따로 두면 글을 읽어 가는 곳에서 두 번 나온다).
+// 예시 제휴라는 것은 배지가 아니라 목록·화면의 안내 문구(PARTNER_EXAMPLE_NOTE)로 알린다.
+function PartnerBadge() {
   return (
     <span className="flex h-[18px] shrink-0 items-center whitespace-nowrap rounded-full border border-mint bg-mint-soft px-[6px] text-[10px] font-semibold leading-none text-mint-deep">
-      {/* flex 안에서는 글 조각 앞뒤 공백이 사라지므로 보이는 글과 읽어 주는 글을 따로 둔다. */}
-      <span aria-hidden="true">{example ? "제휴 예시" : "제휴"}</span>
-      <span className="sr-only">{example ? "제휴 대학 예시" : "제휴 대학"}</span>
+      {PARTNER_LABEL}
     </span>
   );
 }
@@ -484,16 +488,21 @@ function NameWithBadge({ partner, example, children }) {
   return (
     <>
       <span className="min-w-0 truncate">{children}</span>
-      {partner && example !== null && <PartnerBadge example={example} />}
+      {partnerBadge(partner, example) && <PartnerBadge />}
     </>
   );
 }
 
-function YellowCard({ top, title, partner = false, example = false, sub, onClick, className = "", style }) {
+// 노란 카드. tone이 white면 흰 카드(검색 결과에서 제휴가 아닌 학교)다.
+const TONES = {
+  cream: "border-cream-line bg-cream active:bg-cream-2",
+  white: "border-line bg-white active:bg-chalk",
+};
+function YellowCard({ top, title, partner = false, example = false, tone = "cream", sub, onClick, className = "", style }) {
   return (
     <button
       onClick={onClick}
-      className={`pressable absolute left-[20px] h-[80px] w-[362px] rounded-[16px] border border-cream-line bg-cream text-left active:bg-cream-2 ${className}`}
+      className={`pressable absolute left-[20px] h-[80px] w-[362px] rounded-[16px] border text-left ${TONES[tone]} ${className}`}
       style={{ top, ...style }}
     >
       <T y={20} size={16} left={15.5} className="flex items-center gap-[6px] font-semibold text-slate" style={{ maxWidth: 330 }}>
@@ -690,6 +699,7 @@ export function Schools({ nav, route, setState }) {
         title={`${p.school} ${p.course}`}
         partner={p.partner}
         example={p.partnerExample}
+        tone={cardTone(p.partner)}
         sub={
           opening === key
             ? "불러오는 중이에요…"
@@ -765,6 +775,11 @@ export function Schools({ nav, route, setState }) {
       <T y={349} size={16} left={29} className="a-up font-medium text-slate" style={delay(0.2)}>
         {status === "ready" ? `학교·학과 ${total.toLocaleString()}곳을 찾았어요` : "관심 분야를 통해 관련 학교를 추천해드려요"}
       </T>
+      {status === "ready" && showsExampleNote([...similar.programs, ...list]) && (
+        <T y={371} size={10.5} left={30} className="a-fade text-gray" style={delay(0.24)}>
+          {PARTNER_EXAMPLE_NOTE}
+        </T>
+      )}
       <div
         onScroll={(e) => {
           const el = e.currentTarget;
@@ -962,6 +977,11 @@ export function Detail({ active, nav, state, setState }) {
           {`${d.region ? `${d.region}에 있는 학교예요` : "대학 정보 공시 자료 기준이에요"}\n수업연한 ${d.duration || "4년"} 과정`}
         </T>
       </div>
+      {showsExampleNote([d]) && (
+        <T y={231} size={10.5} left={24} className="a-fade text-gray" style={delay(0.1)}>
+          {PARTNER_EXAMPLE_NOTE}
+        </T>
+      )}
       <div
         className="a-up absolute left-[20px] top-[247px] h-[168px] w-[362px] overflow-hidden rounded-[16px] border border-mint"
         style={{ background: "linear-gradient(180deg, #f6fdfd 0%, #d6f8f6 100%)", animationDelay: "0.08s" }}
@@ -1985,7 +2005,7 @@ export function Choose({ active, nav, state, setState }) {
         </p>
         {exampleNote && (
           <p className="a-up mt-[12px] rounded-[12px] border border-mint bg-mint-soft px-[14px] py-[10px] text-[12.5px] leading-[19px] text-mint-deep" style={delay(0.08)}>
-            제휴 대학은 이렇게 학기별로 과목을 골라 체험할 수 있어요 (예시)
+            제휴 학교는 이렇게 학기별로 과목을 골라 체험할 수 있어요 (서비스 예시)
           </p>
         )}
         <ul className="mt-[18px] grid gap-[10px]">

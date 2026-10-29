@@ -437,7 +437,7 @@ export function createDepartment(
     lessonGames,
     levels: subjectLevels,
     picks: lessonPicks,
-    // 제휴 대학 여부. 화면에 "제휴"·"제휴 예시"를 표시하는 데만 쓴다.
+    // 제휴 대학 여부. 화면에 "제휴 학교" 배지와(예시면) 서비스 예시 안내를 표시하는 데만 쓴다.
     partner: partner === true,
     partnerExample: example,
     lessons: [
@@ -749,6 +749,16 @@ export function yearSubjects(d) {
     })),
   };
 }
+
+// 제휴 학교 표시. 예시 제휴도 실제 제휴와 같은 배지를 쓰고, 예시라는 것은 화면의 안내 문구(PARTNER_EXAMPLE_NOTE)로 알린다.
+// 예시 여부를 아직 모르는 옛 기록(partnerExample이 null)은 배지를 붙이지 않는다.
+export const PARTNER_LABEL = "제휴 학교";
+export const PARTNER_EXAMPLE_NOTE = "* 제휴 학교 표시는 서비스 예시입니다";
+export const partnerBadge = (partner, example) => (partner === true && example !== null ? PARTNER_LABEL : null);
+// 검색 결과 카드의 색: 제휴 학교는 노란색, 아니면 흰색.
+export const cardTone = (partner) => (partner === true ? "cream" : "white");
+// 예시 제휴 학교가 하나라도 보이면 안내 문구를 띄운다(실제 제휴만 있으면 띄우지 않는다).
+export const showsExampleNote = (items) => items.some((item) => item?.partner === true && item.partnerExample === true);
 
 // 잠긴 과목에 남긴 "궁금해요". 같은 학교·학과·과목은 한 번만 남긴다.
 const CURIOUS_LIMIT = 500;

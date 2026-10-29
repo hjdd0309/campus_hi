@@ -28,6 +28,11 @@ import {
   yearSubjects,
   addCurious,
   isCurious,
+  PARTNER_LABEL,
+  PARTNER_EXAMPLE_NOTE,
+  partnerBadge,
+  cardTone,
+  showsExampleNote,
 } from "./model.js";
 
 const TOTAL = departments[0].lessons.length;
@@ -777,4 +782,36 @@ test("궁금해요는 학교·학과·과목마다 한 번만 남고, 저장했�
   );
   assert.deepEqual(loaded.curious, [...twice.curious, { ...item, subject: "보안", createdAt: now.toISOString() }]);
   assert.deepEqual(loadState(only(STORAGE_KEY, { curious: "x" })).curious, []);
+});
+
+test("제휴 배지는 예시든 실제든 '제휴 학교' 하나이고, 예시 여부를 모르는 옛 기록과 제휴가 아닌 학교에는 붙지 않는다", () => {
+  assert.equal(PARTNER_LABEL, "제휴 학교");
+  assert.equal(partnerBadge(true, true), "제휴 학교");
+  assert.equal(partnerBadge(true, false), "제휴 학교");
+  assert.equal(partnerBadge(true, null), null);
+  assert.equal(partnerBadge(false, false), null);
+  assert.equal(partnerBadge("true", true), null);
+});
+
+test("검색 결과 카드는 제휴 학교만 노란색이고 나머지는 흰색이다", () => {
+  assert.equal(cardTone(true), "cream");
+  assert.equal(cardTone(false), "white");
+  assert.equal(cardTone(undefined), "white");
+  assert.equal(cardTone("true"), "white");
+});
+
+test("서비스 예시 안내는 예시 제휴 학교가 하나라도 보일 때만 띄운다", () => {
+  assert.equal(PARTNER_EXAMPLE_NOTE, "* 제휴 학교 표시는 서비스 예시입니다");
+  const plain = { school: "가나대학교", partner: false, partnerExample: false };
+  const example = { school: "경희대학교", partner: true, partnerExample: true };
+  const real = { school: "다라대학교", partner: true, partnerExample: false };
+  assert.equal(showsExampleNote([]), false);
+  assert.equal(showsExampleNote([plain]), false);
+  assert.equal(showsExampleNote([real, plain]), false);
+  assert.equal(showsExampleNote([plain, example]), true);
+  assert.equal(showsExampleNote([{ partner: true, partnerExample: null }]), false);
+  // 저장된 학과(학과 상세)도 같은 기준이다.
+  const d = createDepartment("간호학과", "경희대학교", ["기본간호학"], "", null, "4년", "", null, null, null, true, null, true);
+  assert.equal(showsExampleNote([d]), true);
+  assert.equal(partnerBadge(d.partner, d.partnerExample), "제휴 학교");
 });
