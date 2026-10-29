@@ -219,7 +219,7 @@ function HomeSubjects({ subjects, locked, onOpen }) {
                 {left ? (
                   <span className="shrink-0 text-[12px] font-semibold text-mint-deep">궁금해요 남김 ✓</span>
                 ) : (
-                  <span className="flex h-[20px] shrink-0 items-center rounded-full bg-sun px-[8px] text-[11px] font-semibold text-ink-2">제휴</span>
+                  <span className="flex h-[20px] shrink-0 items-center rounded-full bg-sun px-[8px] text-[11px] font-semibold text-ink-2">제휴🔒</span>
                 )}
               </button>
             </li>
@@ -1390,19 +1390,18 @@ function TaskCard({ top, title, sub, opens, hint, onClick, d }) {
     <button
       onClick={onClick}
       aria-label={`${title}, ${sub}, ${opens}에 열려요`}
-      className="pressable a-up absolute left-[21px] h-[69px] w-[365px] rounded-[10px] border border-[#a4acb6] bg-chalk text-left"
+      className="pressable a-up absolute left-[21px] flex h-[69px] w-[365px] items-center gap-[10px] rounded-[10px] border border-[#a4acb6] bg-chalk pl-[14px] pr-[14px] text-left"
       style={{ top, animationDelay: `${d}s` }}
     >
-      <Mask src={icon.eye} w={19} h={19} color="#827d76" className="absolute left-[14px] top-[25px]" />
-      <T y={19} size={14} left={45} clip={215} className="font-semibold text-ink-2">
-        {title}
-      </T>
-      <T key={hint || "sub"} y={41.5} size={10.5} left={45.5} clip={hint ? 300 : 215} className={hint ? "a-shake text-mint-deep" : "text-ink-3"}>
-        {hint || sub}
-      </T>
-      <T y={20.5} size={11} right={14} className="text-gray">
-        {`${opens}에 열려요`}
-      </T>
+      <Mask src={icon.eye} w={19} h={19} color="#827d76" />
+      {/* 이름과 유형은 왼쪽에서 남는 폭만큼만 쓰고 말줄임한다. 오른쪽 "{N}학년에 열려요"는 줄지 않는다(학년 과목의 체험하기와 같은 글자). */}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[14px] font-semibold leading-[20px] text-ink-2">{title}</span>
+        <span key={hint || "sub"} className={`truncate text-[10.5px] leading-[16px] ${hint ? "a-shake text-mint-deep" : "text-ink-3"}`}>
+          {hint || sub}
+        </span>
+      </span>
+      <span className="shrink-0 text-[12.5px] font-semibold text-black">{`${opens}에 열려요`}</span>
     </button>
   );
 }
