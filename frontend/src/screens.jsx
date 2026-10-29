@@ -137,7 +137,7 @@ function useLockedSubject(d, state, setState) {
 
 const SHOWN_SUBJECTS = 4;
 /**
- * 학과 상세의 학년별 과목 목록. 이 학과에서 학년마다 어떤 과목을 배우는지만 보여주는 글 목록이라 누를 수 없고,
+ * 학과 상세의 학년별 과목 칩. 이 학과에서 학년마다 어떤 과목을 배우는지만 보여주는 글 목록이라 누를 수 없고,
  * 체험 과목과 다른 과목을 같은 모양으로 둔다(체험 과목이 먼저). 다른 과목이 4개를 넘으면 더 보기로 펼친다.
  */
 function YearSubjects({ years }) {
@@ -153,10 +153,15 @@ function YearSubjects({ years }) {
               {year}학년
             </span>
             {open.length + names.length ? (
-              <ul className="mt-[8px] grid gap-[6px]">
+              // 과목 칩: 글자 길이만큼의 폭으로 이어 놓고 줄 끝에서 다음 줄로 넘긴다. 아주 긴 이름은 칩 안에서 줄바꿈한다.
+              <ul className="mt-[8px] flex flex-wrap gap-[8px]">
                 {[...open.map((item) => item.title), ...shown].map((name, i) => (
-                  <li key={`${i}-${name}`} className="flex min-h-[40px] items-center rounded-[12px] border border-cream-line bg-cream px-[14px] py-[8px]">
-                    <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink-2">{name}</span>
+                  <li
+                    key={`${i}-${name}`}
+                    className="max-w-full rounded-[16px] border border-line bg-white px-[12px] py-[6px] text-[13px] leading-[19px] text-ink-2"
+                    style={{ wordBreak: "keep-all", overflowWrap: "anywhere" }}
+                  >
+                    {name}
                   </li>
                 ))}
               </ul>
@@ -979,7 +984,7 @@ export function Detail({ active, nav, state, setState }) {
   };
   return (
     <Screen
-      h={Math.max(600, 528 + listH + 24)}
+      h={Math.max(600, 528 + listH + 32)}
       footer={
         <OutlineButton onClick={enroll} className="a-up" style={delay(0.5)}>
           {finished ? "졸업 리포트 보기" : journey ? "이어서 체험하기" : `${d.name} 입학하기`}
