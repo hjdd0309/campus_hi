@@ -22,6 +22,12 @@ import {
   chooseSubject,
   stageLabel,
   CHOOSE_TITLE,
+  skipLesson,
+  isSkipped,
+  progressOf,
+  yearSubjects,
+  addCurious,
+  isCurious,
 } from "./model.js";
 
 const TOTAL = departments[0].lessons.length;
@@ -635,4 +641,140 @@ test("학기별 학과와 고른 과목은 새로고침 뒤에도 그대로이�
   assert.equal(legacy.journeys[old.id].completed, 2);
   assert.deepEqual(legacy.notes, { [`${old.id}-1`]: "2학년 기록" });
   assert.deepEqual(legacy.choices, {});
+});
+
+test("휴강하면 미이수로 남기고 다음 자리로 넘어가며, 쓰던 기록과 체험은 그대로 둔다", () => {
+  const state = {
+    ...structuredClone(initialState),
+    journeys: { design: { completed: 1, paused: false } },
+    drafts: { "design-1": "쓰던 글" },
+  };
+  const skipped = skipLesson(state, "design", 1);
+  assert.deepEqual(skipped.journeys.design, { completed: 2, paused: false, skipped: [1] });
+  assert.deepEqual(skipped.drafts, { "design-1": "쓰던 글" });
+  assert.equal(isSkipped(skipped.journeys.design, 1), true);
+  // 차례가 아닌 자리, 휴학 중, 없는 학과는 휴강할 수 없다.
+  assert.equal(skipLesson(state, "design", 0), state);
+  assert.equal(skipLesson(state, "design", 2), state);
+  const paused = { ...state, journeys: { design: { completed: 1, paused: true } } };
+  assert.equal(skipLesson(paused, "design", 1), paused);
+  assert.equal(skipLesson(state, "missing", 0), state);
+  // 진행 상황: 지나온 자리 2개 중 1개가 미이수라 이수는 1개다.
+  assert.deepEqual(progressOf(skipped.journeys.design, TOTAL), { completed: 2, skipped: [1], passed: 1, finished: false });
+  assert.deepEqual(progressOf(undefined, TOTAL), { completed: 0, skipped: [], passed: 0, finished: false });
+});
+
+test("졸업 과제까지 휴강해도 졸업하고, 미이수는 이수율에서 빠진다", () => {
+  let state = { ...structuredClone(initialState), journeys: { design: { completed: 0, paused: false } } };
+  state = completeLesson(state, "design", 0, "");
+  state = skipLesson(state, "design", 1);
+  state = completeLesson(state, "design", 2, "");
+  // 졸업작품을 하지 않았어도 휴강하면 넘어간다.
+  state = skipLesson(state, "design", 3);
+  const progress = progressOf(state.journeys.design, TOTAL);
+  assert.deepEqual(progress, { completed: TOTAL, skipped: [1, 3], passed: 2, finished: true });
+  assert.equal(Math.round((progress.passed / TOTAL) * 100), 50);
+});
+
+test("미이수 과목은 다시 들어 완료하면 이수로 바뀌고, 진행 자리는 그대로다", () => {
+  let state = { ...structuredClone(initialState), journeys: { design: { completed: 0, paused: false } } };
+  state = skipLesson(state, "design", 0);
+  state = completeLesson(state, "design", 1, "");
+  const retaken = completeLesson(state, "design", 0, "다시 들었어요");
+  assert.deepEqual(retaken.journeys.design, { completed: 2, paused: false, skipped: [] });
+  assert.equal(retaken.notes["design-0"], "다시 들었어요");
+  // 이미 이수한 자리, 아직 오지 않은 자리는 다시 들을 수 없다.
+  assert.equal(completeLesson(retaken, "design", 0, "또"), retaken);
+  assert.equal(completeLesson(retaken, "design", 3, "앞지르기"), retaken);
+  // 미이수인 졸업 과제도 졸업작품을 마쳐야 이수로 바뀐다.
+  let done = { ...structuredClone(initialState), journeys: { design: { completed: TOTAL - 1, paused: false } } };
+  done = skipLesson(done, "design", TOTAL - 1);
+  assert.equal(completeLesson(done, "design", TOTAL - 1, ""), done);
+  done = completeLesson({ ...done, artworks: { design: true } }, "design", TOTAL - 1, "");
+  assert.deepEqual(done.journeys.design.skipped, []);
+  assert.equal(done.journeys.design.completed, TOTAL);
+});
+
+test("학기 자리는 과목을 고른 뒤에만 휴강할 수 있고, 다시 들을 때도 고른 과목 그대로다", () => {
+  const d = semesterDept();
+  let state = enrolledState(d);
+  assert.equal(skipLesson(state, d.id, 0), state);
+  state = chooseSubject(state, d.id, 0, "이산구조");
+  state = skipLesson(state, d.id, 0);
+  assert.deepEqual(state.journeys[d.id].skipped, [0]);
+  assert.equal(state.choices[`${d.id}-0`], "이산구조");
+  const game = withChoices(d, state.choices).games[0];
+  if (game) state = { ...state, plays: { ...state.plays, [`${d.id}-0`]: { game, summary: "다 풀었어요" } } };
+  state = completeLesson(state, d.id, 0, "");
+  assert.deepEqual(state.journeys[d.id].skipped, []);
+  assert.equal(state.journeys[d.id].completed, 1);
+});
+
+test("미이수 기록은 새로고침 뒤에도 남고, 이 필드가 없던 예전 기록은 미이수 없이 그대로 읽는다", () => {
+  const saved = loadState(only(STORAGE_KEY, { journeys: { design: { completed: 3, paused: false, skipped: [1, 1, 2, 3, -1, "0", 0.5] } } }));
+  assert.deepEqual(saved.journeys.design, { completed: 3, paused: false, skipped: [1, 2] });
+  const old = loadState(only(STORAGE_KEY, { journeys: { design: { completed: 2, paused: false } }, notes: { "design-0": "기록" } }));
+  assert.deepEqual(old.journeys.design, { completed: 2, paused: false });
+  assert.equal(old.notes["design-0"], "기록");
+  assert.deepEqual(old.curious, []);
+  for (const key of ["hi-campus-v3", "mirae-campus-v2"]) {
+    const legacy = loadState(only(key, { journeys: { design: { completed: 1 } } }));
+    assert.equal(progressOf(legacy.journeys.design, TOTAL).skipped.length, 0);
+  }
+});
+
+test("학년별 과목: 체험하는 과목은 열림, 그 학년의 다른 교과목은 잠김이고 학년을 모르는 과목은 넣지 않는다", () => {
+  const curriculum = ["자료구조", "운영체제", "이산수학", "선형대수", "컴퓨터네트워크", "해당없음", "졸업연구"];
+  const levels = { 자료구조: [2, 3], 운영체제: [3, 4], 이산수학: [1, 2], 선형대수: [1, 1], 컴퓨터네트워크: [3, 3], 해당없음: [1, 1] };
+  const games = { 자료구조: "ox", 이산수학: "blank" };
+  const d = createDepartment("컴퓨터공학과", "가나대학교", curriculum, "공학", null, "4년", "", games, levels);
+  const list = yearSubjects(d);
+  assert.equal(list.estimated, true);
+  assert.deepEqual(list.years.map((item) => item.year), [1, 2, 3, 4]);
+  for (const [i, item] of list.years.entries()) assert.deepEqual(item.open, [{ index: i, title: d.lessons[i] }]);
+  const all = list.years.flatMap((item) => item.locked);
+  // 체험하는 과목은 잠긴 목록에 다시 나오지 않고, 학년 범위가 없는 졸업연구와 '해당없음'은 빠진다.
+  for (const lesson of d.lessons) assert.ok(!all.includes(lesson));
+  assert.ok(!all.includes("졸업연구"));
+  assert.ok(!all.includes("해당없음"));
+  // 과목은 보통 듣기 시작하는 학년 하나에만 들어간다.
+  assert.equal(new Set(all).size, all.length);
+  const yearOf = (subject) => list.years.find((item) => item.locked.includes(subject))?.year;
+  for (const subject of all) assert.equal(yearOf(subject), levels[subject][0]);
+  // 학년별 편성을 확보한 학과는 그 편성의 학년을 그대로 쓴다.
+  const years = { terms: [{ year: 1, semester: 1, subjects: ["프로그래밍기초", "미적분학"] }, { year: 2, semester: 1, subjects: ["컴퓨터구조", "확률통계"] }] };
+  const exact = createDepartment("컴퓨터공학과", "가나대학교", ["프로그래밍기초", "미적분학", "컴퓨터구조", "확률통계"], "공학", years, "4년");
+  const exactList = yearSubjects(exact);
+  assert.equal(exactList.estimated, false);
+  assert.deepEqual(exactList.years[0].locked, ["미적분학"]);
+  assert.deepEqual(exactList.years[1].locked, ["확률통계"]);
+  // 학기마다 과목을 고르는 제휴 학과는 잠긴 과목이 없다.
+  assert.equal(yearSubjects(semesterDept()), null);
+});
+
+test("궁금해요는 학교·학과·과목마다 한 번만 남고, 저장했다 불러와도 형식이 맞는 것만 남는다", () => {
+  const item = { school: "가나대학교", course: "컴퓨터공학과", subject: "운영체제" };
+  const now = new Date("2026-10-29T01:02:03Z");
+  const once = addCurious(structuredClone(initialState), item, now);
+  assert.deepEqual(once.curious, [{ ...item, createdAt: "2026-10-29T01:02:03.000Z" }]);
+  assert.equal(isCurious(once, item), true);
+  assert.equal(isCurious(once, { ...item, subject: "자료구조" }), false);
+  assert.equal(addCurious(once, item), once);
+  assert.equal(addCurious(once, { ...item, subject: "" }), once);
+  const twice = addCurious(once, { ...item, subject: "자료구조" }, now);
+  assert.equal(twice.curious.length, 2);
+  const loaded = loadState(
+    only(STORAGE_KEY, {
+      curious: [
+        ...twice.curious,
+        twice.curious[0],
+        { ...item, subject: "네트워크", createdAt: "not a date" },
+        { ...item, subject: 3, createdAt: now.toISOString() },
+        { ...item, subject: "보안", createdAt: now.toISOString(), email: "a@b.c" },
+        null,
+      ],
+    }),
+  );
+  assert.deepEqual(loaded.curious, [...twice.curious, { ...item, subject: "보안", createdAt: now.toISOString() }]);
+  assert.deepEqual(loadState(only(STORAGE_KEY, { curious: "x" })).curious, []);
 });

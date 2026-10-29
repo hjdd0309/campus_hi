@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useId, useRef } from "react";
 import { confetti, icon } from "./assets.js";
 
 /** 뽑아낸 아이콘을 CSS 마스크로 그려 색을 입힐 수 있게 한다. */
@@ -50,7 +50,7 @@ export function T({ y, size, lh, left, right, center, clip, className = "", styl
  * - footer: 아래쪽 기준. 시안의 좌표 그대로 주면 화면 아래 끝에 붙는다. foot은 그 영역이 시작하는 y다.
  * - 가운데 기준으로 둘 것은 Center로 감싼다.
  */
-export function Screen({ children, footer, foot = 740, veil = true, h, resetOn, bg = "#fff", className = "" }) {
+export function Screen({ children, footer, foot = 740, veil = true, h, resetOn, bg = "#fff", className = "", overlay }) {
   const scroller = useRef(null);
   useEffect(() => {
     scroller.current.scrollTop = 0;
@@ -81,6 +81,68 @@ export function Screen({ children, footer, foot = 740, veil = true, h, resetOn, 
           )}
           {footer}
         </div>
+      )}
+      {/* 화면 전체를 덮는 것(확인 창, 알림). 스크롤과 상관없이 보이는 영역에 놓인다. */}
+      {overlay}
+    </div>
+  );
+}
+
+/**
+ * 확인 창. 화면을 어둡게 덮고 가운데에 띄운다. 열리면 첫 버튼에 초점을 두고, Tab은 창 안에서만 돌며,
+ * Esc나 바깥을 누르면 닫힌다. 닫히면 열기 전에 초점이 있던 곳으로 돌려준다.
+ */
+export function Dialog({ title, children, actions, onClose }) {
+  const box = useRef(null);
+  const titleId = useId();
+  useEffect(() => {
+    const opener = document.activeElement;
+    box.current.querySelector("button:not([disabled])")?.focus({ preventScroll: true });
+    return () => opener?.focus?.({ preventScroll: true });
+  }, []);
+  const keys = (e) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      onClose();
+    }
+    if (e.key !== "Tab") return;
+    const buttons = [...box.current.querySelectorAll("button:not([disabled])")];
+    const at = buttons.indexOf(document.activeElement);
+    const next = (at + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length;
+    e.preventDefault();
+    buttons[next]?.focus();
+  };
+  return (
+    <div className="a-fade absolute inset-0 z-40 flex items-center justify-center bg-[rgba(32,43,60,0.42)] px-[24px]" onClick={onClose}>
+      <div
+        ref={box}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={keys}
+        onClick={(e) => e.stopPropagation()}
+        className="a-pop w-full max-w-[354px] rounded-[20px] bg-white px-[22px] pb-[18px] pt-[24px] shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
+      >
+        <h2 id={titleId} className="text-[18px] font-bold leading-[26px] text-ink-2" style={{ wordBreak: "keep-all" }}>
+          {title}
+        </h2>
+        <div className="mt-[8px] text-[14px] leading-[22px] text-ink-3" style={{ wordBreak: "keep-all" }}>
+          {children}
+        </div>
+        <div className="mt-[20px] grid gap-[8px]">{actions}</div>
+      </div>
+    </div>
+  );
+}
+
+/** 잠깐 떴다 사라지는 알림. 스크린 리더도 읽는다. */
+export function Toast({ children }) {
+  return (
+    <div role="status" className="pointer-events-none absolute inset-x-[20px] z-50 flex justify-center" style={{ bottom: "calc(150px - var(--bt) * 1px)" }}>
+      {children && (
+        <p className="a-up rounded-full bg-navy/90 px-[18px] py-[10px] text-center text-[13.5px] font-medium leading-[20px] text-white shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+          {children}
+        </p>
       )}
     </div>
   );

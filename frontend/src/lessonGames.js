@@ -140,8 +140,9 @@ export function questionsOf(game, random = Math.random) {
       ),
       explanation: item.explanation,
     }));
+  // OX는 문항 순서를 섞는다. 공개된 문제 상당수가 X를 마지막에 두고 있어 순서대로 내면 답을 짐작하기 쉽다.
   if (game.type === "ox")
-    return game.items.map((item) => ({
+    return shuffle(game.items, random).map((item) => ({
       text: item.text,
       options: [
         { label: "O", correct: item.answer },

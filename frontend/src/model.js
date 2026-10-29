@@ -245,6 +245,8 @@ export const initialState = {
   archive: [],
   // 학기별 편성이 있는 학과에서 학기 자리마다 고른 과목: { "학과id-자리번호": 과목 }.
   choices: {},
+  // 잠긴 과목에 남긴 "궁금해요": [{ school, course, subject, createdAt }]. 개인 정보 없이 학교·학과·과목만 둔다.
+  curious: [],
   onboarded: false,
 };
 // 수집 파이프라인이 검증한 학년별 편성. 형식이 맞지 않으면 없는 것으로 본다.
@@ -543,13 +545,14 @@ export function loadState(storage) {
     const journeys = Object.fromEntries(
       Object.entries(value.journeys || {})
         .filter(([id]) => validIds.has(id))
-        .map(([id, item]) => [
-          id,
-          {
-            completed: moveCompleted(id, item?.completed),
-            paused: !!item?.paused,
-          },
-        ]),
+        .map(([id, item]) => {
+          const completed = moveCompleted(id, item?.completed);
+          // 휴강해서 미이수로 남긴 자리. 지나온 자리 번호만 남긴다(이 필드가 없던 기록은 빈 목록).
+          const skipped = Array.isArray(item?.skipped)
+            ? [...new Set(item.skipped.filter((n) => Number.isInteger(n) && n >= 0 && n < completed))].sort((a, b) => a - b)
+            : [];
+          return [id, { completed, paused: !!item?.paused, ...(skipped.length ? { skipped } : {}) }];
+        }),
     );
     const notes = {};
     if (value.notes && typeof value.notes === "object")
@@ -642,6 +645,7 @@ export function loadState(storage) {
         }
         return kept;
       })(),
+      curious: cleanCurious(value.curious),
       onboarded: !!value.onboarded,
     };
   } catch {
@@ -679,10 +683,12 @@ export function completeLesson(state, id, index, note) {
   // 미니게임이 있는 수업은 게임을 해본 뒤에만 완료할 수 있다.
   const game = state.catalog?.some((d) => d.id === id) ? withChoices(department, state.choices).games?.[index] : undefined;
   if (game && state.plays?.[`${id}-${index}`]?.game !== game) return state;
+  // 지금 차례인 자리이거나, 휴강해서 미이수로 남긴 자리(다시 듣기)만 완료할 수 있다.
+  const retake = isSkipped(journey, index);
   if (
     !journey ||
     journey.paused ||
-    journey.completed !== index ||
+    (journey.completed !== index && !retake) ||
     index >= total
   )
     return state;
@@ -694,6 +700,73 @@ export function completeLesson(state, id, index, note) {
     notes: note.trim()
       ? { ...state.notes, [`${id}-${index}`]: note.trim() }
       : state.notes,
-    journeys: { ...state.journeys, [id]: { ...journey, completed: index + 1 } },
+    journeys: {
+      ...state.journeys,
+      [id]: retake
+        ? { ...journey, skipped: journey.skipped.filter((n) => n !== index) }
+        : { ...journey, completed: index + 1 },
+    },
   };
+}
+// 휴강해서 미이수로 남긴 자리인지.
+export const isSkipped = (journey, index) => Array.isArray(journey?.skipped) && journey.skipped.includes(index);
+// 지금 차례인 수업을 휴강한다: 미이수로 기록하고 다음 자리로 넘어간다. 마지막 자리(졸업 과제)도 휴강하면 졸업한다.
+// 쓰던 기록과 해 둔 체험은 지우지 않는다(다시 들을 때 이어서 한다). 학기 자리는 과목을 고른 뒤에만 휴강할 수 있다.
+export function skipLesson(state, id, index) {
+  const journey = state.journeys[id];
+  const department = [...departments, ...(state.catalog || [])].find((d) => d.id === id);
+  const total = department?.lessons.length || 0;
+  if (!journey || journey.paused || journey.completed !== index || index >= total) return state;
+  if (department.options?.[index] && !state.choices?.[`${id}-${index}`]) return state;
+  const skipped = [...new Set([...(journey.skipped || []), index])].sort((a, b) => a - b);
+  return { ...state, journeys: { ...state.journeys, [id]: { ...journey, completed: index + 1, skipped } } };
+}
+// 진행 상황: 지나온 자리(completed) 중 미이수(skipped)를 뺀 것이 이수(passed)다.
+export function progressOf(journey, total) {
+  const completed = Math.min(Math.max(0, journey?.completed || 0), total);
+  const skipped = (journey?.skipped || []).filter((n) => n < completed);
+  return { completed, skipped, passed: completed - skipped.length, finished: !!journey && completed === total };
+}
+
+// 학년마다 보여줄 과목: [{ year, open: [{ index, title }], locked: [과목] }]. open은 체험하는 자리, locked는 그 학년의 다른 교과목이다.
+// 학년별 편성을 확보한 학과는 그 편성을, 아니면 과목을 보통 듣기 시작하는 학년(levels)을 쓰고, 학년을 모르는 과목은 넣지 않는다.
+// 학기마다 편성 과목을 고르는 제휴 학과는 잠긴 과목이 없으므로 null이다.
+export function yearSubjects(d) {
+  if (!d?.school || d.options) return null;
+  const used = new Set(d.lessons);
+  const fromYears = !!d.lessonsFromYears && !!d.yearly;
+  const ofYear = (year) =>
+    fromYears
+      ? d.yearly.terms.filter((term) => term.year === year).flatMap((term) => term.subjects)
+      : (d.curriculum || []).filter((subject) => Object.hasOwn(d.levels || {}, subject) && d.levels[subject][0] === year);
+  const years = [...new Set(d.yearNumbers)];
+  return {
+    estimated: !fromYears,
+    years: years.map((year) => ({
+      year,
+      open: d.yearNumbers.map((y, index) => ({ y, index, title: d.lessons[index] })).filter((item) => item.y === year).map(({ index, title }) => ({ index, title })),
+      locked: [...new Set(ofYear(year))].filter((subject) => subject !== "해당없음" && !used.has(subject)),
+    })),
+  };
+}
+
+// 잠긴 과목에 남긴 "궁금해요". 같은 학교·학과·과목은 한 번만 남긴다.
+const CURIOUS_LIMIT = 500;
+const sameCurious = (a, b) => a.school === b.school && a.course === b.course && a.subject === b.subject;
+export const isCurious = (state, item) => (state.curious || []).some((entry) => sameCurious(entry, item));
+export function addCurious(state, { school, course, subject }, now = new Date()) {
+  const item = { school, course, subject };
+  if (![school, course, subject].every((v) => typeof v === "string" && v) || isCurious(state, item)) return state;
+  return { ...state, curious: [...(state.curious || []), { ...item, createdAt: now.toISOString() }].slice(-CURIOUS_LIMIT) };
+}
+function cleanCurious(value) {
+  if (!Array.isArray(value)) return [];
+  const kept = [];
+  for (const entry of value) {
+    const fields = [entry?.school, entry?.course, entry?.subject];
+    if (!fields.every((v) => typeof v === "string" && v && v.length <= 100) || typeof entry.createdAt !== "string") continue;
+    if (Number.isNaN(Date.parse(entry.createdAt)) || kept.some((other) => sameCurious(other, entry))) continue;
+    kept.push({ school: entry.school, course: entry.course, subject: entry.subject, createdAt: entry.createdAt });
+  }
+  return kept.slice(-CURIOUS_LIMIT);
 }

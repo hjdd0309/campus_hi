@@ -142,11 +142,21 @@ test("하나씩 고르는 유형은 문항마다 정답 보기가 하나이고, 
   assert.equal(countCorrect(blank, [right[0]]), 1);
   assert.equal(countCorrect(blank, []), 0);
 
-  const ox = questionsOf(OX);
+  // 섞지 않는 난수(늘 마지막 자리와 바꿈 = 제자리)로 채점을 확인한다.
+  const ox = questionsOf(OX, () => 0.999);
   assert.deepEqual(ox.map((q) => q.options.map((o) => o.label)), Array(5).fill(["O", "X"]));
   assert.deepEqual(ox.map(answerOf), ["O", "X", "O", "X", "O"]);
   assert.equal(countCorrect(ox, [0, 1, 0, 1, 0]), 5);
   assert.equal(countCorrect(ox, [1, 0, 1, 0, 1]), 0);
+  // OX 문항은 순서를 섞되, 문항과 정답·해설은 그대로 짝지어 둔다.
+  const mixed = questionsOf(OX, seeded(7));
+  assert.notDeepEqual(mixed.map((q) => q.text), OX.items.map((item) => item.text));
+  assert.deepEqual(mixed.map((q) => q.text).sort(), OX.items.map((item) => item.text).sort());
+  for (const question of mixed) {
+    const item = OX.items.find((it) => it.text === question.text);
+    assert.equal(answerOf(question), item.answer ? "O" : "X");
+    assert.equal(question.explanation, item.explanation);
+  }
 
   const sort = questionsOf(SORT, seeded(5));
   assert.deepEqual(sort.map((q) => q.text).sort(), SORT.items.map((item) => item.text).sort());
