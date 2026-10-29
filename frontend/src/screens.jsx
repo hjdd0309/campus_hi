@@ -135,8 +135,11 @@ function useLockedSubject(d, state, setState) {
 }
 
 const SHOWN_SUBJECTS = 4;
-/** 학년별 과목 목록. 체험하는 과목은 열림(✅), 그 학년의 다른 교과목은 잠김(🔒)으로 보여준다. 많으면 4개까지 보이고 더 보기로 펼친다. */
-function YearSubjects({ d, years, locked }) {
+/**
+ * 학과 상세의 학년별 과목 목록. 이 학과에서 학년마다 어떤 과목을 배우는지만 보여주는 글 목록이라 누를 수 없고,
+ * 체험 과목과 다른 과목을 같은 모양으로 둔다(체험 과목이 먼저). 다른 과목이 4개를 넘으면 더 보기로 펼친다.
+ */
+function YearSubjects({ years }) {
   const [opened, setOpened] = useState({});
   return (
     <div className="grid gap-[16px]">
@@ -149,29 +152,11 @@ function YearSubjects({ d, years, locked }) {
               {year}학년
             </span>
             <ul className="mt-[8px] grid gap-[6px]">
-              {open.map(({ index, title: name }) => (
-                <li key={`open-${index}`} className="flex min-h-[44px] items-center gap-[8px] rounded-[12px] border border-mint bg-mint-soft px-[12px] py-[8px]">
-                  <span aria-hidden="true">✅</span>
-                  <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-ink-2">{name}</span>
-                  <span className="shrink-0 text-[11.5px] text-mint-deep">{d.semesters?.[index] ? stageLabel(d, index) : "체험해요"}</span>
+              {[...open.map((item) => item.title), ...shown].map((name, i) => (
+                <li key={`${i}-${name}`} className="flex min-h-[40px] items-center rounded-[12px] border border-cream-line bg-cream px-[14px] py-[8px]">
+                  <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink-2">{name}</span>
                 </li>
               ))}
-              {shown.map((name) => {
-                const left = locked.curious(name);
-                return (
-                  <li key={name}>
-                    <button
-                      onClick={() => locked.open(name)}
-                      aria-label={`${name}, 잠김${left ? ", 궁금해요 남김" : ""}`}
-                      className="pressable flex min-h-[44px] w-full items-center gap-[8px] rounded-[12px] border border-[#a4acb6] bg-chalk px-[12px] py-[8px] text-left"
-                    >
-                      <span aria-hidden="true">🔒</span>
-                      <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink-3">{name}</span>
-                      {left && <span className="shrink-0 text-[11.5px] font-semibold text-mint-deep">궁금해요 남김 ✓</span>}
-                    </button>
-                  </li>
-                );
-              })}
             </ul>
             {more && (
               <button className="text-button mt-[6px]" onClick={() => setOpened((o) => ({ ...o, [year]: true }))}>
@@ -184,7 +169,7 @@ function YearSubjects({ d, years, locked }) {
     </div>
   );
 }
-const ESTIMATED_NOTE = "잠긴 과목의 학년은 보통 듣는 시기를 기준으로 했어요. 실제 편성과 다를 수 있고, 학년을 알 수 없는 과목은 넣지 않았어요.";
+const ESTIMATED_NOTE = "과목의 학년은 보통 듣는 시기를 기준으로 했어요. 실제 편성과 다를 수 있고, 학년을 알 수 없는 과목은 넣지 않았어요.";
 
 /**
  * 홈의 "이 학년 때 이런 과목을 들어요". 첫 카드는 지금 체험하는 과목(누르면 수업으로), 나머지는 같은 학년의 다른 교과목으로
@@ -986,7 +971,6 @@ export function Detail({ active, nav, state, setState }) {
       .catch(() => {});
     return () => controller.abort();
   }, [active, staleId, setState]);
-  const locked = useLockedSubject(v?.d, state, setState);
   // 학년별 과목 목록은 길이가 정해져 있지 않아(더 보기, 긴 이름) 그려진 높이를 재서 화면 높이를 정한다.
   const list = useRef(null);
   const [listH, setListH] = useState(0);
@@ -1012,7 +996,6 @@ export function Detail({ active, nav, state, setState }) {
   return (
     <Screen
       h={subjects ? Math.max(600, 528 + listH + 24) : Math.min(740, 580 + (total - 1) * step)}
-      overlay={locked.overlay}
       footer={
         <OutlineButton onClick={enroll} className="a-up" style={delay(0.5)}>
           {finished ? "졸업 리포트 보기" : journey ? "이어서 체험하기" : `${d.name} 입학하기`}
@@ -1067,7 +1050,7 @@ export function Detail({ active, nav, state, setState }) {
       </T>
       {subjects && (
         <div ref={list} className="a-up absolute left-[20px] right-[20px] top-[528px]" style={delay(0.28)}>
-          <YearSubjects d={d} years={subjects.years} locked={locked} />
+          <YearSubjects years={subjects.years} />
           {subjects.estimated && <p className="footnote">{ESTIMATED_NOTE}</p>}
         </div>
       )}
