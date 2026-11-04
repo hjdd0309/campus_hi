@@ -147,18 +147,21 @@ function useLockedSubject(d, state, setState) {
   return { open: setSubject, curious, overlay };
 }
 
-const SHOWN_SUBJECTS = 4;
+// 학년마다 처음에 보이는 과목 수(체험 과목 포함). 나머지는 더 보기로 펼친다.
+const SHOWN_SUBJECTS = 3;
 /**
  * 학과 상세의 학년별 과목 칩. 이 학과에서 학년마다 어떤 과목을 배우는지만 보여주는 글 목록이라 누를 수 없고,
- * 체험 과목과 다른 과목을 같은 모양으로 둔다(체험 과목이 먼저). 다른 과목이 4개를 넘으면 더 보기로 펼친다.
+ * 체험 과목과 다른 과목을 같은 모양으로 둔다(체험 과목이 먼저). 체험 과목을 포함해 3개를 넘으면 더 보기로 펼친다.
  */
 function YearSubjects({ years }) {
   const [opened, setOpened] = useState({});
   return (
     <div className="grid gap-[16px]">
       {years.map(({ year, open, others: names }) => {
-        const more = names.length > SHOWN_SUBJECTS && !opened[year];
-        const shown = more ? names.slice(0, SHOWN_SUBJECTS) : names;
+        // 체험 과목은 모두 보이고, 남은 자리만큼 다른 과목을 보인다.
+        const room = Math.max(0, SHOWN_SUBJECTS - open.length);
+        const more = names.length > room && !opened[year];
+        const shown = more ? names.slice(0, room) : names;
         return (
           <section key={year} aria-label={`${year}학년 과목`}>
             <span className="inline-flex h-[28px] w-[47px] items-center justify-center rounded-full border border-mint text-[13px] font-semibold text-mint">
@@ -182,7 +185,7 @@ function YearSubjects({ years }) {
             )}
             {more && (
               <button className="text-button mt-[6px]" onClick={() => setOpened((o) => ({ ...o, [year]: true }))}>
-                {`더 보기 (${names.length - SHOWN_SUBJECTS}개)`}
+                {`더 보기 (${names.length - room}개)`}
               </button>
             )}
           </section>
