@@ -196,13 +196,14 @@ const ESTIMATED_NOTE = "과목의 학년은 보통 듣는 시기를 기준으로
 /**
  * 홈의 "이 학년 때 이런 과목을 들어요". 첫 카드는 지금 체험하는 과목(누르면 수업으로), 나머지는 같은 학년의 다른 교과목이다.
  * 제휴 학교(subjects.open)면 바로 해볼 수 있는 선택 체험(흰 카드, 누르면 선택 체험으로)이고, 아니면 제휴 대학 전용
- * (노란 제휴 배지, 누르면 제휴 안내 창)이다. 많으면 4개까지 보이고 더 보기로 펼친다.
+ * (노란 제휴 배지, 누르면 제휴 안내 창)이다. 처음에는 지금 과목과 다른 과목 2개(모두 3개)까지 보이고 나머지는 더 보기로 펼친다.
  */
+const HOME_SHOWN_OTHERS = 2;
 function HomeSubjects({ subjects, locked, onOpen, electiveDone, onElective }) {
   const [opened, setOpened] = useState(false);
   const { year, main, others, estimated } = subjects;
-  const more = others.length > SHOWN_SUBJECTS && !opened;
-  const shown = more ? others.slice(0, SHOWN_SUBJECTS) : others;
+  const more = others.length > HOME_SHOWN_OTHERS && !opened;
+  const shown = more ? others.slice(0, HOME_SHOWN_OTHERS) : others;
   return (
     <section aria-labelledby="home-subjects">
       <h2 id="home-subjects" className="text-[15px] font-bold leading-[22px] text-ink-2">
@@ -257,7 +258,7 @@ function HomeSubjects({ subjects, locked, onOpen, electiveDone, onElective }) {
       </ul>
       {more && (
         <button className="text-button mt-[8px]" onClick={() => setOpened(true)}>
-          {`더 보기 (${others.length - SHOWN_SUBJECTS}개)`}
+          {`더 보기 (${others.length - HOME_SHOWN_OTHERS}개)`}
         </button>
       )}
       {estimated && others.length > 0 && <p className="footnote">학년은 보통 듣는 시기를 기준으로 했어요. 실제 편성과 다를 수 있어요.</p>}
