@@ -31,6 +31,8 @@ import {
   createDepartment,
   recommend,
   completeLesson,
+  lessonStarted,
+  markStarted,
   initialState,
   stageLabel,
   skipLesson,
@@ -1522,7 +1524,7 @@ export function Home({ active, nav, state, setState }) {
       >
         <span className="loop pointer-events-none absolute inset-0 rounded-[14px]" style={{ animation: "glow 2.4s ease-in-out 1.6s infinite" }} />
         <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-          {finished ? "졸업 리포트 보기" : `${d.lessons[index]} ${completed ? "이어하기" : "시작하기"}`}
+          {finished ? "졸업 리포트 보기" : `${d.lessons[index]} ${lessonStarted(state, d, index) ? "이어하기" : "시작하기"}`}
         </span>
       </button>
       {subjects && (
@@ -1671,8 +1673,9 @@ export function Lesson({ active, nav, route, state, setState }) {
   const typed = !practice && isLessonType(game);
   const quiz = useLessonGame(typed ? subject : null);
   const [draft, setDraft] = useState(() => (ok ? state.drafts[key] ?? state.notes[key] ?? "" : ""));
-  // 체험이나 기록을 이미 시작한 수업은 기록 단계부터 이어간다.
-  const [step, setStep] = useState(() => (ok && ((game && state.plays[key]) || state.drafts[key]) ? 2 : 0));
+  // 체험이나 기록을 이미 시작한 수업은 기록 단계부터 이어간다. 다시 듣기(retake)는 항상 배우기부터 연다
+  // (쓰던 기록은 지우지 않고 기록 단계에서 그대로 보여준다).
+  const [step, setStep] = useState(() => (ok && !v.retake && ((game && state.plays[key]) || state.drafts[key]) ? 2 : 0));
   const [reached, setReached] = useState(step);
   const [notice, setNotice] = useState("");
   const [shake, setShake] = useState(0);
@@ -1684,11 +1687,17 @@ export function Lesson({ active, nav, route, state, setState }) {
   const moved = useRef(false);
   useGuard(ok, nav, active);
   useEffect(() => () => window.clearTimeout(timer.current), []);
-  // 연습 문제를 받을 수 없으면 기본 체험으로 진행하고, 체험을 마친 것으로 기록해 수업을 끝낼 수 있게 한다.
+  // 수업을 열었으면 시작한 것으로 기록한다(홈 버튼이 "이어하기"가 된다).
   useEffect(() => {
-    if ((typed && quiz.status === "basic") || studioGone)
+    if (key) setState((s) => markStarted(s, key));
+  }, [key, setState]);
+  // 연습 문제를 받을 수 없으면 기본 체험(관찰 과제)으로 진행한다. 화면을 여는 것만으로는 해본 것이 아니고,
+  // "직접 해보기" 단계에 실제로 들어갔을 때 해본 것으로 기록해 수업을 끝낼 수 있게 한다.
+  const basicPlay = (typed && quiz.status === "basic") || studioGone;
+  useEffect(() => {
+    if (basicPlay && reached >= 1)
       setState((s) => (s.plays[key]?.game === game ? s : { ...s, plays: { ...s.plays, [key]: { game, summary: "" } } }));
-  }, [typed, quiz.status, studioGone, key, game, setState]);
+  }, [basicPlay, reached, key, game, setState]);
   // 단계를 옮기면 맨 위로 올리고 제목에 초점을 둔다(스크린 리더가 새 단계를 읽게).
   useEffect(() => {
     if (!moved.current) return;
@@ -2077,8 +2086,8 @@ export function Elective({ active, nav, route, state, setState }) {
   const quiz = useLessonGame(ok ? subject : null);
   const saved = ok ? electiveOf(state, v.d.id, subject) : null;
   const [draft, setDraft] = useState(() => saved?.note || "");
-  // 이미 기록이 있는 과목은 기록 단계부터 연다.
-  const [step, setStep] = useState(() => (saved && (saved.done || saved.note || saved.summary) ? 2 : 0));
+  // 직접 해보기를 해 봤거나 기록이 있는 과목은 기록 단계부터 연다(수업의 이어하기와 같은 규칙).
+  const [step, setStep] = useState(() => (saved && (saved.tried || saved.done || saved.note || saved.summary) ? 2 : 0));
   const [reached, setReached] = useState(step);
   const [notice, setNotice] = useState("");
   const [shake, setShake] = useState(0);
@@ -2089,6 +2098,11 @@ export function Elective({ active, nav, route, state, setState }) {
   // 잘못 들어오면(입학하지 않음, 비제휴, 목록에 없는 과목, 다른 학과를 보는 중) 입학한 학과가 있으면 홈으로, 없으면 처음 화면으로 보낸다.
   useGuard(ok, nav, active, latestJourney(state) ? "home" : "splash");
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  // 관찰 과제는 화면을 여는 것만으로는 해본 것이 아니고, 직접 해보기 단계에 들어갔을 때 해본 것으로 기록한다.
+  const basicTried = ok && quiz.status === "basic" && reached >= 1 && !saved?.tried;
+  useEffect(() => {
+    if (basicTried) setState((s) => saveElective(s, v.d.id, subject, { tried: true }));
+  }, [basicTried, v, subject, setState]);
   // 단계를 옮기면 맨 위로 올리고 제목에 초점을 둔다(스크린 리더가 새 단계를 읽게).
   useEffect(() => {
     if (!moved.current) return;
@@ -2101,8 +2115,8 @@ export function Elective({ active, nav, route, state, setState }) {
   // quiz.status: loading | error | ready(연습 문제) | basic(관찰 과제)
   const mode = quiz.status === "ready" ? "quiz" : quiz.status;
   const played = mode === "quiz" ? saved?.summary || "" : "";
-  // 연습 문제는 다 풀어야(요약이 저장돼야) 기록으로 넘어간다. 관찰 과제는 해보고 바로 기록한다.
-  const tried = mode === "basic" || !!saved?.done || !!saved?.summary;
+  // 연습 문제는 다 풀어야(요약이 저장돼야) 기록으로 넘어간다. 관찰 과제는 직접 해보기 단계에 들어가 봤으면 기록한다.
+  const tried = !!saved?.tried || !!saved?.done || !!saved?.summary || (mode === "basic" && reached >= 1);
   const warn = (message) => {
     setNotice(message);
     setShake((n) => n + 1);

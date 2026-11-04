@@ -37,6 +37,8 @@ import {
   saveElective,
   completedElectives,
   electiveReportText,
+  lessonStarted,
+  markStarted,
 } from "./model.js";
 
 const TOTAL = departments[0].lessons.length;
@@ -801,13 +803,13 @@ test("선택 체험은 입학한 제휴 학과의 목록에 있는 과목만 저
 
   // 기록을 먼저 쓰고 나중에 완료해도 이어진다.
   let s = saveElective(base, partner.id, "유기화학", { note: "작용기를 정리했다" });
-  assert.deepEqual(electiveOf(s, partner.id, "유기화학"), { done: false, note: "작용기를 정리했다", summary: "" });
+  assert.deepEqual(electiveOf(s, partner.id, "유기화학"), { done: false, note: "작용기를 정리했다", summary: "", tried: false });
   s = saveElective(s, partner.id, "유기화학", { summary: "5문제 중 5개 맞힘" });
   s = saveElective(s, partner.id, "유기화학", { done: true });
-  assert.deepEqual(electiveOf(s, partner.id, "유기화학"), { done: true, note: "작용기를 정리했다", summary: "5문제 중 5개 맞힘" });
+  assert.deepEqual(electiveOf(s, partner.id, "유기화학"), { done: true, note: "작용기를 정리했다", summary: "5문제 중 5개 맞힘", tried: true });
   // 완료 뒤 기록만 고쳐도 done은 그대로다.
   s = saveElective(s, partner.id, "유기화학", { note: "고친 기록", done: false });
-  assert.deepEqual(electiveOf(s, partner.id, "유기화학"), { done: true, note: "고친 기록", summary: "5문제 중 5개 맞힘" });
+  assert.deepEqual(electiveOf(s, partner.id, "유기화학"), { done: true, note: "고친 기록", summary: "5문제 중 5개 맞힘", tried: true });
   assert.equal(electiveKey(partner.id, "유기화학"), `${partner.id}|유기화학`);
   assert.equal(electiveOf(s, partner.id, "생리학"), null);
   // 길이 제한: 기록 3000자, 요약 200자.
@@ -834,8 +836,8 @@ test("선택 체험 기록은 다시 불러와도 남고, 잘못된 항목은 �
   saved.electives[`${partner.id}|약품분석학`] = { done: false, note: "다".repeat(4000), summary: "" };
   const loaded = loadState(only(STORAGE_KEY, saved));
   assert.deepEqual(Object.keys(loaded.electives).sort(), [`${partner.id}|생리학`, `${partner.id}|약품분석학`, `${partner.id}|유기화학`]);
-  assert.deepEqual(electiveOf(loaded, partner.id, "유기화학"), { done: true, note: "기록", summary: "요약" });
-  assert.deepEqual(electiveOf(loaded, partner.id, "생리학"), { done: false, note: "쓰는 중", summary: "" });
+  assert.deepEqual(electiveOf(loaded, partner.id, "유기화학"), { done: true, note: "기록", summary: "요약", tried: true });
+  assert.deepEqual(electiveOf(loaded, partner.id, "생리학"), { done: false, note: "쓰는 중", summary: "", tried: true });
   assert.equal(electiveOf(loaded, partner.id, "약품분석학").note.length, 3000);
   assert.deepEqual(loaded.journeys[partner.id].completed, 1);
   assert.deepEqual(loadState(only(STORAGE_KEY, { ...saved, electives: [1, 2] })).electives, {});
@@ -854,10 +856,11 @@ test("리포트의 선택 체험은 그 학과에서 마친 것만 학년 순서
   assert.deepEqual(completedElectives(s, partner), []);
   assert.equal(electiveReportText(s, partner), "");
   // 2학년 과목을 먼저 마치고, 1학년 과목은 나중에 마친다. 쓰는 중(done 아님)인 과목과 다른 학과의 기록은 빠진다.
+  s = saveElective(s, partner.id, "미생물학", { tried: true });
   s = saveElective(s, partner.id, "미생물학", { note: "균을 길러 봤다", done: true });
   s = saveElective(s, partner.id, "유기화학", { summary: "5쌍 짝 맞추기 · 틀린 시도 0번", done: true });
   s = saveElective(s, partner.id, "생리학", { note: "쓰는 중" });
-  s = saveElective(s, other.id, "약품분석학", { note: "다른 학과", done: true });
+  s = saveElective(s, other.id, "약품분석학", { note: "다른 학과", tried: true, done: true });
   assert.deepEqual(completedElectives(s, partner), [
     { subject: "유기화학", summary: "5쌍 짝 맞추기 · 틀린 시도 0번", note: "" },
     { subject: "미생물학", summary: "", note: "균을 길러 봤다" },
@@ -889,4 +892,151 @@ test("선택 체험이 생기기 전에 저장한 기록도 그대로 불러오�
   assert.equal(electiveReportText(loaded, partner), "");
   // electives가 없는 state(예전 형식)를 그대로 넘겨도 깨지지 않는다.
   assert.equal(electiveReportText({ ...loaded, electives: undefined }, partner), "");
+});
+
+test("선택 체험 관찰 과제는 직접 해보기를 해 본 뒤에만 마칠 수 있고, 예전 기록은 그대로 마친 것으로 둔다", () => {
+  const partner = pharm("경희대학교", true);
+  let s = { ...structuredClone(initialState), catalog: [partner], journeys: { [partner.id]: { completed: 1, skipped: [] } } };
+  // 직접 해보기 없이 완료하려 하면 마친 것으로 남지 않는다.
+  s = saveElective(s, partner.id, "생리학", { done: true });
+  assert.deepEqual(electiveOf(s, partner.id, "생리학"), { done: false, note: "", summary: "", tried: false });
+  // 직접 해보기 단계에 들어가면 해 본 것으로 남고, 그 뒤에는 마칠 수 있다.
+  s = saveElective(s, partner.id, "생리학", { tried: true });
+  assert.equal(electiveOf(s, partner.id, "생리학").tried, true);
+  s = saveElective(s, partner.id, "생리학", { note: "심장 박동을 재 봤다", done: true });
+  assert.deepEqual(electiveOf(s, partner.id, "생리학"), { done: true, note: "심장 박동을 재 봤다", summary: "", tried: true });
+  // tried는 한 번 해 보면 그대로다.
+  s = saveElective(s, partner.id, "생리학", { tried: false });
+  assert.equal(electiveOf(s, partner.id, "생리학").tried, true);
+  // 연습 문제를 풀어 결과(summary)가 있으면 해 본 것이다.
+  s = saveElective(s, partner.id, "유기화학", { summary: "5쌍 짝 맞추기", done: true });
+  assert.equal(electiveOf(s, partner.id, "유기화학").done, true);
+
+  // tried가 없던 예전 기록: 마친 것, 문제를 푼 것, 기록을 쓴 것은 해 본 것으로, 빈 기록은 아닌 것으로 불러온다.
+  const old = {
+    catalog: [JSON.parse(JSON.stringify(partner))],
+    journeys: { [partner.id]: { completed: 1, skipped: [] } },
+    electives: {
+      [`${partner.id}|생리학`]: { done: true, note: "", summary: "" },
+      [`${partner.id}|유기화학`]: { done: false, note: "", summary: "5쌍" },
+      [`${partner.id}|물리약학`]: { done: false, note: "쓰는 중", summary: "" },
+      [`${partner.id}|미생물학`]: { done: false, note: "", summary: "" },
+      [`${partner.id}|약품분석학`]: { done: false, note: "", summary: "", tried: "yes" },
+    },
+  };
+  const loaded = loadState(only(STORAGE_KEY, old));
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(loaded.electives).map(([key, item]) => [key.split("|")[1], [item.done, item.tried]])),
+    { 생리학: [true, true], 유기화학: [false, true], 물리약학: [false, true], 미생물학: [false, false], 약품분석학: [false, false] },
+  );
+  assert.deepEqual(completedElectives(loaded, partner).map((item) => item.subject), ["생리학"]);
+});
+
+test("관찰 과제 수업도 해본 기록(plays)이 있어야 완료되고, 예전에 화면을 열자마자 저장된 기록도 그대로 완료할 수 있다", () => {
+  const d = createDepartment("간호학과", "가나대학교", ["기본간호학", "성인간호학", "아동간호학"], "의학", null, "4년", "", { 기본간호학: "blank" });
+  const game = d.games[0];
+  assert.ok(game, "1학년 자리에 연습 문제 유형이 있다");
+  const base = { ...structuredClone(initialState), catalog: [d], journeys: { [d.id]: { completed: 0, paused: false } } };
+  // 직접 해보기를 하지 않아 해본 기록이 없으면 완료되지 않는다.
+  assert.equal(completeLesson(base, d.id, 0, "기록"), base);
+  // 직접 해보기 단계에 들어가 해본 기록이 생기면 완료된다(관찰 과제는 summary가 비어 있다).
+  const played = { ...base, plays: { [`${d.id}-0`]: { game, summary: "" } } };
+  assert.equal(completeLesson(played, d.id, 0, "기록").journeys[d.id].completed, 1);
+  // 예전 버전에서 화면을 열자마자 저장된 기록(같은 모양)도 불러와서 그대로 완료할 수 있다.
+  const loaded = loadState(only(STORAGE_KEY, JSON.parse(JSON.stringify(played))));
+  assert.deepEqual(loaded.plays[`${d.id}-0`], { game, summary: "" });
+  assert.equal(completeLesson(loaded, d.id, 0, "").journeys[d.id].completed, 1);
+});
+
+// 홈 버튼 "이어하기"·"시작하기": 지난 학년을 마쳤는지가 아니라 지금 자리의 수업을 시작했는지로 정한다.
+const enrolled = (d, completed = 0) => ({ ...structuredClone(initialState), catalog: departments.some((x) => x.id === d.id) ? [] : [d], current: d.id, journeys: { [d.id]: { completed, paused: false } } });
+const DEPARTMENTS = [
+  departments[0],
+  createDepartment("컴퓨터공학과", "가천대학교", ["자료구조", "운영체제", "알고리즘", "컴퓨터구조"], "공학", null, "4년"),
+  createDepartment("간호과", "전문대학", ["기본간호학", "성인간호학"], "의학", null, "2년"),
+  createDepartment("산업디자인학과", "경희대학교", ["드로잉", "평면디자인", "UX디자인", "서비스디자인", "3D Design 1"], "예체능", null, "4년", "서울특별시", null, null, null, true, true),
+];
+
+test("수업 시작 여부: 아무 기록도 없는 자리는 앞 학년을 마쳤어도 시작하지 않은 것이다(학과·학년 모두 같다)", () => {
+  for (const d of DEPARTMENTS)
+    for (let index = 0; index < d.lessons.length; index++) {
+      const state = enrolled(d, index);
+      assert.equal(lessonStarted(state, d, index), false, `${d.name} ${index + 1}번째 자리`);
+      // 수업 화면을 열면(배우기만 봐도) 시작한 것이다.
+      const opened = markStarted(state, `${d.id}-${index}`);
+      assert.equal(lessonStarted(opened, d, index), true, `${d.name} ${index + 1}번째 자리를 연 뒤`);
+      // 다른 자리를 연 기록은 이 자리와 상관없다.
+      assert.equal(lessonStarted(markStarted(state, `${d.id}-${index + 1}`), d, index), false);
+      assert.equal(lessonStarted(markStarted(state, `other-${index}`), d, index), false);
+    }
+});
+
+test("수업 시작 여부: 쓰던 기록, 남긴 기록, 해본 체험, 체험 결과 중 하나라도 있으면 시작한 것이다", () => {
+  const d = DEPARTMENTS[1];
+  const key = `${d.id}-1`;
+  const state = enrolled(d, 1);
+  const started = (patch) => lessonStarted({ ...state, ...patch }, d, 1);
+  assert.equal(started({ drafts: { [key]: "쓰던 글" } }), true);
+  assert.equal(started({ drafts: { [key]: "  " } }), false, "공백만 있는 기록은 쓴 것이 아니다");
+  assert.equal(started({ notes: { [key]: "남긴 글" } }), true);
+  assert.equal(started({ plays: { [key]: { game: "ox", summary: "" } } }), true, "기본 체험으로 넘어간 것도 시작한 것이다");
+  assert.equal(started({ results: { [key]: [null, { template: "C", summary: "분류" }] } }), true);
+  assert.equal(started({ results: { [key]: [null, null] } }), false);
+  // 졸업 과제 기록은 마지막 자리에만 해당한다.
+  assert.equal(started({ capstones: { [d.id]: { topic: "주제", reason: "", method: "" } }, artworks: { [d.id]: true } }), false);
+  const last = d.lessons.length - 1;
+  const final = enrolled(d, last);
+  assert.equal(lessonStarted(final, d, last), false);
+  assert.equal(lessonStarted({ ...final, capstones: { [d.id]: { topic: "주제", reason: "", method: "" } } }, d, last), true);
+  assert.equal(lessonStarted({ ...final, capstones: { [d.id]: { topic: "", reason: " ", method: "" } } }, d, last), false);
+  assert.equal(lessonStarted({ ...final, artworks: { [d.id]: true } }, d, last), true);
+});
+
+test("수업 시작 여부: 이미 연 자리면 상태를 그대로 돌려주고, 완료·휴강해도 다음 자리는 시작 전이다", () => {
+  const d = departments[0];
+  const state = markStarted(enrolled(d, 0), `${d.id}-0`);
+  assert.equal(markStarted(state, `${d.id}-0`), state);
+  const done = completeLesson(state, d.id, 0, "");
+  assert.equal(done.journeys[d.id].completed, 1);
+  assert.equal(lessonStarted(done, d, 1), false, "1학년을 마친 직후 2학년은 시작하기");
+  const skipped = skipLesson(markStarted(done, `${d.id}-1`), d.id, 1);
+  assert.equal(lessonStarted(skipped, d, 2), false, "휴강하고 넘어간 다음 자리도 시작하기");
+  // 휴강한 자리는 다시 들을 때 이어서 한다.
+  assert.equal(lessonStarted(skipped, d, 1), true);
+});
+
+test("수업 시작 여부는 저장했다 불러와도 남고, started가 없던 예전 기록은 남은 기록으로 판단한다", () => {
+  const d = DEPARTMENTS[1];
+  const state = markStarted(enrolled(d, 1), `${d.id}-1`);
+  const loaded = loadState(only(STORAGE_KEY, JSON.parse(JSON.stringify(state))));
+  assert.deepEqual(loaded.started, { [`${d.id}-1`]: true });
+  assert.equal(lessonStarted(loaded, loaded.catalog[0], 1), true);
+  // 잘못된 값과 없는 학과의 자리는 버린다.
+  const broken = loadState(only(STORAGE_KEY, { ...JSON.parse(JSON.stringify(state)), started: { [`${d.id}-1`]: "yes", "없는학과-0": true, [`${d.id}-2`]: true } }));
+  assert.deepEqual(broken.started, { [`${d.id}-2`]: true });
+  assert.deepEqual(loadState(only(STORAGE_KEY, { ...JSON.parse(JSON.stringify(state)), started: "x" })).started, {});
+  // started가 생기기 전(v4)에 저장한 기록: 쓰던 기록이 있는 자리만 이어하기다.
+  const { started, ...older } = JSON.parse(JSON.stringify({ ...enrolled(d, 1), drafts: { [`${d.id}-1`]: "쓰던 글" } }));
+  const old = loadState(only(STORAGE_KEY, older));
+  assert.deepEqual(old.started, {});
+  assert.equal(lessonStarted(old, old.catalog[0], 1), true);
+  assert.equal(lessonStarted(loadState(only(STORAGE_KEY, { ...older, drafts: {} })), old.catalog[0], 1), false);
+  // 3단계(v2)로 저장한 기록: 옮긴 뒤의 지금 자리에 남은 기록으로 판단한다.
+  const v2 = loadState(
+    only("mirae-campus-v2", {
+      journeys: { design: { completed: 1 }, psychology: { completed: 1 } },
+      notes: { "design-0": "첫 기록" },
+      drafts: { "psychology-1": "쓰던 두 번째 글" },
+    }),
+  );
+  const design = departments.find((x) => x.id === "design");
+  const psychology = departments.find((x) => x.id === "psychology");
+  assert.equal(v2.journeys.design.completed, 1);
+  assert.equal(lessonStarted(v2, design, 1), false, "1학년 기록만 있는 학과의 2학년은 시작하기");
+  assert.equal(lessonStarted(v2, psychology, 1), true, "2학년에 쓰던 글이 있으면 이어하기");
+  // 8단계(v1)로 저장한 기록: 반만 마친 학년 자리에 합쳐진 기록이 있으면 이어하기다.
+  const v1 = loadState(only("mirae-campus-v1", { journeys: { design: { completed: 1 } }, notes: { "design-0": "첫 학기 기록" } }));
+  assert.equal(v1.journeys.design.completed, 0);
+  assert.equal(lessonStarted(v1, design, 0), true);
+  assert.equal(lessonStarted(v1, design, 1), false);
 });

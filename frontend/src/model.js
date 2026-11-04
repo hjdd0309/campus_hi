@@ -249,8 +249,11 @@ export const initialState = {
   archive: [],
   // 잠긴 과목에 남긴 "궁금해요": [{ school, course, subject, createdAt }]. 개인 정보 없이 학교·학과·과목만 둔다.
   curious: [],
-  // 제휴 학교 홈에서 고른 같은 학년의 다른 과목(선택 체험): { "학과id|과목": { done, note, summary } }. 졸업 진행(journeys)과 별개다.
+  // 제휴 학교 홈에서 고른 같은 학년의 다른 과목(선택 체험): { "학과id|과목": { done, note, summary, tried } }. 졸업 진행(journeys)과 별개다.
+  // tried는 직접 해보기를 해 봤는지(연습 문제를 풀었거나 관찰 과제의 직접 해보기 단계에 들어갔는지)다.
   electives: {},
+  // 한 번이라도 연 수업 자리: { "학과-자리": true }. 배우기만 보고 나가도 남는다. 홈의 "이어하기"·"시작하기"를 가른다(lessonStarted).
+  started: {},
   onboarded: false,
 };
 // 수집 파이프라인이 검증한 과목별 학년: { subjects: { 과목: 학년 }, source_url, curriculum_year, checked_at }.
@@ -537,6 +540,13 @@ export function loadState(storage) {
         )
           plays[target] = { game: play.game, summary: play.summary.slice(0, 200) };
       }
+    // 연 수업 자리. 다른 기록과 같은 방법으로 지금 자리 번호로 옮기고, 수업이 바뀐 자리는 버린다.
+    const started = {};
+    if (value.started && typeof value.started === "object")
+      for (const [key, opened] of Object.entries(value.started)) {
+        const target = opened === true && !replaced(key) ? moveKey(key) : null;
+        if (target) started[target] = true;
+      }
     // 학과 전용 체험의 결과. 지금 구조(v4)로 저장된 것만, 그 자리가 지금도 전용 체험이고 체험 수가 같을 때만 둔다.
     const results = {};
     if (stages === 0 && from === STORAGE_KEY && value.results && typeof value.results === "object")
@@ -571,6 +581,7 @@ export function loadState(storage) {
       notes,
       drafts,
       plays,
+      started,
       results,
       current: validIds.has(value.current) ? value.current : "design",
       studying: Object.hasOwn(journeys, value.studying) ? value.studying : null,
@@ -674,6 +685,20 @@ export function completeLesson(state, id, index, note) {
     },
   };
 }
+// 그 자리 수업을 시작한 적이 있는지(배우기·직접 해보기·기록 중 하나라도). 홈 버튼의 "이어하기"·"시작하기"를 가른다.
+// started가 없던 예전 기록도 판단할 수 있게, 그 자리에 남은 기록(쓰던 기록, 남긴 기록, 해본 체험, 체험 결과)과
+// 마지막 자리면 졸업 과제 기록(계획서에 쓴 칸, 마친 졸업작품)도 본다.
+export function lessonStarted(state, d, index) {
+  const key = `${d.id}-${index}`;
+  const text = (value) => typeof value === "string" && !!value.trim();
+  if (state.started?.[key] || text(state.drafts?.[key]) || text(state.notes?.[key]) || state.plays?.[key]) return true;
+  if (Array.isArray(state.results?.[key]) && state.results[key].some(Boolean)) return true;
+  if (index !== d.lessons.length - 1) return false;
+  const plan = state.capstones?.[d.id];
+  return !!state.artworks?.[d.id] || (!!plan && PLAN_FIELDS.some((field) => text(plan[field])));
+}
+// 수업 화면을 열었다고 기록한다. 이미 있으면 상태를 그대로 돌려준다(다시 그리지 않게).
+export const markStarted = (state, key) => (state.started?.[key] ? state : { ...state, started: { ...state.started, [key]: true } });
 // 휴강해서 미이수로 남긴 자리인지.
 export const isSkipped = (journey, index) => Array.isArray(journey?.skipped) && journey.skipped.includes(index);
 // 지금 차례인 수업을 휴강한다: 미이수로 기록하고 다음 자리로 넘어간다. 마지막 자리(졸업 과제)도 휴강하면 졸업한다.
@@ -761,18 +786,18 @@ export function electiveSubjects(d) {
   if (d?.partner !== true) return [];
   return [...new Set((yearSubjects(d)?.years || []).flatMap((item) => item.others))];
 }
-// 선택 체험 기록을 고친다. 입학한 학과의 선택 체험 과목일 때만 저장한다. done은 한 번 마치면 그대로 둔다.
+// 선택 체험 기록을 고친다. 입학한 학과의 선택 체험 과목일 때만 저장한다. done은 한 번 마치면 그대로 두고,
+// 직접 해보기를 해 본 뒤(tried, 연습 문제를 풀어 summary가 있으면 해 본 것)에만 마칠 수 있다.
 export function saveElective(state, id, subject, changes) {
   const d = [...departments, ...(state.catalog || [])].find((item) => item.id === id);
   if (!d || !state.journeys?.[id] || typeof subject !== "string" || !electiveSubjects(d).includes(subject)) return state;
   const key = electiveKey(id, subject);
-  const before = state.electives?.[key] || { done: false, note: "", summary: "" };
+  const before = state.electives?.[key] || { done: false, note: "", summary: "", tried: false };
   const pick = (field, max) => (typeof changes?.[field] === "string" ? changes[field].slice(0, max) : before[field]);
-  const next = {
-    done: before.done || changes?.done === true,
-    note: pick("note", ELECTIVE_NOTE_MAX),
-    summary: pick("summary", ELECTIVE_SUMMARY_MAX),
-  };
+  const note = pick("note", ELECTIVE_NOTE_MAX);
+  const summary = pick("summary", ELECTIVE_SUMMARY_MAX);
+  const tried = before.tried === true || before.done === true || changes?.tried === true || !!summary.trim();
+  const next = { done: before.done || (changes?.done === true && tried), note, summary, tried };
   return { ...state, electives: { ...state.electives, [key]: next } };
 }
 // 리포트에 넣을 선택 체험: 그 학과에서 마친(done) 것만 [{ subject, summary, note }]. 학년 순서(electiveSubjects)대로 두고,
@@ -805,7 +830,9 @@ function cleanElectives(value, validIds) {
     const subject = id ? key.slice(id.length + 1) : "";
     if (!subject.trim() || !item || typeof item !== "object" || Array.isArray(item)) continue;
     if (typeof item.done !== "boolean" || typeof item.note !== "string" || typeof item.summary !== "string") continue;
-    kept[key] = { done: item.done, note: item.note.slice(0, ELECTIVE_NOTE_MAX), summary: item.summary.slice(0, ELECTIVE_SUMMARY_MAX) };
+    // tried가 없던 예전 기록: 마쳤거나, 문제를 풀었거나, 기록 단계에서 글을 썼으면 직접 해보기를 지나온 것이다.
+    const tried = item.tried === true || item.done || !!item.summary.trim() || !!item.note.trim();
+    kept[key] = { done: item.done, note: item.note.slice(0, ELECTIVE_NOTE_MAX), summary: item.summary.slice(0, ELECTIVE_SUMMARY_MAX), tried };
   }
   return kept;
 }
