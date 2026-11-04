@@ -39,6 +39,9 @@ import {
   electiveReportText,
   lessonStarted,
   markStarted,
+  departmentFrom,
+  refreshDepartment,
+  refreshEnrolled,
 } from "./model.js";
 
 const TOTAL = departments[0].lessons.length;
@@ -1039,4 +1042,140 @@ test("수업 시작 여부는 저장했다 불러와도 남고, started가 없�
   assert.equal(v1.journeys.design.completed, 0);
   assert.equal(lessonStarted(v1, design, 0), true);
   assert.equal(lessonStarted(v1, design, 1), false);
+});
+
+// 입학한 학과를 최신 서버 데이터로 바꾸기(2026-11-04). 편성표 학년(years)이 들어오기 전에 입학한 학과는 저장본의 yearly가 null이다.
+const mechCurriculum = ["공업수학", "정역학", "동역학", "열역학", "유체역학", "기계설계", "제어공학", "기계공작법"];
+const mechResult = (years) => ({
+  curriculum: mechCurriculum,
+  category: "공학",
+  years,
+  duration: "4년",
+  region: "서울",
+  games: null,
+  levels: { 공업수학: [1, 1], 정역학: [2, 2] },
+  picks: null,
+  partner: false,
+  partnerExample: false,
+});
+const mechYears = { subjects: { 공업수학: 1, 정역학: 2, 동역학: 2, 열역학: 3, 유체역학: 3, 기계설계: 3, 제어공학: 4, 기계공작법: 4 } };
+
+test("yearly 없는 저장본은 3학년 다른 과목이 비고, 최신 데이터로 바꾸면 채워지며 진행도와 기록은 그대로다", () => {
+  const stale = departmentFrom("기계공학과", "가나대학교", mechResult(null));
+  const fresh = departmentFrom("기계공학과", "가나대학교", mechResult(mechYears));
+  assert.equal(stale.id, fresh.id);
+  const journey = { completed: 2, paused: false, skipped: [1] };
+  // 저장했다 다시 불러와도 옛 데이터(yearly 없음) 그대로라 3학년 다른 과목이 비어 있다.
+  const saved = {
+    catalog: [JSON.parse(JSON.stringify(stale))],
+    journeys: { [stale.id]: journey },
+    notes: { [`${stale.id}-0`]: "1학년 기록" },
+    drafts: { [`${stale.id}-2`]: "3학년 쓰는 중" },
+    plays: { [`${stale.id}-0`]: { game: "blank", summary: "빈칸" } },
+    electives: {},
+  };
+  const loaded = loadState(only(STORAGE_KEY, saved));
+  assert.equal(loaded.catalog[0].yearly, null);
+  assert.deepEqual(homeSubjects(loaded.catalog[0], loaded.journeys[stale.id]).others, []);
+
+  const s = refreshDepartment(loaded, fresh);
+  const d = s.catalog.find((item) => item.id === fresh.id);
+  assert.ok(d.yearly);
+  const home = homeSubjects(d, s.journeys[fresh.id]);
+  assert.equal(home.year, 3);
+  assert.deepEqual(home.others, yearSubjects(fresh).years.find((item) => item.year === 3).others);
+  assert.ok(home.others.length > 0);
+  // 진행도는 그대로다.
+  assert.equal(s.journeys, loaded.journeys);
+  assert.deepEqual(s.journeys[fresh.id], { completed: 2, paused: false, skipped: [1] });
+  // 학년 자리의 수업이 그대로인 자리의 기록은 그대로 두고, 바뀐 자리의 기록은 예전 수업 이름으로 archive에 옮긴다.
+  for (let i = 0; i < fresh.lessons.length; i++) {
+    const key = `${fresh.id}-${i}`;
+    if (stale.lessons[i] === fresh.lessons[i]) {
+      assert.equal(s.notes[key], loaded.notes[key]);
+      assert.equal(s.drafts[key], loaded.drafts[key]);
+      assert.deepEqual(s.plays[key], loaded.plays[key]);
+    } else {
+      assert.equal(s.notes[key], undefined);
+      for (const text of [loaded.notes[key], loaded.drafts[key]].filter(Boolean))
+        assert.ok(s.archive.some((item) => item.id === fresh.id && item.title === stale.lessons[i] && item.note === text), text);
+    }
+  }
+  // 저장했다 다시 불러와도 최신 데이터가 남는다.
+  const again = loadState(only(STORAGE_KEY, JSON.parse(JSON.stringify(s))));
+  assert.deepEqual(homeSubjects(again.catalog[0], again.journeys[fresh.id]).others, home.others);
+  // 같은 데이터로 다시 바꾸면 상태가 그대로다(다시 저장하지 않는다).
+  assert.equal(refreshDepartment(s, departmentFrom("기계공학과", "가나대학교", mechResult(mechYears))), s);
+});
+
+test("학년 자리의 수업이 바뀌면 그 자리의 기록·체험 결과는 archive로 옮기고, 다른 자리와 선택 체험은 그대로 둔다", () => {
+  const stale = departmentFrom("기계공학과", "가나대학교", mechResult(null));
+  const lessons = [...stale.lessons];
+  lessons[1] = "바뀐 2학년 수업";
+  const fresh = { ...stale, lessons };
+  const id = stale.id;
+  const base = {
+    ...structuredClone(initialState),
+    catalog: [stale],
+    journeys: { [id]: { completed: 2, paused: false } },
+    notes: { [`${id}-0`]: "1학년 기록", [`${id}-1`]: "2학년 기록" },
+    drafts: { [`${id}-1`]: "2학년 쓰던 기록", [`${id}-2`]: "3학년 쓰던 기록" },
+    plays: { [`${id}-1`]: { game: "blank", summary: "" } },
+    started: { [`${id}-1`]: true, [`${id}-2`]: true },
+    electives: { [`${id}|열역학`]: { done: true, note: "선택", summary: "", tried: true } },
+    archive: [],
+  };
+  const s = refreshDepartment(base, fresh);
+  assert.deepEqual(s.catalog[0].lessons, lessons);
+  assert.deepEqual(s.journeys, base.journeys);
+  assert.deepEqual(s.notes, { [`${id}-0`]: "1학년 기록" });
+  assert.deepEqual(s.drafts, { [`${id}-2`]: "3학년 쓰던 기록" });
+  assert.deepEqual(s.plays, {});
+  assert.deepEqual(s.started, { [`${id}-2`]: true });
+  assert.deepEqual(s.electives, base.electives);
+  assert.deepEqual(s.archive, [
+    { id, title: stale.lessons[1], note: "2학년 기록" },
+    { id, title: stale.lessons[1], note: "2학년 쓰던 기록" },
+  ]);
+  // 저장해 두지 않은 학과는 바꾸지 않는다.
+  assert.equal(refreshDepartment(base, { ...fresh, id: "api:없는:학과" }), base);
+});
+
+test("입학한 학과만 앱 실행당 한 번 다시 받고, 받지 못하면 저장본을 그대로 쓴다", async () => {
+  const stale = departmentFrom("기계공학과", "가나대학교", mechResult(null));
+  const browsed = departmentFrom("물리학과", "가나대학교", { ...mechResult(null), curriculum: ["역학", "전자기학", "열역학"] });
+  let state = {
+    ...structuredClone(initialState),
+    catalog: [stale, browsed],
+    journeys: { [stale.id]: { completed: 2, paused: false } },
+  };
+  const update = (fn) => {
+    state = fn(state);
+  };
+  const reports = [];
+  const report = (...args) => reports.push(args);
+  // 받지 못하면(네트워크 오류, 404) 저장본 그대로다.
+  for (const error of [new TypeError("Failed to fetch"), Object.assign(new Error("없음"), { status: 404 })]) {
+    const before = state;
+    await refreshEnrolled(state, () => Promise.reject(error), update, new Set(), report);
+    assert.equal(state, before);
+  }
+  assert.equal(reports.length, 2);
+  // load 자체가 예외를 던져도 흐름을 막지 않는다.
+  await refreshEnrolled(state, () => {
+    throw new Error("동기 오류");
+  }, update, new Set(), report);
+  assert.equal(reports.length, 3);
+  // 받으면 최신 데이터로 바뀐다. 둘러보기만 한 학과는 받지 않고, 같은 실행에서 다시 부르면 다시 받지 않는다.
+  const asked = [];
+  const seen = new Set();
+  const load = async (school, course) => {
+    asked.push(course);
+    return mechResult(mechYears);
+  };
+  await refreshEnrolled(state, load, update, seen, report);
+  await refreshEnrolled(state, load, update, seen, report);
+  assert.deepEqual(asked, ["기계공학과"]);
+  assert.ok(state.catalog.find((d) => d.id === stale.id).yearly);
+  assert.deepEqual(state.journeys[stale.id], { completed: 2, paused: false });
 });

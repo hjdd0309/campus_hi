@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SCREENS } from "./screens.jsx";
-import { STORAGE_KEY, loadState } from "./model.js";
+import { STORAGE_KEY, loadState, refreshEnrolled } from "./model.js";
+import { getCurriculum } from "./api.js";
 import { addGhost, makeRoute as make, restoreStack } from "./navStack.js";
 
 // 화면은 402×874 아트보드에 맞춰 그리고, 창 크기에 맞게 통째로 줄이거나 늘린다.
@@ -18,6 +19,9 @@ const ENTER = { push: "tr-push-in", fade: "tr-fade-in", rise: "tr-rise-in" };
 const EXIT = { push: "tr-push-out", fade: "tr-fade-out", rise: "tr-fade-out" };
 // 잠깐 보여주고 넘어가는 화면. 새로고침으로 돌아왔을 때는 그다음 화면을 보여준다.
 const SETTLED = { loading: "result", enrolled: "welcome", grades: "graduation", diploma: "graduation" };
+
+// 이번 실행에서 최신 교육과정을 받으러 간 학과 id. 같은 학과를 화면마다(또는 StrictMode에서 두 번) 다시 받지 않는다.
+const refreshed = new Set();
 
 function initialStack(state) {
   try {
@@ -69,6 +73,13 @@ export default function App() {
   const short = Math.max(0, H - height);
   const trimBottom = Math.min(short, TRIM_BOTTOM);
   const trimTop = Math.min(short - trimBottom, TRIM_TOP);
+
+  // 입학한 학과는 앱을 열 때 서버에서 교육과정을 다시 받아 최신 데이터로 바꾼다(저장본이 옛 데이터일 수 있다).
+  // 진행도와 기록은 그대로 둔다(refreshDepartment). 받지 못하면 저장본을 그대로 쓰고, 오류는 콘솔에만 남긴다.
+  useEffect(() => {
+    refreshEnrolled(state, getCurriculum, setState, refreshed);
+    // 앱을 열 때 한 번만 한다. 이번 실행에서 새로 입학하는 학과는 학교 검색에서 막 받은 데이터를 쓴다.
+  }, []);
 
   useEffect(() => {
     try {

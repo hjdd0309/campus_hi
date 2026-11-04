@@ -699,6 +699,63 @@ export function lessonStarted(state, d, index) {
 }
 // 수업 화면을 열었다고 기록한다. 이미 있으면 상태를 그대로 돌려준다(다시 그리지 않게).
 export const markStarted = (state, key) => (state.started?.[key] ? state : { ...state, started: { ...state.started, [key]: true } });
+// getCurriculum 응답으로 학과를 만든다(학교 검색에서 열 때와, 입학한 학과를 최신 데이터로 갱신할 때).
+export const departmentFrom = (course, school, result) =>
+  createDepartment(course, school, result.curriculum, result.category, result.years, result.duration, result.region, result.games, result.levels, result.picks, result.partner, result.partnerExample);
+
+// 저장해 둔 학과(state.catalog)를 서버에서 새로 받은 데이터로 만든 학과(fresh)로 바꾼다.
+// 진행도(journeys)와 기록은 그대로 두고 학년 자리는 지금 데이터로 정한다(2026-11-04 결정).
+// 학년 자리의 수업이 바뀌었으면, 그 자리의 기록(남긴 기록·쓰던 기록·체험 결과)은 예전 수업 이름으로 리포트의 이전 체험 기록(archive)으로 옮기고
+// 그 자리의 해본 체험(plays)·연 기록(started)은 지운다. 바뀐 수업에 예전 기록이 붙어 보이지 않게 하되 기록은 잃지 않는다(loadState의 v3 규칙과 같다).
+export function refreshDepartment(state, fresh) {
+  const old = (state.catalog || []).find((item) => item.id === fresh?.id);
+  if (!old || JSON.stringify(old) === JSON.stringify(fresh)) return state;
+  const changed = [];
+  for (let i = 0; i < Math.max(old.lessons.length, fresh.lessons.length); i++) if (old.lessons[i] !== fresh.lessons[i]) changed.push(i);
+  const next = { ...state, catalog: state.catalog.map((item) => (item.id === fresh.id ? fresh : item)) };
+  if (!changed.length) return next;
+  const archive = [...(state.archive || [])];
+  const notes = { ...state.notes };
+  const drafts = { ...state.drafts };
+  const plays = { ...state.plays };
+  const results = { ...state.results };
+  const started = { ...state.started };
+  for (const i of changed) {
+    const key = `${fresh.id}-${i}`;
+    const title = String(old.lessons[i] || `${i + 1}번째 수업`).slice(0, 60);
+    for (const text of [state.notes?.[key], state.drafts?.[key]])
+      if (typeof text === "string" && text.trim()) archive.push({ id: fresh.id, title, note: text.slice(0, 3000) });
+    const done = (state.results?.[key] || []).filter(Boolean);
+    if (done.length) archive.push({ id: fresh.id, title: `${title} · 바뀌기 전 체험`.slice(0, 60), note: done.map(resultSummary).join(" · ").slice(0, 3000) });
+    delete notes[key];
+    delete drafts[key];
+    delete plays[key];
+    delete results[key];
+    delete started[key];
+  }
+  return { ...next, archive, notes, drafts, plays, results, started };
+}
+
+// 입학한 학과(저장된 학과 중 학교가 있는 것)의 교육과정을 다시 받아 최신 데이터로 바꾼다. 앱을 열 때 한 번 부른다.
+// load(school, course): getCurriculum. update(fn): setState. seen: 이번 실행에서 이미 받으러 간 학과 id(같은 학과를 다시 받지 않는다).
+// 받지 못하면(네트워크 오류, 404 등) 저장본을 그대로 두고 report(콘솔)에만 남긴다.
+export function refreshEnrolled(state, load, update, seen = new Set(), report = console.warn) {
+  const jobs = [];
+  for (const d of state.catalog || []) {
+    if (!d?.school || !Object.hasOwn(state.journeys || {}, d.id) || seen.has(d.id)) continue;
+    seen.add(d.id);
+    jobs.push(
+      Promise.resolve()
+        .then(() => load(d.school, d.name))
+        .then(
+          (result) => update((s) => refreshDepartment(s, departmentFrom(d.name, d.school, result))),
+          (error) => report(`[캠퍼스하이] ${d.school} ${d.name} 교육과정을 새로 받지 못해 저장된 데이터를 씁니다.`, error),
+        ),
+    );
+  }
+  return Promise.all(jobs);
+}
+
 // 휴강해서 미이수로 남긴 자리인지.
 export const isSkipped = (journey, index) => Array.isArray(journey?.skipped) && journey.skipped.includes(index);
 // 지금 차례인 수업을 휴강한다: 미이수로 기록하고 다음 자리로 넘어간다. 마지막 자리(졸업 과제)도 휴강하면 졸업한다.

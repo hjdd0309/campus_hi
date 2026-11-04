@@ -28,7 +28,6 @@ import {
   finalOf,
   planReady,
   PLAN_FIELDS,
-  createDepartment,
   recommend,
   completeLesson,
   lessonStarted,
@@ -50,6 +49,8 @@ import {
   electiveOf,
   electiveSubjects,
   saveElective,
+  departmentFrom,
+  refreshDepartment,
   completedElectives,
   electiveReportText,
 } from "./model.js";
@@ -744,16 +745,13 @@ export function Schools({ nav, route, setState }) {
     setFailed(null);
     getCurriculum(p.school, p.course)
       .then((result) => {
-        const dept = createDepartment(p.course, p.school, result.curriculum, result.category, result.years, result.duration, result.region, result.games, result.levels, result.picks, result.partner, result.partnerExample);
-        // 이미 입학한 학과는 입학할 때 정한 학년별 수업을 그대로 둔다. 새로 받은 데이터로 바꾸면 진행 중인 학년의 수업이 바뀐다.
-        // 제휴 여부는 수업과 상관없으니 새로 받은 값으로 바꾼다.
-        setState((s) => ({
-          ...s,
-          current: dept.id,
-          catalog: s.journeys[dept.id] && s.catalog.some((item) => item.id === dept.id)
-            ? s.catalog.map((item) => (item.id === dept.id ? { ...item, partner: dept.partner, partnerExample: dept.partnerExample } : item))
-            : [...s.catalog.filter((item) => item.id !== dept.id), dept],
-        }));
+        const dept = departmentFrom(p.course, p.school, result);
+        // 이미 입학한 학과도 새로 받은 데이터로 바꾸고, 진행도와 기록은 그대로 둔다(학년 자리의 수업이 바뀌면 그 자리 기록은 archive로).
+        setState((s) =>
+          s.journeys[dept.id] && s.catalog.some((item) => item.id === dept.id)
+            ? { ...refreshDepartment(s, dept), current: dept.id }
+            : { ...s, current: dept.id, catalog: [...s.catalog.filter((item) => item.id !== dept.id), dept] },
+        );
         nav.push("detail");
       })
       .catch(() => {
