@@ -1,7 +1,9 @@
-// 체험 틀 H(그리기)·I(기억해서 맞추기)의 데이터 형식 검사, 채점, 결과 기록 검사. 화면은 StudioTemplates.jsx에 있다.
+// 체험 틀 H(그리기)·I(기억해서 맞추기)·J(대화로 알아내기)·K(조절해서 시험하기)의 데이터 형식 검사, 채점, 결과 기록 검사. 화면은 StudioTemplates.jsx에 있다.
 // 틀은 학과 내용을 모른다. 투시 스케치·색 맞추기 같은 내용은 데이터(departmentData.js 등)로 넣는다.
 //   H 그리기: 소실점이 찍힌 화면에 선을 그으면 선마다 투시 방향과 얼마나 맞는지 채점한다. 라운드마다 가이드선을 켤 수 있다.
 //   I 기억해서 맞추기: 목표 값을 잠깐 보여 주고 숨긴 뒤, 슬라이더로 기억해서 맞춘다. 지금은 색(색상·채도·명도)을 맞춘다.
+//   J 대화로 알아내기: 등장인물과 대화하며 턴마다 질문을 고른다. 열린 질문을 고르면 인사이트가 드러나고, 마지막에 컨셉을 고른다.
+//   K 조절해서 시험하기: 슬라이더로 치수를 바꾸고, 사람마다의 측정값과 규칙으로 편한지 계산한다. 모두 편한 값을 찾으면 끝난다.
 
 const text = (value, max) => (typeof value === "string" && value.trim() && [...value].length <= max ? value : null);
 const list = (value, min, max) => (Array.isArray(value) && value.length >= min && value.length <= max ? value : null);
@@ -244,11 +246,217 @@ export function recallSummary(result) {
 }
 
 /* ---------------------------------------------------------------- */
+/* J 대화로 알아내기 (사용자 인터뷰)                                    */
+/* ---------------------------------------------------------------- */
+
+// 질문의 종류. 열린 질문만 숨은 불편함(인사이트)을 드러낸다(데이터 형식 검사에서 강제한다).
+export const QUESTION_KINDS = { open: "열린 질문", leading: "유도 질문", closed: "닫힌 질문" };
+const id = (value) => (typeof value === "string" && /^[a-z][a-z0-9-]{0,19}$/.test(value) ? value : null);
+const distinctIds = (items) => new Set(items.map((item) => item.id)).size === items.length;
+
+function cleanInterview(raw) {
+  const insights = all(list(raw.insights, 2, 6)?.map((item) => (id(item?.id) && text(item.text, 60) ? { id: item.id, text: item.text } : null)));
+  if (!insights || !distinctIds(insights)) return null;
+  const known = new Set(insights.map((item) => item.id));
+  const turns = all(
+    list(raw.turns, 3, 6)?.map((turn) => {
+      const choices = all(
+        list(turn?.choices, 2, 3)?.map((choice) => {
+          if (!choice || !Object.hasOwn(QUESTION_KINDS, choice.kind) || !text(choice.ask, 60) || !text(choice.reply, 120)) return null;
+          // 인사이트는 열린 질문에만 붙는다.
+          if (choice.insight !== undefined && (choice.kind !== "open" || !known.has(choice.insight))) return null;
+          return { ask: choice.ask, kind: choice.kind, reply: choice.reply, ...(choice.insight ? { insight: choice.insight } : {}) };
+        }),
+      );
+      return choices && (turn.lead === undefined || text(turn.lead, 80)) ? { lead: turn.lead || "", choices } : null;
+    }),
+  );
+  const reachable = new Set(turns?.flatMap((turn) => turn.choices.map((choice) => choice.insight).filter(Boolean)) || []);
+  const concepts = all(
+    list(raw.concepts, 2, 4)?.map((concept) =>
+      text(concept?.text, 50) && Array.isArray(concept.needs) && concept.needs.length <= 4 && concept.needs.every((need) => known.has(need))
+        ? { text: concept.text, needs: [...new Set(concept.needs)] }
+        : null,
+    ),
+  );
+  const persona = raw.persona;
+  return turns &&
+    insights.every((item) => reachable.has(item.id)) &&
+    concepts &&
+    concepts.some((concept) => concept.needs.length) &&
+    persona &&
+    text(persona.label, 20) &&
+    text(persona.note, 40) &&
+    text(raw.opening, 120) &&
+    text(raw.prompt, 120) &&
+    text(raw.conceptPrompt, 60) &&
+    text(raw.explanation, 160)
+    ? {
+        persona: { label: persona.label, note: persona.note },
+        opening: raw.opening,
+        turns,
+        insights,
+        concepts,
+        prompt: raw.prompt,
+        conceptPrompt: raw.conceptPrompt,
+        explanation: raw.explanation,
+      }
+    : null;
+}
+
+// 턴마다 고른 보기 번호(picks)로 찾은 인사이트 id를 찾은 순서대로 돌려준다.
+export function foundInsights(data, picks) {
+  const found = [];
+  picks.forEach((pick, turn) => {
+    const insight = data.turns[turn]?.choices[pick]?.insight;
+    if (insight && !found.includes(insight)) found.push(insight);
+  });
+  return found;
+}
+// 컨셉이 인터뷰에서 찾은 인사이트에 근거하는지: 필요한 인사이트 중 못 찾은 것(missing). 근거가 하나도 없는 컨셉은 grounded가 false다.
+export function conceptCheck(concept, found) {
+  const missing = concept.needs.filter((need) => !found.includes(need));
+  return { grounded: concept.needs.length > 0 && missing.length === 0, missing };
+}
+
+function cleanInterviewResult(raw) {
+  const insights = all(list(raw?.insights, 0, 6)?.map((item) => text(item, 60)));
+  return insights && int(raw.total, 1, 6) && insights.length <= raw.total && text(raw.concept, 50) && typeof raw.grounded === "boolean"
+    ? { template: "J", insights: [...insights], total: raw.total, concept: raw.concept, grounded: raw.grounded }
+    : null;
+}
+export const interviewSummary = (result) => `사용자 인터뷰 인사이트 ${result.insights.length}/${result.total}개 · 컨셉 "${result.concept}"`;
+
+/* ---------------------------------------------------------------- */
+/* K 조절해서 시험하기 (손잡이 테스트)                                   */
+/* ---------------------------------------------------------------- */
+
+// 값 = Σ k × (슬라이더 값 또는 사람의 측정값). 검사(checks)는 사람마다, 제한(limits)은 사람과 상관없이 한 번 본다.
+// 결과를 미리 정해 두지 않고, 슬라이더 값과 사람의 측정값으로 매번 계산한다.
+function cleanTerm(term, params, measures) {
+  if (!term || typeof term !== "object" || !num(term.k, -100, 100) || term.k === 0) return null;
+  if (typeof term.param === "string" && params.has(term.param) && term.measure === undefined) return { param: term.param, k: term.k };
+  if (typeof term.measure === "string" && measures?.has(term.measure) && term.param === undefined) return { measure: term.measure, k: term.k };
+  return null;
+}
+function cleanRule(rule, params, measures) {
+  const terms = all(list(rule?.terms, 1, 4)?.map((term) => cleanTerm(term, params, measures)));
+  const hasMin = rule?.min !== undefined;
+  const hasMax = rule?.max !== undefined;
+  if (!terms || !id(rule.id) || !text(rule.label, 20) || (!hasMin && !hasMax)) return null;
+  if ((hasMin && (!num(rule.min, -1000, 1000) || !text(rule.low, 40))) || (hasMax && (!num(rule.max, -1000, 1000) || !text(rule.high, 40)))) return null;
+  if (hasMin && hasMax && rule.min > rule.max) return null;
+  return { id: rule.id, label: rule.label, terms, ...(hasMin ? { min: rule.min, low: rule.low } : {}), ...(hasMax ? { max: rule.max, high: rule.high } : {}) };
+}
+
+function cleanSim(raw) {
+  const params = all(
+    list(raw.params, 1, 3)?.map((param) =>
+      param &&
+      id(param.id) &&
+      text(param.label, 16) &&
+      text(param.unit, 4) &&
+      num(param.min, -1000, 1000) &&
+      num(param.max, param.min, 1000) &&
+      num(param.step, 0.001, 1000) &&
+      num(param.start, param.min, param.max) &&
+      (param.max - param.min) / param.step <= 400
+        ? { id: param.id, label: param.label, unit: param.unit, min: param.min, max: param.max, step: param.step, start: param.start }
+        : null,
+    ),
+  );
+  const measures = all(list(raw.measures, 1, 6)?.map((m) => (m && id(m.id) && text(m.label, 16) && text(m.unit, 4) ? { id: m.id, label: m.label, unit: m.unit } : null)));
+  if (!params || !distinctIds(params) || !measures || !distinctIds(measures)) return null;
+  const paramIds = new Set(params.map((param) => param.id));
+  const measureIds = new Set(measures.map((m) => m.id));
+  const people = all(
+    list(raw.people, 1, 4)?.map((person) =>
+      person &&
+      id(person.id) &&
+      text(person.label, 8) &&
+      text(person.note, 30) &&
+      text(person.source, 120) &&
+      person.values &&
+      measures.every((m) => num(person.values[m.id], 0, 1000))
+        ? { id: person.id, label: person.label, note: person.note, source: person.source, values: Object.fromEntries(measures.map((m) => [m.id, person.values[m.id]])) }
+        : null,
+    ),
+  );
+  const checks = all(list(raw.checks, 1, 6)?.map((rule) => cleanRule(rule, paramIds, measureIds)));
+  const limits = raw.limits === undefined ? [] : all(list(raw.limits, 0, 3)?.map((rule) => cleanRule(rule, paramIds, null)));
+  if (!people || !distinctIds(people) || !checks || !distinctIds(checks) || !limits) return null;
+  const data = {
+    params,
+    measures,
+    people,
+    checks,
+    limits,
+    prompt: text(raw.prompt, 120),
+    good: text(raw.good, 30),
+    done: text(raw.done, 60),
+    footnote: raw.footnote === undefined ? "" : text(raw.footnote, 120),
+    explanation: text(raw.explanation, 160),
+  };
+  if (!data.prompt || !data.good || !data.done || data.footnote === null || !data.explanation) return null;
+  // 모두 만족하는 값이 하나도 없으면 끝낼 수 없는 체험이다. 처음 값이 이미 정답이면 해볼 것이 없다.
+  return findSolution(data) && !evaluate(data, startValues(data)).ok ? data : null;
+}
+
+export const startValues = (data) => Object.fromEntries(data.params.map((param) => [param.id, param.start]));
+const valueOf = (rule, values, person) => rule.terms.reduce((sum, term) => sum + term.k * (term.param ? values[term.param] : person.values[term.measure]), 0);
+// 아주 작은 부동소수 오차로 경계에서 판정이 뒤집히지 않게 한다.
+const EPSILON = 1e-9;
+function judge(rule, values, person) {
+  const value = valueOf(rule, values, person);
+  if (rule.min !== undefined && value < rule.min - EPSILON) return { id: rule.id, label: rule.label, side: "low", message: rule.low, value };
+  if (rule.max !== undefined && value > rule.max + EPSILON) return { id: rule.id, label: rule.label, side: "high", message: rule.high, value };
+  return null;
+}
+// 지금 값으로 사람마다(people), 그리고 사람과 상관없는 제한(limits)을 판정한다.
+export function evaluate(data, values) {
+  const people = data.people.map((person) => {
+    const fails = data.checks.map((rule) => judge(rule, values, person)).filter(Boolean);
+    return { id: person.id, ok: fails.length === 0, fails };
+  });
+  const limits = data.limits.map((rule) => judge(rule, values, null)).filter(Boolean);
+  return { people, limits, ok: limits.length === 0 && people.every((person) => person.ok) };
+}
+// 슬라이더 눈금을 모두 훑어 모두 만족하는 첫 값을 찾는다(없으면 null). 눈금 수는 형식 검사에서 제한한다.
+export function findSolution(data) {
+  const grids = data.params.map((param) => {
+    const count = Math.floor((param.max - param.min) / param.step + EPSILON);
+    return Array.from({ length: count + 1 }, (_, i) => Math.round((param.min + i * param.step) * 1000) / 1000);
+  });
+  const visit = (index, values) => {
+    if (index === grids.length) return evaluate(data, values).ok ? { ...values } : null;
+    for (const value of grids[index]) {
+      const found = visit(index + 1, { ...values, [data.params[index].id]: value });
+      if (found) return found;
+    }
+    return null;
+  };
+  return visit(0, {});
+}
+
+function cleanSimResult(raw) {
+  const params = all(
+    list(raw?.params, 1, 3)?.map((param) =>
+      param && text(param.label, 16) && text(param.unit, 4) && num(param.value, -1000, 1000) ? { label: param.label, value: param.value, unit: param.unit } : null,
+    ),
+  );
+  return params && int(raw.tries, 1, 9999) && int(raw.people, 1, 4) ? { template: "K", params, tries: raw.tries, people: raw.people } : null;
+}
+export const simSummary = (result) =>
+  `손잡이 테스트 ${result.params.map((param) => `${param.label} ${param.value}${param.unit}`).join(" · ")} (${result.people}명 모두 편함, ${result.tries}번 만에)`;
+
+/* ---------------------------------------------------------------- */
 
 // experiences.js의 templates에 더하는 틀. clean은 체험 데이터, cleanResult는 저장된 결과를 검사한다.
 export const studioTemplates = {
   H: { title: "그리기", clean: cleanSketch, cleanResult: cleanSketchResult, summary: sketchSummary },
   I: { title: "기억해서 맞추기", clean: cleanRecall, cleanResult: cleanRecallResult, summary: recallSummary },
+  J: { title: "대화로 알아내기", clean: cleanInterview, cleanResult: cleanInterviewResult, summary: interviewSummary },
+  K: { title: "조절해서 시험하기", clean: cleanSim, cleanResult: cleanSimResult, summary: simSummary },
 };
 
 // 저장된 결과 하나를 검사한다. 틀을 모르거나 형식이 틀리면 null.

@@ -170,11 +170,13 @@ backend/.venv/Scripts/python -m backend.pipeline status                       # 
 backend/.venv/Scripts/python -m backend.pipeline approve 경희대학교 산업디자인학과
 ```
 
-홈페이지에 편성표가 없거나 읽을 수 없는 학과는 직접 정리한 CSV(`school,course,year,subject`, 선택으로 `url`, `curriculum_year`)로 넣을 수 있습니다.
+홈페이지에 편성표가 없거나 읽을 수 없는 학과는 직접 정리한 CSV(`school,course,year,subject`, 선택으로 `alias`, `url`, `curriculum_year`)로 넣을 수 있습니다. 사람이 편성표와 대조한 자료로 보고 바로 공개합니다. `subject`는 편성표에 적힌 과목 이름입니다. 공시 자료(`courses.csv.gz`)의 교과목 이름이 다르면 `alias`에 공시 이름을 적습니다(예: 편성표 "디자인비즈니스", 공시 "산업디자인비지니스"). 띄어쓰기만 다른 이름은 자동으로 맞춥니다. 공시 자료에 없는 편성표 과목은 `extra`로 남아 학년별 과목 목록에 편성표 이름 그대로 보입니다. 넣은 CSV는 출처를 남기기 위해 `backend/data/year_imports/`에 둡니다(예: `경희대학교-산업디자인학과-2025.csv`, 2025학년도 예술·디자인대학 교육과정 [별표1]).
 
 ```
-backend/.venv/Scripts/python -m backend.pipeline import 편성표.csv
+backend/.venv/Scripts/python -m backend.pipeline import backend/data/year_imports/학교-학과-연도.csv
 ```
+
+단과대 전체 교육과정처럼 한 PDF에 여러 학과가 들어 있고 100쪽이 넘으면, `collect`가 학과 이름이 나오는 쪽(과 그 다음 쪽)만 골라 보냅니다(`pypdf`, `requirements-pipeline.txt`).
 
 수집 결과는 서버를 다시 띄우거나 다시 배포해야 반영됩니다.
 

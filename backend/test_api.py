@@ -194,7 +194,7 @@ class ApiTests(unittest.TestCase):
     def test_verified_department_gets_subject_years(self):
         result = self.curriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과")
         years = result["years"]
-        self.assertEqual(set(years), {"subjects", "source_url", "curriculum_year", "checked_at"})
+        self.assertEqual(set(years), {"subjects", "names", "extra", "source_url", "curriculum_year", "checked_at"})
         self.assertTrue(years["source_url"].startswith("https://"))
         self.assertEqual(years["curriculum_year"], 2026)
         # 과목명은 원본 교과목명 그대로이고, 학년은 수업연한 안의 정수다. 학기 구분은 없다.
@@ -205,7 +205,7 @@ class ApiTests(unittest.TestCase):
         self.assertNotIn("terms", result)
 
     def test_department_without_year_data_gets_none(self):
-        result = self.curriculum("경희대학교", "산업디자인학과")
+        result = self.curriculum("경희대학교", "시각디자인학과")
         self.assertIsNone(result["years"])
         self.assertNotIn("terms", result)
         self.assertGreater(len(result["curriculum_list"]), 0)
@@ -220,7 +220,29 @@ class ApiTests(unittest.TestCase):
             entry["subjects"] = {subject: 2, "없는과목": 1}
             result = self.curriculum("서울대학교", "전기·정보공학부")
         self.assertIs(result["partner"], False)
-        self.assertEqual(result["years"], {"subjects": {subject: 2}, "source_url": "https://example.ac.kr/c", "curriculum_year": None, "checked_at": "2026-10-28"})
+        self.assertEqual(
+            result["years"],
+            {"subjects": {subject: 2}, "names": {}, "extra": {}, "source_url": "https://example.ac.kr/c", "curriculum_year": None, "checked_at": "2026-10-28"},
+        )
+
+    def test_schedule_only_subjects_and_display_names_come_with_their_source(self):
+        # 경희대 산업디자인학과: 2025 교육과정 편성표에서 넣은 학년. 공시 자료에 없는 편성표 과목(extra)과 편성표 이름(names)도 함께 보낸다.
+        result = self.curriculum("경희대학교", "산업디자인학과")
+        years = result["years"]
+        self.assertEqual(years["curriculum_year"], 2025)
+        self.assertTrue(years["source_url"].startswith("https://dc.khu.ac.kr/"))
+        self.assertEqual((years["subjects"]["드로잉"], years["subjects"]["현대 미술사"], years["subjects"]["기초산업디자인 1"]), (1, 1, 2))
+        self.assertEqual(years["names"], {"산업디자인비지니스": "디자인비즈니스"})
+        self.assertEqual(years["subjects"]["산업디자인비지니스"], 3)
+        self.assertEqual(years["extra"]["리빙제품디자인"], 2)
+        self.assertFalse(set(years["extra"]) & set(result["curriculum_list"]))
+        entry = {"school": "서울대학교", "course": "전기·정보공학부", "url": "https://example.ac.kr/c", "checked_at": "2026-10-28", "status": "verified"}
+        subject = self.curriculum("서울대학교", "전기·정보공학부")["curriculum_list"][0]
+        # 형식이 틀린 extra·names, 교과목에 이미 있는 이름은 보내지 않는다.
+        entry.update(subjects={subject: 2}, names={"없는과목": "이름", subject: ""}, extra={"편성표과목": 9, "다른과목": "2", subject: 1, "좋은과목": 3})
+        with mock.patch("backend.main.year_curricula", return_value={("서울대학교", "전기·정보공학부"): entry}):
+            served = self.curriculum("서울대학교", "전기·정보공학부")["years"]
+        self.assertEqual((served["names"], served["extra"]), ({}, {"좋은과목": 3}))
 
     def test_school_and_program_lists_mark_partners(self):
         schools = self.client.post("/api/school_list", json={"course": "산업디자인학과"}).json()["school_list"]

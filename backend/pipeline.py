@@ -9,7 +9,7 @@
     python -m backend.pipeline report 경희대학교              # 학과별 결과 리포트(data/year_reports/학교.csv)
     python -m backend.pipeline status                         # 수집 현황
     python -m backend.pipeline approve 학교 학과              # 검토 대기 항목을 사람이 확인하고 공개
-    python -m backend.pipeline import 파일.csv                # 직접 정리한 학년표 넣기
+    python -m backend.pipeline import 파일.csv                # 직접 정리한 학년표 넣기(school,course,year,subject, 선택: alias,url,curriculum_year)
 
 출처 목록은 `data/year_sources.csv`(school,course,url)에 한 줄씩 적는다. 출처를 못 찾은 학과는 url을 비워 둔다.
 """
@@ -42,6 +42,8 @@ MODEL = "claude-opus-5-5"
 PRICES = {"claude-opus-5-5": (4.0, 20.0)}
 MAX_BYTES = 20 * 1024 * 1024
 MAX_TEXT_CHARS = 400_000
+# 한 번에 보낼 수 있는 PDF 쪽수. 단과대 전체 교육과정처럼 이보다 긴 PDF는 그 학과 이름이 나오는 쪽만 골라 보낸다.
+MAX_PDF_PAGES = 100
 MIN_SUBJECTS = 5
 # 추출한 과목 중 원본 교과목에 맞춘 비율이 이보다 낮으면 사람이 확인하기 전까지 공개하지 않는다.
 AUTO_VERIFY_RATIO = 0.5
@@ -194,12 +196,46 @@ def usage_of(model, input_tokens, output_tokens):
     return {"model": model, "input_tokens": input_tokens, "output_tokens": output_tokens, "cost_usd": cost}
 
 
+def pages_for(texts, course, limit=MAX_PDF_PAGES):
+    """쪽마다의 글자(texts)에서 학과 이름이 나오는 쪽과 그 바로 다음 쪽(표가 다음 쪽으로 이어질 때)의 번호를 고른다.
+    띄어쓰기는 무시한다. 학과 이름이 나오는 쪽이 없으면 ValueError."""
+    key = compact(course)
+    hits = [i for i, text in enumerate(texts) if key in compact(text or "")]
+    if not hits:
+        raise ValueError(f"PDF {len(texts)}쪽 중 '{course}'이(가) 나오는 쪽을 찾지 못했습니다.")
+    chosen = sorted({page for hit in hits for page in (hit, hit + 1) if page < len(texts)})
+    return chosen[:limit]
+
+
+def trim_pdf(raw, course, limit=MAX_PDF_PAGES):
+    """쪽수가 limit을 넘는 PDF는 학과 이름이 나오는 쪽만 모아 새 PDF로 만든다. 그 이하면 그대로 돌려준다."""
+    import io
+
+    import pypdf
+
+    try:
+        reader = pypdf.PdfReader(io.BytesIO(raw))
+        count = len(reader.pages)
+    except pypdf.errors.PdfReadError:
+        # 쪽을 셀 수 없는 PDF는 그대로 보낸다. 정말 깨진 파일이면 추출 단계가 오류를 알려 준다.
+        return raw
+    if count <= limit:
+        return raw
+    writer = pypdf.PdfWriter()
+    for page in pages_for([page.extract_text() for page in reader.pages], course, limit):
+        writer.add_page(reader.pages[page])
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
 def extract_with_claude(school, course, raw, kind, content_type):
     """문서에서 과목별 학년을 뽑는다. `ANTHROPIC_API_KEY`가 필요하다. 결과의 usage에 토큰 수와 비용을 담는다."""
     import anthropic
 
     instructions = PROMPT.format(school=school, course=course)
     if kind == "pdf":
+        raw = trim_pdf(raw, course)
         content = [
             {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": base64.standard_b64encode(raw).decode()}},
             {"type": "text", "text": instructions},
@@ -455,22 +491,36 @@ def summarize(rows):
 
 
 def import_rows(rows, results, today=None):
-    """직접 정리한 학년표(school,course,year,subject, 선택: url, curriculum_year)를 넣는다. 사람이 확인한 자료로 보고 바로 공개한다."""
+    """직접 정리한 학년표(school,course,year,subject, 선택: alias, url, curriculum_year)를 넣는다. 사람이 확인한 자료로 보고 바로 공개한다.
+    subject는 학교 편성표의 과목 이름이다. 공시 자료(courses.csv.gz)의 교과목 이름이 다르면 alias에 그 이름을 적는다:
+    학년은 공시 자료 이름(subjects)에 붙고, 화면에는 편성표 이름(names)을 보여 준다.
+    공시 자료에 없는 편성표 과목은 extra(편성표 이름 → 학년)로 둔다. 학년의 출처는 모두 url·curriculum_year의 편성표다."""
     today = today or date.today().isoformat()
-    grouped, meta = {}, {}
+    grouped, meta, aliases = {}, {}, {}
     for number, row in enumerate(rows, start=2):
         try:
             school, course = row["school"].strip(), row["course"].strip()
-            grouped.setdefault((school, course), []).append({"name": row["subject"], "years": [int(row["year"])]})
+            subject = " ".join(row["subject"].split())
+            alias = " ".join((row.get("alias") or "").split())
+            grouped.setdefault((school, course), []).append({"name": alias or subject, "years": [int(row["year"])]})
+            if alias:
+                aliases.setdefault((school, course), {})[alias] = subject
             year = (row.get("curriculum_year") or "").strip()
             meta.setdefault((school, course), {"url": (row.get("url") or "").strip(), "curriculum_year": int(year) if year else None})
         except (KeyError, ValueError, AttributeError) as error:
             raise ValueError(f"{number}번째 줄을 읽을 수 없습니다: {error}") from error
     for (school, course), subjects in grouped.items():
         checked = validate(school, course, subjects)
+        matched = match_subjects(list(aliases.get((school, course), {})), catalog().programs[(school, course)]["curriculum"])
+        names = {}
+        for alias, original in matched.items():
+            if original is None:
+                raise ValueError(f"별칭 '{alias}'이(가) 공시 자료 교과목에 없습니다: {school} {course}")
+            names[original] = aliases[(school, course)][alias]
         results[key_of(school, course)] = {
             "school": school, "course": course, **meta[(school, course)], "content_hash": "",
             "fetched_at": today, "checked_at": today, "note": "직접 입력", **checked, "status": "verified",
+            "names": names, "extra": {item["name"]: item["year"] for item in checked["unmatched"]},
         }
     return len(grouped)
 

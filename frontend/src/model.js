@@ -2,7 +2,7 @@ import { cleanLevels, cleanPicks, isGame, pickLessons, pickPracticeSubject } fro
 import { cleanLessonGames } from "./lessonGames.js";
 import { experiences } from "./experiences.js";
 import { groupExperience, groupOf, PRACTICE_SUBJECTS } from "./groups.js";
-import { studioFor } from "./departmentData.js";
+import { studioFor, subjectConfirmed } from "./departmentData.js";
 import { cleanResult } from "./studio.js";
 
 export const STORAGE_KEY = "hi-campus-v4";
@@ -266,8 +266,21 @@ export function cleanYears(years) {
     for (const [subject, year] of Object.entries(years.subjects)) keep(subject, year);
   if (!Object.keys(subjects).length) return null;
   const url = typeof years.source_url === "string" ? years.source_url : "";
+  // names: 공시 교과목명 → 편성표에 적힌 이름(다를 때만, 화면에 보여 줄 이름). extra: 공시 자료에 없는 편성표 과목 → 학년.
+  // 두 가지 모두 학년의 출처는 source_url·curriculum_year의 편성표다.
+  const record = (value) => (value && typeof value === "object" && !Array.isArray(value) ? Object.entries(value) : []);
+  const names = Object.fromEntries(
+    record(years.names).filter(([original, name]) => Object.hasOwn(subjects, original) && typeof name === "string" && name && name.length <= 100),
+  );
+  const extra = Object.fromEntries(
+    record(years.extra).filter(
+      ([name, year]) => name && name.length <= 100 && !Object.hasOwn(subjects, name) && Number.isInteger(year) && year >= 1 && year <= 6,
+    ),
+  );
   return {
     subjects,
+    names,
+    extra,
     source_url: /^https?:\/\//.test(url) ? url : "",
     curriculum_year: Number.isInteger(years.curriculum_year) ? years.curriculum_year : null,
     checked_at: typeof years.checked_at === "string" ? years.checked_at : "",
@@ -311,12 +324,13 @@ export function createDepartment(
   const theoryYears = yearNumbers.slice(0, practice ? -2 : -1);
   // 학과 전용 체험(departmentData.js)이 있는 학년 자리. 졸업 과제 자리는 바꾸지 않는다.
   // override가 false면 쓰지 않는다: 전용 체험이 생기기 전에 입학한 학과는 입학할 때 정한 수업을 그대로 둔다.
-  // 과목이 그 학과의 교과목에 모두 있을 때만 쓴다(교과목 데이터가 바뀌어 과목이 빠지면 학과군 규칙으로 돌아간다).
+  // 과목마다 출처(공시 교과목 또는 학교 편성표)에서 그 학년 과목으로 확인될 때만 쓴다(데이터가 바뀌어 확인되지 않으면 학과군 규칙으로 돌아간다).
   const studios = yearNumbers.map((year, i) => {
     const studio = override && i < yearNumbers.length - 1 ? studioFor(school, course, year) : null;
-    return studio && studio.subjects.every((subject) => curriculum.includes(subject)) ? studio : null;
+    return studio && studio.subjects.every((subject) => subjectConfirmed(subject, year, curriculum, yearly, studio.source)) ? studio : null;
   });
-  const studioSubjects = new Set(studios.flatMap((studio) => studio?.subjects || []));
+  // 공시 교과목 이름(별칭 포함)으로 견준다.
+  const studioSubjects = new Set(studios.flatMap((studio) => studio?.subjects.map((subject) => subject.alias || subject.name) || []));
   // 전용 체험에 쓴 과목은 다른 학년의 이론 수업·실습 과목으로 다시 고르지 않는다.
   const pool = studioSubjects.size ? curriculum.filter((subject) => !studioSubjects.has(subject)) : curriculum;
   // 과목의 학년은 학교 홈페이지에서 모은 학년(yearly) → 사람이 정한 과목(picks) → 보통 듣는 학년(levels) 순서로 쓴다.
@@ -362,12 +376,12 @@ export function createDepartment(
     // 학과 전용 체험을 쓰는 학과인지(저장해 두고 다시 불러올 때 그대로 쓴다).
     override: override === true,
     // 학년 자리마다 학과 전용 체험의 실제 과목들(없으면 null). 학년별 과목 목록에 과목마다 따로 보여 준다.
-    slotSubjects: studios.map((studio) => studio?.subjects || null),
+    slotSubjects: studios.map((studio) => studio?.subjects.map((subject) => subject.name) || null),
     lessons: [
       ...theoryYears.map((year, i) => picked[i]?.subject || `${year}학년 전공 탐색`),
       ...(practice ? [practiceSubject || practice.title] : []),
       final.name,
-    ].map((name, i) => (studios[i] ? studios[i].subjects.join(" · ") : name)),
+    ].map((name, i) => (studios[i] ? studios[i].subjects.map((subject) => subject.name).join(" · ") : name)),
     // 학년마다의 체험: 연습 문제의 유형, 학과군 실습(group:학과군), 학과 전용 체험(studio:학년), 없으면 null.
     games: [...theoryYears.map((_, i) => picked[i]?.game || null), ...(practice ? [`group:${group}`] : []), null].map((game, i) =>
       studios[i] ? `studio:${yearNumbers[i]}` : game,
@@ -679,13 +693,16 @@ export function progressOf(journey, total) {
 // 학년을 모르는 과목은 넣지 않는다. open에는 실제 교과목인 자리만 넣는다(학과군 실습·졸업 과제 이름은 빠진다).
 export function yearSubjects(d) {
   if (!d?.school) return null;
-  const used = new Set([...d.lessons, ...(d.slotSubjects || []).flat().filter(Boolean)]);
   const subjectYears = d.yearly?.subjects || {};
-  const real = new Set([...(d.curriculum || []), ...Object.keys(subjectYears)]);
+  // 편성표 이름이 공시 교과목명과 다르면 편성표 이름으로 보여 준다(names). 편성표에만 있는 과목(extra)도 그 학년에 넣는다.
+  const shown = (subject) => d.yearly?.names?.[subject] || subject;
+  const extra = d.yearly?.extra || {};
+  const used = new Set([...d.lessons, ...(d.slotSubjects || []).flat().filter(Boolean)].map(shown));
+  const real = new Set([...(d.curriculum || []), ...Object.keys(subjectYears), ...Object.keys(extra)].flatMap((subject) => [subject, shown(subject)]));
   const fromYears = !!d.lessonsFromYears && !!d.yearly;
   const ofYear = (year) =>
     fromYears
-      ? Object.keys(subjectYears).filter((subject) => subjectYears[subject] === year)
+      ? [...Object.keys(subjectYears).filter((subject) => subjectYears[subject] === year).map(shown), ...Object.keys(extra).filter((subject) => extra[subject] === year)]
       : (d.curriculum || []).filter((subject) => Object.hasOwn(d.levels || {}, subject) && d.levels[subject][0] === year);
   const years = [...new Set(d.yearNumbers)];
   return {
@@ -693,7 +710,7 @@ export function yearSubjects(d) {
     years: years.map((year) => ({
       year,
       open: d.yearNumbers
-        .flatMap((y, index) => (d.slotSubjects?.[index] || [d.lessons[index]]).map((title) => ({ y, index, title })))
+        .flatMap((y, index) => (d.slotSubjects?.[index] || [d.lessons[index]]).map((title) => ({ y, index, title: shown(title) })))
         .filter((item) => item.y === year && real.has(item.title))
         .map(({ index, title }) => ({ index, title })),
       others: [...new Set(ofYear(year))].filter((subject) => subject !== "해당없음" && !used.has(subject)),

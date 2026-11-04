@@ -1,19 +1,24 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Fragment, useEffect, useRef, useState } from "react";
 import {
   GOOD_LINE,
   MIN_LINE,
+  QUESTION_KINDS,
   SKETCH,
   averageScore,
+  conceptCheck,
   cssColor,
+  evaluate,
   fitStroke,
+  foundInsights,
   matchPercent,
   scoreSketch,
   simplifyStroke,
   startColor,
+  startValues,
   studioTemplates,
 } from "./studio.js";
 
-// 학과 전용 체험의 화면: 배우기 카드, 체험 여러 개를 차례로 하는 틀, 틀 H(그리기)·I(기억해서 맞추기), 결과 요약.
+// 학과 전용 체험의 화면: 배우기 카드, 체험 여러 개를 차례로 하는 틀, 틀 H(그리기)·I(기억해서 맞추기)·J(대화로 알아내기)·K(조절해서 시험하기), 결과 요약.
 // 형식 검사와 채점은 studio.js에 있다. 틀은 onComplete(결과)를 부르고, 결과는 수업 화면이 저장한다.
 
 const { width: W, height: H } = SKETCH;
@@ -138,6 +143,38 @@ export function ResultView({ data, result }) {
         </button>
       </div>
     );
+  if (result.template === "J")
+    return (
+      <div>
+        <p className="studio-big" role="status">
+          찾은 인사이트 <b>{result.insights.length}</b> / {result.total}개
+        </p>
+        {result.insights.length > 0 && (
+          <ul className="studio-insights">
+            {result.insights.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        )}
+        <p className="body-copy">
+          고른 컨셉: <strong>{result.concept}</strong>
+          {result.grounded ? " (인터뷰에 근거함)" : " (인터뷰 근거가 모자람)"}
+        </p>
+      </div>
+    );
+  if (result.template === "K") {
+    const values = Object.fromEntries(data.params.map((param, i) => [param.id, result.params[i]?.value]));
+    return (
+      <div>
+        <CupView data={data} values={values} small />
+        <p className="body-copy mt-[8px]">
+          {result.params.map((param) => `${param.label} ${param.value}${param.unit}`).join(" · ")}
+          <br />
+          {result.people}명 모두 편하게 잡았어요 · {result.tries}번 만에
+        </p>
+      </div>
+    );
+  }
   return (
     <div>
       <p className="studio-big" role="status">
@@ -613,4 +650,304 @@ export function Recall({ data, onComplete }) {
   );
 }
 
-const games = { H: Sketch, I: Recall };
+
+/* ---- J 대화로 알아내기 (사용자 인터뷰) ---- */
+
+export function Interview({ data, onComplete }) {
+  const [picks, setPicks] = useState([]);
+  const [concept, setConcept] = useState(null);
+  const turn = picks.length;
+  const finished = turn === data.turns.length;
+  const found = foundInsights(data, picks);
+  const textOf = (insightId) => data.insights.find((item) => item.id === insightId)?.text || "";
+
+  function choose(concept) {
+    setConcept(concept);
+    const picked = data.concepts[concept];
+    onComplete({ template: "J", insights: found.map(textOf), total: data.insights.length, concept: picked.text, grounded: conceptCheck(picked, found).grounded });
+  }
+  function restart() {
+    setPicks([]);
+    setConcept(null);
+  }
+
+  return (
+    <div>
+      <p className="body-copy">{data.prompt}</p>
+      <ol className="studio-chat" aria-label="인터뷰 대화" aria-live="polite">
+        <li className="is-them">
+          <span className="studio-chat-who">
+            {data.persona.label} <small>{data.persona.note}</small>
+          </span>
+          <p>{data.opening}</p>
+        </li>
+        {picks.map((pick, i) => {
+          const choice = data.turns[i].choices[pick];
+          return (
+            <Fragment key={i}>
+              <li className="is-me">
+                <p>{choice.ask}</p>
+                <small className={`studio-kind is-${choice.kind}`}>{QUESTION_KINDS[choice.kind]}</small>
+              </li>
+              <li className="is-them">
+                <p>{choice.reply}</p>
+              </li>
+              <li className={`studio-chat-note ${choice.insight ? "is-found" : ""}`}>
+                {choice.insight
+                  ? `인사이트 발견: ${textOf(choice.insight)}`
+                  : choice.kind === "leading"
+                    ? "원하는 답을 넣어 물어서 맞장구만 들었어요."
+                    : "짧은 답으로 끝나 이유는 듣지 못했어요."}
+              </li>
+            </Fragment>
+          );
+        })}
+      </ol>
+      {!finished && (
+        <>
+          <p className="game-progress" role="status">
+            {turn + 1} / {data.turns.length}번째 질문
+          </p>
+          {data.turns[turn].lead && <p className="body-copy">{data.turns[turn].lead}</p>}
+          <div className="game-choices stack" role="group" aria-label="할 질문 고르기">
+            {data.turns[turn].choices.map((choice, i) => (
+              <button key={i} onClick={() => setPicks([...picks, i])}>
+                {choice.ask}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {finished && (
+        <div role="status">
+          <p className="studio-big">
+            찾은 인사이트 <b>{found.length}</b> / {data.insights.length}개
+          </p>
+          {found.length > 0 && (
+            <ul className="studio-insights">
+              {found.map((insightId) => (
+                <li key={insightId}>{textOf(insightId)}</li>
+              ))}
+            </ul>
+          )}
+          <p className="body-copy">{data.conceptPrompt}</p>
+          <div className="game-choices stack" role="group" aria-label="컨셉 고르기">
+            {data.concepts.map((item, i) => {
+              const check = conceptCheck(item, found);
+              const state = concept === null ? "" : i === concept ? (check.grounded ? "is-right" : "is-wrong") : "is-rest";
+              return (
+                <button key={i} className={state} aria-pressed={i === concept} onClick={() => choose(i)}>
+                  {item.text}
+                </button>
+              );
+            })}
+          </div>
+          {concept !== null && (
+            <p className="game-feedback">
+              {(() => {
+                const check = conceptCheck(data.concepts[concept], found);
+                if (check.grounded) return "인터뷰에서 찾은 불편함에 근거한 컨셉이에요.";
+                if (!data.concepts[concept].needs.length) return "이 컨셉은 인터뷰에서 들은 이야기와 이어지지 않아요. 근거가 있는 컨셉을 골라 보세요.";
+                return `좋은 방향이지만 근거가 모자라요. 아직 못 찾은 인사이트: ${check.missing.map(textOf).join(", ")}`;
+              })()}
+            </p>
+          )}
+          <button className="text-button" onClick={restart}>
+            다시 인터뷰하기 →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- K 조절해서 시험하기 (손잡이 테스트) ---- */
+
+// 컵 단면 그림. 1mm를 SCALE만큼 그린다. 손잡이 안쪽 깊이(컵 벽에서 손잡이까지)는 그림용으로 고정했다.
+const SCALE = 1.7;
+const CUP = { left: 64, right: 164, top: 26, height: 90, depth: 24 };
+function CupView({ data, values, person, failed, small = false }) {
+  const length = values.length ?? 0;
+  const thickness = values.thickness ?? 0;
+  const cy = CUP.top + (CUP.height * SCALE) / 2;
+  const half = (length * SCALE) / 2;
+  const bar = thickness * SCALE;
+  const gap = CUP.depth * SCALE;
+  const x0 = CUP.right;
+  const x1 = x0 + gap;
+  const limit = data.limits.find((rule) => rule.id === "cup");
+  const reach = limit ? (limit.max * SCALE) / 2 : null;
+  const over = failed?.some((fail) => fail.id === "cup");
+  const fingers = person ? [person.values.index, person.values.middle] : [];
+  let y = cy - half;
+  return (
+    <svg viewBox="0 0 320 210" className={`studio-board ${small ? "is-small" : ""}`} role="img" aria-label={`손잡이 안쪽 길이 ${length}mm, 굵기 ${thickness}mm`}>
+      <rect width="320" height="210" fill="#fff" />
+      <rect x={CUP.left} y={CUP.top} width={CUP.right - CUP.left} height={CUP.height * SCALE} rx="10" fill="#e8faf7" stroke="#202b3c" strokeWidth="2" />
+      {reach && (
+        <g stroke="#b3b9c2" strokeDasharray="4 3">
+          <line x1={x0 - 14} y1={cy - reach} x2={x0 + 6} y2={cy - reach} />
+          <line x1={x0 - 14} y1={cy + reach} x2={x0 + 6} y2={cy + reach} />
+        </g>
+      )}
+      <path
+        d={`M${x0} ${cy - half - bar} H${x1 + bar - 8} Q${x1 + bar} ${cy - half - bar} ${x1 + bar} ${cy - half - bar + 8} V${cy + half + bar - 8} Q${x1 + bar} ${cy + half + bar} ${x1 + bar - 8} ${cy + half + bar} H${x0} V${cy + half} H${x1} V${cy - half} H${x0} Z`}
+        fill={over ? "#fde2e3" : "#fffaea"}
+        stroke={over ? "#e5484d" : "#202b3c"}
+        strokeWidth="2"
+      />
+      {fingers.map((breadth, i) => {
+        const r = (breadth * SCALE) / 2;
+        const cyFinger = y + r;
+        y += breadth * SCALE;
+        const tight = y > cy + half + 0.01;
+        return <circle key={i} cx={x0 + gap / 2} cy={cyFinger} r={r} fill={tight ? "rgba(229,72,77,0.35)" : "rgba(255,211,47,0.55)"} stroke={tight ? "#e5484d" : "#e8930c"} strokeWidth="1.5" />;
+      })}
+      {!small && (
+        <>
+          <text x={(CUP.left + CUP.right) / 2} y={CUP.top + CUP.height * SCALE + 16} textAnchor="middle" fontSize="10" fill="#637083">
+            컵
+          </text>
+          {reach && (
+            <text x={x0 - 16} y={cy - reach - 4} textAnchor="end" fontSize="9" fill="#949494">
+              붙일 수 있는 높이
+            </text>
+          )}
+        </>
+      )}
+    </svg>
+  );
+}
+
+const SIM_STEP_MS = 650;
+export function Simulation({ data, onComplete }) {
+  const [values, setValues] = useState(() => startValues(data));
+  const [tries, setTries] = useState(0);
+  // 잡아 보는 중이면 지금 차례인 사람의 번호, 끝났으면 사람 수. 값을 바꾸면 다시 null(아직 안 잡아 봄)이 된다.
+  const [shown, setShown] = useState(null);
+  const [outcome, setOutcome] = useState(null);
+  const timer = useRef(0);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const testing = shown !== null && outcome && shown < data.people.length && outcome.limits.length === 0;
+  const active = testing ? data.people[shown] : null;
+
+  function change(id, value) {
+    window.clearTimeout(timer.current);
+    setValues({ ...values, [id]: value });
+    setShown(null);
+    setOutcome(null);
+  }
+  function test() {
+    // 잡아 보는 동안에는 다시 누르지 않는다(버튼을 끄면 키보드 초점이 사라지므로 끄지 않고 무시한다).
+    if (testing) return;
+    const result = evaluate(data, values);
+    const attempt = tries + 1;
+    setTries(attempt);
+    setOutcome(result);
+    window.clearTimeout(timer.current);
+    if (result.limits.length) return setShown(data.people.length);
+    setShown(0);
+    const step = (i) => {
+      timer.current = window.setTimeout(() => {
+        setShown(i + 1);
+        if (i + 1 < data.people.length) step(i + 1);
+        else if (result.ok)
+          onComplete({
+            template: "K",
+            params: data.params.map((param) => ({ label: param.label, value: values[param.id], unit: param.unit })),
+            tries: attempt,
+            people: data.people.length,
+          });
+      }, SIM_STEP_MS);
+    };
+    step(0);
+  }
+
+  const doneAll = outcome && shown === data.people.length;
+  return (
+    <div>
+      <p className="body-copy">{data.prompt}</p>
+      <CupView data={data} values={values} person={active} failed={doneAll ? outcome.limits : null} />
+      <div className="mt-[12px] grid gap-[10px]">
+        {data.params.map((param) => (
+          <label key={param.id} className="studio-slider">
+            <span>
+              {param.label}
+              <output>
+                {values[param.id]}
+                {param.unit}
+              </output>
+            </span>
+            <input
+              type="range"
+              className="is-plain"
+              min={param.min}
+              max={param.max}
+              step={param.step}
+              value={values[param.id]}
+              disabled={!!testing}
+              onChange={(e) => change(param.id, Number(e.target.value))}
+            />
+          </label>
+        ))}
+      </div>
+      <ul className="studio-people" aria-label="잡아 보는 사람들">
+        {data.people.map((person, i) => {
+          const judged = outcome && shown !== null && i < shown && outcome.limits.length === 0 ? outcome.people[i] : null;
+          const state = judged ? (judged.ok ? "is-ok" : "is-bad") : active?.id === person.id ? "is-active" : "";
+          return (
+            <li key={person.id} className={state}>
+              <Face mood={judged ? (judged.ok ? "good" : "bad") : "wait"} />
+              <b>{person.label}</b>
+              <small>{person.note}</small>
+              <small>
+                손가락 너비 {person.values.index}·{person.values.middle}mm
+              </small>
+              <p role="status">{judged ? (judged.ok ? data.good : judged.fails[0].message) : active?.id === person.id ? "잡아 보는 중…" : "대기"}</p>
+            </li>
+          );
+        })}
+      </ul>
+      {doneAll && outcome.limits.length > 0 && (
+        <p className="game-feedback" role="alert">
+          {outcome.limits[0].message}
+        </p>
+      )}
+      {doneAll && outcome.ok && (
+        <p className="studio-big" role="status">
+          {data.done}
+          <br />
+          <small>{tries}번 만에 찾았어요</small>
+        </p>
+      )}
+      <button className="button mt-[10px]" onClick={test} aria-disabled={!!testing}>
+        {tries ? "다시 잡아 보기" : "잡아 보기"}
+      </button>
+      {data.footnote && <p className="footnote">{data.footnote}</p>}
+      <details className="studio-sources">
+        <summary>손 크기 자료 출처</summary>
+        <ul>
+          {data.people.map((person) => (
+            <li key={person.id}>
+              {person.label}({person.note}): {person.source}
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
+  );
+}
+
+function Face({ mood }) {
+  const mouth = mood === "good" ? "M9 15 Q14 20 19 15" : mood === "bad" ? "M9 18 Q14 13 19 18" : "M10 16 H18";
+  return (
+    <svg viewBox="0 0 28 28" width="34" height="34" aria-hidden="true">
+      <circle cx="14" cy="14" r="12.5" fill={mood === "good" ? "#e8faf7" : mood === "bad" ? "#fde2e3" : "#fffaea"} stroke="#202b3c" strokeWidth="1.5" />
+      <circle cx="10" cy="11" r="1.4" fill="#202b3c" />
+      <circle cx="18" cy="11" r="1.4" fill="#202b3c" />
+      <path d={mouth} fill="none" stroke="#202b3c" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const games = { H: Sketch, I: Recall, J: Interview, K: Simulation };

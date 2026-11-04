@@ -452,7 +452,19 @@ def curriculum_list(body: CurriculumRequest):
     verified = year_curricula().get((body.school, body.course))
     # 학교 홈페이지 교육과정에서 모은 과목별 학년. 그 학과 교과목에 있는 과목만 보낸다.
     subjects = {subject: year for subject, year in (verified or {}).get("subjects", {}).items() if subject in program["curriculum"]}
-    years = {"subjects": subjects, "source_url": verified["url"], "curriculum_year": verified.get("curriculum_year"), "checked_at": verified["checked_at"]} if subjects else None
+    # names: 공시 교과목명 → 편성표에 적힌 이름(다를 때만). extra: 공시 자료에는 없고 편성표에만 있는 과목 → 학년.
+    # 학년의 출처는 모두 source_url·curriculum_year의 편성표다(backend/SOURCE.md).
+    names = {original: name for original, name in (verified or {}).get("names", {}).items() if original in subjects and isinstance(name, str) and name}
+    extra = {
+        name: year
+        for name, year in (verified or {}).get("extra", {}).items()
+        if isinstance(name, str) and name and len(name) <= 100 and name not in program["curriculum"] and isinstance(year, int) and not isinstance(year, bool) and 1 <= year <= 6
+    }
+    years = (
+        {"subjects": subjects, "names": names, "extra": extra, "source_url": verified["url"], "curriculum_year": verified.get("curriculum_year"), "checked_at": verified["checked_at"]}
+        if subjects
+        else None
+    )
     fields = partner_fields(body.school)
     games = lesson_games()
     # 연습 문제가 있는 과목과 그 유형. 화면이 체험할 과목을 고를 때 쓴다.

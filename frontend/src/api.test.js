@@ -104,6 +104,8 @@ test("과목별 학년은 형식이 맞는 과목만 받는다", async (t) => {
       partner: true,
       years: {
         subjects: { 자료구조: 2, 운영체제: 9, "": 1, 컴퓨터구조: "2" },
+        names: { 자료구조: "자료 구조", 없는과목: "이름", 운영체제: 3 },
+        extra: { 알고리즘설계: 3, 자료구조: 1, 범위밖: 9, 문자: "2" },
         source_url: "https://ce.khu.ac.kr/c.pdf",
         curriculum_year: 2026,
         checked_at: "2026-10-28",
@@ -113,7 +115,15 @@ test("과목별 학년은 형식이 맞는 과목만 받는다", async (t) => {
   const result = await getCurriculum("경희대학교", "컴퓨터공학부 컴퓨터공학과");
   assert.equal(result.partner, true);
   assert.equal(result.partnerExample, false);
-  assert.deepEqual(result.years, { subjects: { 자료구조: 2 }, source_url: "https://ce.khu.ac.kr/c.pdf", curriculum_year: 2026, checked_at: "2026-10-28" });
+  // 편성표 이름(names)은 받은 과목에 대해서만, 편성표에만 있는 과목(extra)은 학년이 맞고 과목과 겹치지 않을 때만 받는다.
+  assert.deepEqual(result.years, {
+    subjects: { 자료구조: 2 },
+    names: { 자료구조: "자료 구조" },
+    extra: { 알고리즘설계: 3 },
+    source_url: "https://ce.khu.ac.kr/c.pdf",
+    curriculum_year: 2026,
+    checked_at: "2026-10-28",
+  });
   assert.equal("terms" in result, false);
   for (const years of ["1학년", { subjects: [] }, { subjects: { 가: 0 } }, null]) {
     t.mock.method(globalThis, "fetch", async () =>

@@ -243,6 +243,52 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pipeline.import_rows([{"school": SCHOOL, "course": COURSE, "year": "일", "subject": "드로잉"}], {})
 
+    def test_manual_import_keeps_schedule_names_aliases_and_extra(self):
+        # 편성표 이름이 공시 자료와 다르면 alias로 맞추고, 공시 자료에 없는 편성표 과목은 extra로 남긴다.
+        rows = [
+            {"school": SCHOOL, "course": COURSE, "year": year, "subject": subject, "alias": alias, "url": "https://a.ac.kr", "curriculum_year": "2025"}
+            for year, subject, alias in (
+                ("1", "드로잉", ""), ("1", "평면디자인", ""), ("1", "현대미술사", ""), ("2", "기초산업디자인1", ""),
+                ("2", "리빙제품디자인", ""), ("3", "디자인비즈니스", "산업디자인비지니스"), ("3", "UX디자인", ""),
+            )
+        ]
+        results = {}
+        pipeline.import_rows(rows, results, today="2026-11-04")
+        entry = results[pipeline.key_of(SCHOOL, COURSE)]
+        # 띄어쓰기만 다른 이름은 공시 자료 이름으로 맞춘다.
+        self.assertEqual(entry["subjects"]["현대 미술사"], 1)
+        self.assertEqual(entry["subjects"]["기초산업디자인 1"], 2)
+        self.assertEqual(entry["subjects"]["산업디자인비지니스"], 3)
+        self.assertEqual(entry["names"], {"산업디자인비지니스": "디자인비즈니스"})
+        self.assertEqual(entry["extra"], {"리빙제품디자인": 2})
+        with self.assertRaises(ValueError):
+            pipeline.import_rows([{**rows[0], "subject": "없는과목", "alias": "공시에도없는과목"}, *rows[1:]], {})
+
+    def test_long_pdf_keeps_only_pages_with_the_department(self):
+        texts = ["표지", "컴퓨터공학과 편성표", "이어지는 표", "산업 디자인학과 교육과정", "[별표1] 이어서", "다른 학과"]
+        self.assertEqual(pipeline.pages_for(texts, "산업디자인학과"), [3, 4])
+        self.assertEqual(pipeline.pages_for(texts + ["산업디자인학과"], "산업디자인학과"), [3, 4, 6])
+        self.assertEqual(pipeline.pages_for(texts, "산업디자인학과", limit=1), [3])
+        with self.assertRaises(ValueError):
+            pipeline.pages_for(texts, "음악학과")
+        import io
+
+        import pypdf
+
+        writer = pypdf.PdfWriter()
+        for _ in range(6):
+            writer.add_blank_page(width=200, height=200)
+        buffer = io.BytesIO()
+        writer.write(buffer)
+        raw = buffer.getvalue()
+        # 쪽수가 상한 이하면 그대로, 넘으면 학과 이름이 나오는 쪽만 남긴다.
+        self.assertIs(pipeline.trim_pdf(raw, "산업디자인학과", limit=6), raw)
+        with mock.patch.object(pypdf.PageObject, "extract_text", side_effect=texts):
+            trimmed = pipeline.trim_pdf(raw, "산업디자인학과", limit=5)
+        self.assertEqual(len(pypdf.PdfReader(io.BytesIO(trimmed)).pages), 2)
+        # 쪽을 셀 수 없는 파일은 그대로 넘긴다(추출 단계가 오류를 낸다).
+        self.assertEqual(pipeline.trim_pdf(b"%PDF-1.7 broken", "산업디자인학과"), b"%PDF-1.7 broken")
+
     def test_extraction_request_shape(self):
         import anthropic
 

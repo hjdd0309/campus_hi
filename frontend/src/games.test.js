@@ -60,7 +60,7 @@ test("게임 결과와 학년별 편성은 형식이 맞는 것만 복구한다"
     curriculum_year: "2026",
     checked_at: "2026-10-10",
   });
-  assert.deepEqual(d.yearly, { subjects: { 심리학개론: 1 }, source_url: "", curriculum_year: null, checked_at: "2026-10-10" });
+  assert.deepEqual(d.yearly, { subjects: { 심리학개론: 1 }, names: {}, extra: {}, source_url: "", curriculum_year: null, checked_at: "2026-10-10" });
   assert.equal(cleanYears(null), null);
   assert.equal(cleanYears({ subjects: "x" }), null);
   assert.equal(cleanYears({ subjects: {} }), null);
