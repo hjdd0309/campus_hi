@@ -15,8 +15,17 @@ import {
   simplifyStroke,
   startColor,
   startValues,
-  studioTemplates,
+  TAP,
+  barCenters,
+  difficulty,
+  hitBar,
+  median,
+  predictTap,
+  tapLaw,
 } from "./studio.js";
+import { templates } from "./experiences.js";
+import { shuffle } from "./lessonGames.js";
+import { Experience } from "./Templates.jsx";
 
 // 학과 전용 체험의 화면: 배우기 카드, 체험 여러 개를 차례로 하는 틀, 틀 H(그리기)·I(기억해서 맞추기)·J(대화로 알아내기)·K(조절해서 시험하기), 결과 요약.
 // 형식 검사와 채점은 studio.js에 있다. 틀은 onComplete(결과)를 부르고, 결과는 수업 화면이 저장한다.
@@ -92,7 +101,7 @@ export function StudioLesson({ studio, results = [], onResult }) {
       )}
       <section className="lesson-game" aria-label={part.title}>
         <h2 className="section-title">
-          {studioTemplates[part.template].title}
+          {templates[part.template].title}
           {result && <span className="tag">완료</span>}
         </h2>
         <p className="body-copy">{part.task}</p>
@@ -162,6 +171,8 @@ export function ResultView({ data, result }) {
         </p>
       </div>
     );
+  if (result.template === "L") return <TapLaw data={data} rounds={result.rounds} small />;
+  if (result.summary !== undefined) return <p className="body-copy">{result.summary}</p>;
   if (result.template === "K") {
     const values = Object.fromEntries(data.params.map((param, i) => [param.id, result.params[i]?.value]));
     return (
@@ -950,4 +961,230 @@ function Face({ mood }) {
   );
 }
 
-const games = { H: Sketch, I: Recall, J: Interview, K: Simulation };
+/* ---- L 재어서 법칙 찾기 (버튼 크기 실험) ---- */
+
+const TAP_BAR = { top: 12, height: TAP.height - 24 };
+// 판 좌표로 바꾼 포인터 x. 화면이 통째로 확대·축소돼도 그림 크기 기준으로 잰다.
+const boardX = (event) => {
+  const rect = event.currentTarget.getBoundingClientRect();
+  return ((event.clientX - rect.left) / rect.width) * TAP.width;
+};
+
+export function Tap({ data, onComplete }) {
+  // 진행 상태는 빠르게 연달아 누를 때도 어긋나지 않게 ref에 두고, 그릴 때만 tick을 올린다.
+  const run = useRef(null);
+  const [, setTick] = useState(0);
+  const [rounds, setRounds] = useState(null);
+  const [flash, setFlash] = useState(false);
+  const flashTimer = useRef(0);
+  const bars = useRef([]);
+  const viaKeyboard = useRef(false);
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
+  const state = run.current;
+  const target = state ? data.targets[state.order[state.at]] : null;
+
+  // 키보드로 누르고 있으면 다음 막대로 초점을 옮긴다.
+  useEffect(() => {
+    if (state && viaKeyboard.current) bars.current[state.side]?.focus();
+  });
+
+  function start() {
+    run.current = { order: shuffle(data.targets.map((_, i) => i)), at: 0, side: 0, last: null, times: [], misses: 0, done: [] };
+    setRounds(null);
+    setTick((n) => n + 1);
+  }
+  function hit() {
+    const s = run.current;
+    const now = performance.now();
+    if (s.last !== null) s.times.push(now - s.last);
+    s.last = now;
+    s.side = 1 - s.side;
+    if (s.times.length === data.taps) {
+      const index = s.order[s.at];
+      const { width, distance } = data.targets[index];
+      s.done[index] = { width, distance, ms: Math.max(1, Math.round(median(s.times))), misses: s.misses };
+      if (s.at + 1 === s.order.length) {
+        run.current = null;
+        const result = { template: "L", rounds: s.done };
+        setRounds(s.done);
+        onComplete(result);
+      } else Object.assign(s, { at: s.at + 1, side: 0, last: null, times: [], misses: 0 });
+    }
+    setTick((n) => n + 1);
+  }
+  function miss() {
+    const s = run.current;
+    // 시계가 돌기 시작한 뒤(첫 막대를 누른 뒤)의 헛누름만 센다.
+    if (s.last !== null) s.misses += 1;
+    setFlash(true);
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlash(false), 160);
+    setTick((n) => n + 1);
+  }
+  function pointer(event) {
+    if (!run.current || event.button > 0) return;
+    event.preventDefault();
+    viaKeyboard.current = false;
+    const now = data.targets[run.current.order[run.current.at]];
+    if (hitBar(boardX(event), barCenters(now)[run.current.side], now.width)) hit();
+    else miss();
+  }
+  function key(event, side) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (event.repeat || !run.current || side !== run.current.side) return;
+    viaKeyboard.current = true;
+    hit();
+  }
+
+  if (rounds)
+    return (
+      <div>
+        <TapLaw data={data} rounds={rounds} />
+        <button className="text-button mt-[8px]" onClick={start}>
+          실험 다시 하기 →
+        </button>
+      </div>
+    );
+  if (!state)
+    return (
+      <div>
+        <p className="body-copy">{data.prompt}</p>
+        <button className="button mt-[10px]" onClick={start}>
+          실험 시작하기
+        </button>
+        <p className="footnote">{data.footnote}</p>
+      </div>
+    );
+  const centers = barCenters(target);
+  return (
+    <div>
+      <p className="game-progress" role="status">
+        {state.at + 1} / {state.order.length}번째 막대 · {state.last === null ? "왼쪽 막대를 누르면 시작해요" : `${state.times.length} / ${data.taps}번`}
+      </p>
+      <svg
+        viewBox={`0 0 ${TAP.width} ${TAP.height}`}
+        className="studio-board"
+        style={{ cursor: "pointer" }}
+        onPointerDown={pointer}
+        role="group"
+        aria-label="번갈아 누르기 판"
+      >
+        <rect width={TAP.width} height={TAP.height} fill={flash ? "#fde2e3" : "#fff"} />
+        {centers.map((center, side) => {
+          const on = side === state.side;
+          return (
+            <rect
+              key={`${state.at}-${side}`}
+              ref={(node) => (bars.current[side] = node)}
+              x={center - target.width / 2}
+              y={TAP_BAR.top}
+              width={target.width}
+              height={TAP_BAR.height}
+              rx="4"
+              fill={on ? "#087f77" : "#e8faf7"}
+              stroke={on ? "#087f77" : "#b3b9c2"}
+              strokeWidth="1.5"
+              tabIndex={on ? 0 : -1}
+              role="button"
+              aria-label={on ? `지금 누를 막대(${side ? "오른쪽" : "왼쪽"})` : `다음에 누를 막대(${side ? "오른쪽" : "왼쪽"})`}
+              onKeyDown={(event) => key(event, side)}
+            />
+          );
+        })}
+      </svg>
+      <p className="footnote">
+        색이 진한 막대를 빠르고 정확하게 눌러요. 헛누름 {state.misses}번
+      </p>
+    </div>
+  );
+}
+
+// 내 기록 그래프(어려움 지수 → 걸린 시간)와 법칙 직선, 그리고 그 법칙으로 버튼 크기 정해 보기.
+function TapLaw({ data, rounds, small = false }) {
+  const law = tapLaw(rounds);
+  const top = Math.max(...law.points.map((p) => p.ms), law.line ? predictTap(law.line, { width: data.apply.min, distance: data.apply.distance }) : 0) * 1.15;
+  const box = { left: 40, right: 308, top: 12, bottom: 136 };
+  const maxId = Math.ceil(Math.max(...law.points.map((p) => p.id), difficulty({ width: data.apply.min, distance: data.apply.distance })));
+  const sx = (id) => box.left + (id / maxId) * (box.right - box.left);
+  const sy = (ms) => box.bottom - (ms / top) * (box.bottom - box.top);
+  const first = law.points[0];
+  const last = law.points[law.points.length - 1];
+  return (
+    <div>
+      <svg viewBox="0 0 320 160" className={`studio-board is-small ${small ? "" : "mt-[4px]"}`} role="img" aria-label={`내 기록: ${law.points.map((p) => `어려움 ${p.id.toFixed(1)}비트 ${p.ms}ms`).join(", ")}`}>
+        <rect width="320" height="160" fill="#fff" />
+        <line x1={box.left} y1={box.bottom} x2={box.right} y2={box.bottom} stroke="#b3b9c2" />
+        <line x1={box.left} y1={box.top} x2={box.left} y2={box.bottom} stroke="#b3b9c2" />
+        {Array.from({ length: maxId + 1 }, (_, i) => (
+          <text key={i} x={sx(i)} y={box.bottom + 12} textAnchor="middle" fontSize="9" fill="#637083">
+            {i}
+          </text>
+        ))}
+        <text x={(box.left + box.right) / 2} y="158" textAnchor="middle" fontSize="9" fill="#637083">
+          누르기 어려움(비트) · 오른쪽일수록 작고 먼 막대
+        </text>
+        <text x={box.left - 4} y={box.top + 4} textAnchor="end" fontSize="9" fill="#637083">
+          {seconds(top)}
+        </text>
+        <text x={box.left - 4} y={box.bottom} textAnchor="end" fontSize="9" fill="#637083">
+          0
+        </text>
+        {law.line && (
+          <line x1={sx(0)} y1={sy(Math.max(0, law.line.a))} x2={sx(maxId)} y2={sy(Math.max(0, law.line.a + law.line.b * maxId))} stroke={law.effect ? "#087f77" : "#b3b9c2"} strokeWidth="2" strokeDasharray={law.effect ? "" : "4 3"} />
+        )}
+        {law.points.map((p, i) => (
+          <circle key={i} cx={sx(p.id)} cy={sy(p.ms)} r="4.5" fill="#ffd32f" stroke="#202b3c" strokeWidth="1.2" />
+        ))}
+      </svg>
+      <p className="body-copy mt-[8px]" role="status">
+        크고 가까운 막대 <b>{seconds(first.ms)}</b> → 작고 먼 막대 <b>{seconds(last.ms)}</b>
+        <br />
+        {law.effect ? `어려움이 1비트 늘 때마다 ${Math.round(law.line.b)}ms씩 더 걸렸어요. ${data.effect}` : data.noEffect}
+      </p>
+      <p className="footnote">
+        헛누름 {rounds.reduce((sum, round) => sum + round.misses, 0)}번 · 막대마다 {data.taps}번 잰 시간의 가운데값이에요.
+      </p>
+      {law.effect && !small && <TapApply data={data} line={law.line} />}
+    </div>
+  );
+}
+
+function TapApply({ data, line }) {
+  const { apply } = data;
+  const [width, setWidth] = useState(apply.start);
+  const target = { width, distance: apply.distance };
+  const start = TAP.width / 2 - apply.distance / 2;
+  const percent = Math.round((width / TAP.width) * 100);
+  return (
+    <section className="mt-[14px]" aria-label="내 법칙으로 버튼 크기 정하기">
+      <p className="body-copy">{apply.prompt}</p>
+      <svg viewBox={`0 0 ${TAP.width} 70`} className="studio-board is-small" role="img" aria-label={`${apply.label} 화면 폭의 ${percent}%`}>
+        <rect width={TAP.width} height="70" fill="#fff" />
+        <circle cx={start} cy="35" r="6" fill="#ffd32f" stroke="#202b3c" strokeWidth="1.2" />
+        <line x1={start + 8} y1="35" x2={start + apply.distance - width / 2 - 4} y2="35" stroke="#b3b9c2" strokeDasharray="4 3" />
+        <rect x={start + apply.distance - width / 2} y="17" width={width} height="36" rx="6" fill="#087f77" />
+      </svg>
+      <label className="studio-slider mt-[10px]">
+        <span>
+          {apply.label}
+          <output>화면 폭의 {percent}%</output>
+        </span>
+        <input type="range" className="is-plain" min={apply.min} max={apply.max} step="1" value={width} aria-valuetext={`화면 폭의 ${percent}%`} onChange={(e) => setWidth(Number(e.target.value))} />
+      </label>
+      <p className="studio-big" role="status">
+        예상 시간 <b>{seconds(predictTap(line, target))}</b>
+        <br />
+        <small>어려움 {difficulty(target).toFixed(1)}비트 · 내 기록으로 구한 법칙으로 계산했어요</small>
+      </p>
+    </section>
+  );
+}
+const seconds = (ms) => `${(ms / 1000).toFixed(2)}초`;
+
+/* ---- 기존 틀(C 분류하기)을 학과 전용 체험에서 쓸 때: 요약 한 줄을 결과로 저장한다. ---- */
+function SummaryGame({ data, onComplete }) {
+  return <Experience data={data} onComplete={(summary) => onComplete({ template: data.template, summary })} />;
+}
+
+const games = { H: Sketch, I: Recall, J: Interview, K: Simulation, L: Tap, C: SummaryGame };

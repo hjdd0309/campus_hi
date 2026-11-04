@@ -1,7 +1,7 @@
 // 체험 틀(A·B·C·D·F·G)의 데이터 형식 검사와 채점, 그리고 지금 쓰는 체험 데이터. 화면은 Templates.jsx에 있다.
 // 틀(코드)은 그대로 두고 데이터만 더해 체험을 늘린다(개발기획서_체험구조.md 2-3).
 //   A 문지르기·칠하기 / B 순서 맞추기 / C 분류하기 / D 반응 실험 / F 계획 조립 / G AI 가르치기
-//   H 그리기 / I 기억해서 맞추기 (형식 검사와 채점은 studio.js)
+//   H 그리기 / I 기억해서 맞추기 / J 대화로 알아내기 / K 조절해서 시험하기 / L 재어서 법칙 찾기 (형식 검사와 채점은 studio.js)
 //   (E 장면에서 찾기는 그림이 준비된 뒤에 만든다)
 import { scramble, shuffle } from "./lessonGames.js";
 import { studioTemplates } from "./studio.js";

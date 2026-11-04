@@ -24,6 +24,14 @@ import {
   scoreSketch,
   simplifyStroke,
   startColor,
+  TAP,
+  barCenters,
+  difficulty,
+  fitLine,
+  hitBar,
+  median,
+  predictTap,
+  tapLaw,
 } from "./studio.js";
 import { cleanExperience } from "./experiences.js";
 import { cleanStudio, departmentData, studioFor, subjectConfirmed } from "./departmentData.js";
@@ -35,6 +43,8 @@ const sketch = khu.years[1].parts[0];
 const recall = khu.years[1].parts[1];
 const interview = khu.years[2].parts[0];
 const handle = khu.years[2].parts[1];
+const tap = khu.years[3].parts[0];
+const blueprint = khu.years[3].parts[1];
 
 // 실제 데이터: 공시 교과목(courses.csv.gz)과, 서버가 보내는 모양으로 바꾼 편성표 학년(year_curricula.json).
 const ROWS = gunzipSync(readFileSync(new URL("../../backend/data/courses.csv.gz", import.meta.url))).toString("utf8").split("\n");
@@ -267,8 +277,12 @@ test("학과 전용 체험: 경희대 산업디자인 1학년은 드로잉·평�
   assert.ok(!other.games.some((game) => String(game).startsWith("studio:")));
   assert.equal(other.override, true);
   // 교과목에 과목이 빠져 있으면 쓰지 않는다.
+  // (학년마다 따로 본다: 3학년 과목이 있으면 3학년 전용 체험은 그대로 쓴다.)
   const missing = createDepartment("산업디자인학과", "경희대학교", CURRICULUM.filter((s) => s !== "평면디자인"), "예체능", null, "4년");
-  assert.ok(!missing.games.some((game) => String(game).startsWith("studio:")));
+  assert.notEqual(missing.games[0], "studio:1");
+  const noUx = createDepartment("산업디자인학과", "경희대학교", CURRICULUM.filter((s) => s !== "UX디자인"), "예체능", null, "4년");
+  assert.equal(noUx.games[0], "studio:1");
+  assert.notEqual(noUx.games[2], "studio:3");
 });
 
 test("학과 전용 체험: 체험을 모두 마쳐야 완료되고, 결과는 저장했다 불러와도 그대로다", () => {
@@ -441,6 +455,82 @@ test("경희대 산업디자인 2학년: 편성표 학년 자료가 있을 때�
     { template: "K", params: [{ label: "손잡이 안쪽 길이", value: 50, unit: "mm" }], tries: 2, people: 3 },
   ];
   const stored = JSON.stringify({ catalog: [d], journeys: { [d.id]: { completed: 1, paused: false } }, results: { [key]: results } });
+  const loaded = loadState({ getItem: (name) => (name === STORAGE_KEY ? stored : null) });
+  assert.deepEqual(loaded.results[key], results);
+});
+
+test("버튼 크기 실험(L): 어려움 지수, 가운데값, 직선 맞추기, 예측", () => {
+  assert.ok(tap, "버튼 크기 실험 데이터가 형식 검사를 통과해야 한다");
+  // 섀넌 형식 log2(D/W + 1): 조건은 1·2·3·4비트다.
+  assert.deepEqual(tap.targets.map(difficulty), [1, 2, 3, 4]);
+  // 두 막대는 판 안에 들어간다.
+  for (const target of tap.targets) {
+    const [left, right] = barCenters(target);
+    assert.ok(left - target.width / 2 >= 0 && right + target.width / 2 <= TAP.width);
+  }
+  // 예측 슬라이더는 잰 범위(1~4비트) 안에서 움직인다.
+  for (const width of [tap.apply.min, tap.apply.max]) {
+    const id = difficulty({ width, distance: tap.apply.distance });
+    assert.ok(id >= 1 && id <= 4, `${width} → ${id}`);
+  }
+  assert.ok(hitBar(100, 100, 20) && hitBar(110, 100, 20) && !hitBar(110.5, 100, 20));
+  assert.equal(median([300, 5000, 320]), 320);
+  assert.equal(median([1, 2, 3, 10]), 2.5);
+  // 정확히 직선 위의 점이면 그 직선을 돌려준다. ID가 모두 같으면 기울기를 구할 수 없다.
+  const line = fitLine([1, 2, 3, 4].map((id) => ({ id, ms: 200 + 150 * id })));
+  assert.ok(Math.abs(line.a - 200) < 1e-9 && Math.abs(line.b - 150) < 1e-9);
+  assert.equal(fitLine([{ id: 2, ms: 1 }, { id: 2, ms: 3 }]), null);
+  assert.equal(predictTap(line, { width: 64, distance: 64 }), 350);
+  assert.equal(predictTap({ a: -500, b: 10 }, { width: 64, distance: 64 }), 0);
+  // 결과를 미리 정해 두지 않는다: 기록에 따라 법칙이 드러나기도, 안 드러나기도 한다.
+  const rounds = (times) => tap.targets.map((target, i) => ({ ...target, ms: times[i], misses: 0 }));
+  assert.equal(tapLaw(rounds([380, 470, 560, 690])).effect, true);
+  assert.equal(tapLaw(rounds([600, 500, 450, 400])).effect, false);
+  // 형식 검사: ID가 너무 붙어 있거나 판을 넘으면 걸린다.
+  assert.equal(cleanExperience({ ...tap, targets: [{ width: 40, distance: 40 }, { width: 41, distance: 41 }, { width: 18, distance: 270 }] }), null);
+  assert.equal(cleanExperience({ ...tap, targets: [...tap.targets.slice(0, 3), { width: 40, distance: 300 }] }), null);
+  assert.equal(cleanExperience({ ...tap, apply: { ...tap.apply, distance: 280 } }), null);
+});
+
+test("버튼 크기 실험(L)과 분류하기(C) 결과를 저장하고 요약한다", () => {
+  const result = { template: "L", rounds: tap.targets.map((target, i) => ({ ...target, ms: [400, 520, 610, 735][i], misses: i })) };
+  assert.deepEqual(cleanResult(result), result);
+  assert.equal(resultSummary(result), "버튼 크기 실험 크고 가까운 막대 0.40초 → 작고 먼 막대 0.73초");
+  assert.equal(cleanResult({ ...result, rounds: result.rounds.slice(0, 2) }), null);
+  assert.equal(cleanResult({ ...result, rounds: [{ ...result.rounds[0], ms: 0.5 }, ...result.rounds.slice(1)] }), null);
+  const sorted = { template: "C", summary: "장면 8개 · 한 번에 맞힌 것 6개" };
+  assert.deepEqual(cleanResult(sorted), sorted);
+  assert.equal(resultSummary(sorted), "장면 8개 · 한 번에 맞힌 것 6개");
+  assert.equal(cleanResult({ template: "C", summary: "" }), null);
+  assert.equal(cleanResult({ template: "B", summary: "요약" }), null);
+  // 블루프린트 카드는 네 줄을 모두 쓴다.
+  assert.deepEqual(new Set(blueprint.items.map((item) => item.answer[0])), new Set(["customer", "front", "back", "support"]));
+});
+
+test("경희대 산업디자인 3학년: UX디자인·서비스디자인으로 버튼 크기 실험과 서비스 블루프린트를 한다", () => {
+  const curriculum = curriculumOf("경희대학교", "산업디자인학과");
+  const years = servedYears("경희대학교", "산업디자인학과");
+  const d = createDepartment("산업디자인학과", "경희대학교", curriculum, "예체능", years, "4년", "서울특별시", null, null, null, true, true);
+  assert.equal(d.lessons[2], "UX디자인 · 서비스디자인");
+  assert.equal(d.games[2], "studio:3");
+  assert.deepEqual(studioOf(d, 2).parts.map((part) => part.template), ["L", "C"]);
+  // 편성표 학년 자료에서도 두 과목은 3학년이다.
+  assert.equal(years.subjects["UX디자인"], 3);
+  assert.equal(years.subjects["서비스디자인"], 3);
+  const third = yearSubjects(d).years.find((item) => item.year === 3);
+  assert.deepEqual(third.open, [
+    { index: 2, title: "UX디자인" },
+    { index: 2, title: "서비스디자인" },
+  ]);
+  // 졸업 과제 자리는 그대로다.
+  assert.equal(d.games[3], null);
+  // 결과를 저장했다 불러와도 그대로다.
+  const key = `${d.id}-2`;
+  const results = [
+    { template: "L", rounds: tap.targets.map((target, i) => ({ ...target, ms: 300 + 100 * i, misses: 0 })) },
+    { template: "C", summary: "장면 8개 · 한 번에 맞힌 것 8개" },
+  ];
+  const stored = JSON.stringify({ catalog: [d], journeys: { [d.id]: { completed: 2, paused: false } }, results: { [key]: results } });
   const loaded = loadState({ getItem: (name) => (name === STORAGE_KEY ? stored : null) });
   assert.deepEqual(loaded.results[key], results);
 });

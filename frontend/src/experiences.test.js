@@ -36,8 +36,8 @@ test("지금 쓰는 체험 데이터는 모두 형식 검사를 통과한다", (
   for (const final of Object.values(finals)) assert.ok(final.name);
   for (const group of Object.values(groupData))
     for (const entry of [group.practice, group.final]) if (entry.base) assert.ok(experiences[entry.base], entry.base);
-  // 틀은 데이터로 늘리기 어려운 새 조작 방식이 필요할 때만 더한다(2026-11-04: 학과 전용 체험의 H 그리기·I 기억해서 맞추기·J 대화로 알아내기·K 조절해서 시험하기).
-  assert.deepEqual(Object.keys(templates), ["A", "B", "C", "D", "F", "G", "H", "I", "J", "K"]);
+  // 틀은 데이터로 늘리기 어려운 새 조작 방식이 필요할 때만 더한다(2026-11-04: 학과 전용 체험의 H 그리기·I 기억해서 맞추기·J 대화로 알아내기·K 조절해서 시험하기, 3학년의 L 재어서 법칙 찾기: 크기·거리가 다른 목표를 누르는 시간 재기는 D 반응 실험의 보기 고르기로 할 수 없다).
+  assert.deepEqual(Object.keys(templates), ["A", "B", "C", "D", "F", "G", "H", "I", "J", "K", "L"]);
 });
 
 test("형식이 틀린 체험 데이터는 거른다", () => {

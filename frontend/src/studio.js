@@ -4,6 +4,8 @@
 //   I 기억해서 맞추기: 목표 값을 잠깐 보여 주고 숨긴 뒤, 슬라이더로 기억해서 맞춘다. 지금은 색(색상·채도·명도)을 맞춘다.
 //   J 대화로 알아내기: 등장인물과 대화하며 턴마다 질문을 고른다. 열린 질문을 고르면 인사이트가 드러나고, 마지막에 컨셉을 고른다.
 //   K 조절해서 시험하기: 슬라이더로 치수를 바꾸고, 사람마다의 측정값과 규칙으로 편한지 계산한다. 모두 편한 값을 찾으면 끝난다.
+//   L 재어서 법칙 찾기: 너비와 거리가 다른 두 막대를 번갈아 누르는 시간을 재고, 내 기록으로 피츠의 법칙 직선을 구한다.
+// 학과 전용 체험에는 기존 틀 C(분류하기)도 쓸 수 있다. 결과는 요약 한 줄로 저장한다(cleanSummaryResult).
 
 const text = (value, max) => (typeof value === "string" && value.trim() && [...value].length <= max ? value : null);
 const list = (value, min, max) => (Array.isArray(value) && value.length >= min && value.length <= max ? value : null);
@@ -450,6 +452,117 @@ export const simSummary = (result) =>
   `손잡이 테스트 ${result.params.map((param) => `${param.label} ${param.value}${param.unit}`).join(" · ")} (${result.people}명 모두 편함, ${result.tries}번 만에)`;
 
 /* ---------------------------------------------------------------- */
+/* L 재어서 법칙 찾기 (피츠의 법칙)                                     */
+/* ---------------------------------------------------------------- */
+
+// 누르기판 크기(데이터와 기록의 좌표 단위). 화면은 폭에 맞춰 늘리지만, 법칙은 거리와 너비의 비만 쓰므로 단위가 상관없다.
+export const TAP = { width: 320, height: 150 };
+// 양옆 여백. 두 막대가 이 안에 들어가야 한다.
+const TAP_MARGIN = 8;
+
+// 어려움 지수(ID, 비트): 피츠의 법칙의 섀넌 형식(MacKenzie, 1992) log2(거리/너비 + 1).
+export const difficulty = ({ distance, width }) => Math.log2(distance / width + 1);
+
+function cleanTap(raw) {
+  const targets = all(
+    list(raw.targets, 3, 5)?.map((target) =>
+      target && num(target.width, 10, 120) && num(target.distance, target.width, TAP.width) && target.distance + target.width <= TAP.width - TAP_MARGIN * 2
+        ? { width: target.width, distance: target.distance }
+        : null,
+    ),
+  );
+  // 어려움 지수가 서로 달라야 기울기를 구할 수 있다(0.5비트 이상 차이).
+  const ids = targets?.map(difficulty).sort((a, b) => a - b);
+  if (!targets || ids.some((value, i) => i > 0 && value - ids[i - 1] < 0.5)) return null;
+  const apply = raw.apply;
+  const applyOk =
+    apply &&
+    text(apply.label, 16) &&
+    text(apply.prompt, 120) &&
+    num(apply.distance, 10, TAP.width) &&
+    num(apply.min, 10, 120) &&
+    num(apply.max, apply.min + 10, 120) &&
+    num(apply.start, apply.min, apply.max) &&
+    apply.distance + apply.max <= TAP.width - TAP_MARGIN * 2;
+  return applyOk &&
+    int(raw.taps, 5, 15) &&
+    text(raw.prompt, 120) &&
+    text(raw.effect, 160) &&
+    text(raw.noEffect, 160) &&
+    text(raw.footnote, 120) &&
+    text(raw.explanation, 160)
+    ? {
+        targets,
+        taps: raw.taps,
+        apply: { label: apply.label, prompt: apply.prompt, distance: apply.distance, min: apply.min, max: apply.max, start: apply.start },
+        prompt: raw.prompt,
+        effect: raw.effect,
+        noEffect: raw.noEffect,
+        footnote: raw.footnote,
+        explanation: raw.explanation,
+      }
+    : null;
+}
+
+// 두 막대의 가운데 x 좌표. 판 가운데를 기준으로 거리만큼 벌린다.
+export const barCenters = ({ distance }) => [TAP.width / 2 - distance / 2, TAP.width / 2 + distance / 2];
+// x(판 좌표)가 막대 안인지. 막대는 위아래로 판을 채우므로 가로만 본다(1차원 왕복 누르기).
+export const hitBar = (x, center, width) => Math.abs(x - center) <= width / 2;
+
+// 가운데값. 한 번 멈칫한 시간이 평균을 크게 끌어올리지 않게 한다.
+export function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// 최소제곱 직선 ms = a + b × ID. points: [{ id, ms }]. ID가 모두 같으면 null.
+export function fitLine(points) {
+  const n = points.length;
+  const mx = points.reduce((sum, p) => sum + p.id, 0) / n;
+  const my = points.reduce((sum, p) => sum + p.ms, 0) / n;
+  const sxx = points.reduce((sum, p) => sum + (p.id - mx) ** 2, 0);
+  if (!sxx) return null;
+  const b = points.reduce((sum, p) => sum + (p.id - mx) * (p.ms - my), 0) / sxx;
+  return { a: my - b * mx, b };
+}
+// 기록(rounds)으로 법칙을 구한다. 기울기가 0보다 커야(어려울수록 오래 걸려야) 법칙이 드러난 것으로 본다.
+export function tapLaw(rounds) {
+  const points = rounds.map((round) => ({ id: difficulty(round), ms: round.ms })).sort((x, y) => x.id - y.id);
+  const line = fitLine(points);
+  return { points, line, effect: !!line && line.b > 0 };
+}
+// 내 법칙으로 예상한 시간(ms, 정수). 0보다 작게 나오지 않게 한다.
+export const predictTap = (line, target) => Math.max(0, Math.round(line.a + line.b * difficulty(target)));
+
+// 저장된 결과: { template: "L", rounds: [{ width, distance, ms, misses }] }. 조건 순서는 데이터 순서다.
+function cleanTapResult(raw) {
+  const rounds = all(
+    list(raw?.rounds, 3, 5)?.map((round) =>
+      round && num(round.width, 10, 120) && num(round.distance, round.width, TAP.width) && int(round.ms, 1, 60000) && int(round.misses, 0, 999)
+        ? { width: round.width, distance: round.distance, ms: round.ms, misses: round.misses }
+        : null,
+    ),
+  );
+  return rounds && { template: "L", rounds };
+}
+const seconds = (ms) => `${(ms / 1000).toFixed(2)}초`;
+export function tapSummary(result) {
+  const { points } = tapLaw(result.rounds);
+  return `버튼 크기 실험 크고 가까운 막대 ${seconds(points[0].ms)} → 작고 먼 막대 ${seconds(points[points.length - 1].ms)}`;
+}
+
+/* ---------------------------------------------------------------- */
+/* 학과 전용 체험에서 쓰는 기존 틀(C 분류하기)의 결과                      */
+/* ---------------------------------------------------------------- */
+
+// 기존 틀은 끝나면 요약 한 줄을 돌려준다. 학과 전용 체험에서는 { template, summary }로 저장한다.
+const SUMMARY_TEMPLATES = ["C"];
+function cleanSummaryResult(raw) {
+  return raw && SUMMARY_TEMPLATES.includes(raw.template) && text(raw.summary, 100) ? { template: raw.template, summary: raw.summary } : null;
+}
+
+/* ---------------------------------------------------------------- */
 
 // experiences.js의 templates에 더하는 틀. clean은 체험 데이터, cleanResult는 저장된 결과를 검사한다.
 export const studioTemplates = {
@@ -457,11 +570,13 @@ export const studioTemplates = {
   I: { title: "기억해서 맞추기", clean: cleanRecall, cleanResult: cleanRecallResult, summary: recallSummary },
   J: { title: "대화로 알아내기", clean: cleanInterview, cleanResult: cleanInterviewResult, summary: interviewSummary },
   K: { title: "조절해서 시험하기", clean: cleanSim, cleanResult: cleanSimResult, summary: simSummary },
+  L: { title: "재어서 법칙 찾기", clean: cleanTap, cleanResult: cleanTapResult, summary: tapSummary },
 };
 
 // 저장된 결과 하나를 검사한다. 틀을 모르거나 형식이 틀리면 null.
 export function cleanResult(raw) {
+  if (raw && SUMMARY_TEMPLATES.includes(raw.template)) return cleanSummaryResult(raw);
   const template = raw && typeof raw === "object" && Object.hasOwn(studioTemplates, raw.template) ? studioTemplates[raw.template] : null;
   return template ? template.cleanResult(raw) : null;
 }
-export const resultSummary = (result) => studioTemplates[result.template].summary(result);
+export const resultSummary = (result) => (SUMMARY_TEMPLATES.includes(result.template) ? result.summary : studioTemplates[result.template].summary(result));
