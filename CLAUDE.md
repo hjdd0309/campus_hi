@@ -70,6 +70,7 @@
 - `backend/`: FastAPI. `main.py` 하나에 API가 있고, 데이터는 `data/courses.csv.gz`를 읽는다. 데이터 출처는 `backend/SOURCE.md`에 있다.
 - `backend/pipeline.py`: 학교 이름을 받아 그 학교 학과들의 교육과정 페이지에서 과목별 학년을 모으고, 원본 교과목명에 맞춰 `data/year_curricula.json`에 저장하는 수집 도구(출처는 `data/year_sources.csv`, 리포트는 `data/year_reports/`). 서버는 이 파일의 검증된 항목만 내보낸다.
 - `frontend/src/experiences.js`, `Templates.jsx`: 체험 틀(A 문지르기, B 순서, C 분류, D 반응 실험, F 계획 조립, G AI 가르치기)의 형식 검사·채점과 화면, 그리고 학과군 데이터가 바탕으로 쓰는 체험(버블 정렬, 분개, 졸업 과제 5종). G는 컴퓨터·AI 졸업 과제로, 그림 카드로 작은 AI(결정 그루터기)를 실제로 학습시키며 결과를 미리 정해 두지 않는다. 체험은 틀을 늘리지 않고 데이터를 더해 늘린다.
+- `frontend/src/departmentData.js`, `studio.js`, `StudioTemplates.jsx`: 학과 전용 체험. 특정 학교·학과의 학년 자리를 학과군 규칙 대신 채운다(한 학년에 체험 1~3개를 차례로, 결과는 `state.results`). 과목은 출처 편성표에서 그 학년임을 확인한 것만 쓰고, 교과목에 과목이 없으면 쓰지 않는다. 전용 체험이 생기기 전에 입학한 학과는 예전 수업을 유지한다(`override`). 틀 H(그리기)·I(기억해서 맞추기)의 채점은 `studio.js`. 지금은 경희대 산업디자인학과 1학년(드로잉·평면디자인: 투시 스케치, 색 맞추기)이 있다.
 - `frontend/src/groups.js`, `groupData.js`: 학과 → 학과군(16개) 분류 규칙과 학과군별 실습·졸업 과제 데이터. 체험 내용(응급도 분류 기준, 법 분야, 회계 처리 등)은 사실과 맞아야 하므로 고칠 때 근거를 확인하고, AI가 쓴 데이터는 쓰지 않은 별도 에이전트의 검토를 통과한 뒤에만 `status: "verified"`로 바꾼다. `games.js`는 이론 수업에 쓸 과목 고르기다.
 - `frontend/src/lessonGames.js`, `TypedGames.jsx`, `backend/lesson_games.py`: 이론 수업에 붙는 유형별 연습 문제(빈칸 채우기, OX, 순서 맞추기, 짝 맞추기, 분류하기). 문제는 미리 만들어 `backend/data/lesson_games.jsonl`에 넣고 서버는 검증된 것만 내보낸다. 연습 문제가 없거나 받지 못하면 기본 체험(관찰 과제)으로 진행한다.
 - `scripts/dev.mjs`: 백엔드 가상환경 준비와 백엔드·프론트 동시 실행을 맡는다.

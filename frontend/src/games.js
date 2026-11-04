@@ -7,9 +7,9 @@ export function gameFor(subject, lessonGames = {}) {
   const type = Object.hasOwn(lessonGames, subject) ? lessonGames[subject] : null;
   return isLessonType(type) ? type : null;
 }
-// 저장된 체험 결과가 지금도 있는 체험의 것인지: 연습 문제 유형이거나 학과군 실습(group:학과군).
+// 저장된 체험 결과가 지금도 있는 체험의 것인지: 연습 문제 유형, 학과군 실습(group:학과군), 학과 전용 체험(studio:학년).
 export const isGame = (id) =>
-  isLessonType(id) || (typeof id === "string" && GROUPS.some((group) => id === `group:${group.id}`));
+  isLessonType(id) || (typeof id === "string" && (GROUPS.some((group) => id === `group:${group.id}`) || /^studio:[1-6]$/.test(id)));
 
 // 과목을 보통 듣는 학년 범위(과목 → [시작, 끝], 1~4학년). 형식이 맞는 것만 남긴다.
 export function cleanLevels(value) {

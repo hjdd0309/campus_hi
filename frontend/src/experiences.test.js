@@ -36,7 +36,8 @@ test("지금 쓰는 체험 데이터는 모두 형식 검사를 통과한다", (
   for (const final of Object.values(finals)) assert.ok(final.name);
   for (const group of Object.values(groupData))
     for (const entry of [group.practice, group.final]) if (entry.base) assert.ok(experiences[entry.base], entry.base);
-  assert.ok(Object.keys(templates).length <= 6);
+  // 틀은 데이터로 늘리기 어려운 새 조작 방식이 필요할 때만 더한다(2026-11-04: 학과 전용 체험의 H 그리기·I 기억해서 맞추기).
+  assert.deepEqual(Object.keys(templates), ["A", "B", "C", "D", "F", "G", "H", "I"]);
 });
 
 test("형식이 틀린 체험 데이터는 거른다", () => {

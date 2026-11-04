@@ -44,12 +44,15 @@ import {
   cardTone,
   showsExampleNote,
   homeSubjects,
+  studioOf,
 } from "./model.js";
 import { isLessonType, lessonTypes } from "./lessonGames.js";
 import LessonGame, { useLessonGame } from "./Games.jsx";
 import { PlanSummary, PlanTemplate, Rub } from "./Templates.jsx";
 import { templates } from "./experiences.js";
 import { groupName } from "./groups.js";
+import { LearnDeck, ResultView, StudioLesson } from "./StudioTemplates.jsx";
+import { resultSummary } from "./studio.js";
 
 /* ------------------------------------------------------------------ */
 /* 공통                                                                */
@@ -1360,6 +1363,8 @@ function taskKind(d, index) {
   if (index === d.lessons.length - 1) return "졸업 과제";
   const id = d.games?.[index];
   if (typeof id === "string" && id.startsWith("group:") && d.practice) return `전공 실습(${templates[d.practice.template].title})`;
+  const studio = studioOf(d, index);
+  if (studio) return `직접 해보기(${studio.parts.map((part) => templates[part.template].title).join(" · ")})`;
   return lessonTypes[id]?.title || "직접 해보고 느낀 점 기록하기";
 }
 
@@ -1630,6 +1635,9 @@ export function Lesson({ active, nav, route, state, setState }) {
   const game = ok && !isFinal ? v.d.games?.[v.index] || null : null;
   // 학과군 전공 실습이면 그 체험 데이터. 아니면 연습 문제 유형(이론 수업)이거나 null(기본 체험).
   const practice = typeof game === "string" && game.startsWith("group:") ? v.d.practice : null;
+  // 학과 전용 체험(그리기·색 맞추기 등). 데이터가 내려가 없어졌으면 기본 체험으로 진행한다.
+  const studio = ok && !isFinal ? studioOf(v.d, v.index) : null;
+  const studioGone = typeof game === "string" && game.startsWith("studio:") && !studio;
   const typed = !practice && isLessonType(game);
   const quiz = useLessonGame(typed ? subject : null);
   const [draft, setDraft] = useState(() => (ok ? state.drafts[key] ?? state.notes[key] ?? "" : ""));
@@ -1648,9 +1656,9 @@ export function Lesson({ active, nav, route, state, setState }) {
   useEffect(() => () => window.clearTimeout(timer.current), []);
   // 연습 문제를 받을 수 없으면 기본 체험으로 진행하고, 체험을 마친 것으로 기록해 수업을 끝낼 수 있게 한다.
   useEffect(() => {
-    if (typed && quiz.status === "basic")
+    if ((typed && quiz.status === "basic") || studioGone)
       setState((s) => (s.plays[key]?.game === game ? s : { ...s, plays: { ...s.plays, [key]: { game, summary: "" } } }));
-  }, [typed, quiz.status, key, game, setState]);
+  }, [typed, quiz.status, studioGone, key, game, setState]);
   // 단계를 옮기면 맨 위로 올리고 제목에 초점을 둔다(스크린 리더가 새 단계를 읽게).
   useEffect(() => {
     if (!moved.current) return;
@@ -1714,15 +1722,21 @@ export function Lesson({ active, nav, route, state, setState }) {
     );
 
   // 수업의 종류: 졸업 계획서, 졸업 프로젝트(AI 가르치기 등), 학과군 전공 실습, 연습 문제(불러오는 중·오류 포함), 기본 체험.
-  const mode = isFinal ? (final.kind === "project" ? "project" : "plan") : practice ? "practice" : typed && quiz.status !== "basic" ? quiz.status === "ready" ? "quiz" : quiz.status : "basic";
+  const mode = isFinal ? (final.kind === "project" ? "project" : "plan") : practice ? "practice" : studio ? "studio" : typed && quiz.status !== "basic" ? quiz.status === "ready" ? "quiz" : quiz.status : "basic";
   const play = game && state.plays[key]?.game === game ? state.plays[key] : null;
   const played = play?.summary || "";
   const plan = state.capstones[d.id];
   const projectDone = !!state.artworks[d.id];
+  const results = studio ? state.results?.[key] || [] : [];
   const tried =
-    mode === "plan" ? planReady(plan) : mode === "project" ? projectDone : mode === "practice" || mode === "quiz" ? !!played : mode === "basic";
+    mode === "plan" ? planReady(plan) : mode === "project" ? projectDone : mode === "practice" || mode === "quiz" || mode === "studio" ? !!played : mode === "basic";
 
-  const headline = mode === "plan" || mode === "project" ? final.name : mode === "practice" ? practice.title : mode === "quiz" ? quiz.game.title : subject;
+  const headline =
+    mode === "plan" || mode === "project" ? final.name
+    : mode === "practice" ? practice.title
+    : mode === "studio" ? studio.parts.map((part) => part.title).join(" · ")
+    : mode === "quiz" ? quiz.game.title
+    : subject;
   const warn = (message) => {
     setNotice(message);
     setShake((n) => n + 1);
@@ -1786,6 +1800,19 @@ export function Lesson({ active, nav, route, state, setState }) {
             <p style={delay(0.1)}>{(mode === "practice" ? practice : final).learn}</p>
           </MintCard>
         )}
+        {mode === "studio" && <LearnDeck parts={studio.parts} />}
+        {mode === "studio" && (
+          <MintCard title="이 수업에서 해볼 것" className="a-up mt-[12px]">
+            <ol className="grid gap-[4px]" style={delay(0.12)}>
+              {studio.parts.map((part, i) => (
+                <li key={i}>
+                  {studio.parts.length > 1 ? `${"①②③"[i]} ` : ""}
+                  {part.task}
+                </li>
+              ))}
+            </ol>
+          </MintCard>
+        )}
         {task && (
           <MintCard
             title="이 수업에서 해볼 것"
@@ -1834,6 +1861,24 @@ export function Lesson({ active, nav, route, state, setState }) {
             }}
           />
         )}
+        {mode === "studio" && (
+          <StudioLesson
+            studio={studio}
+            results={results}
+            onResult={(at, result) => {
+              setNotice("");
+              setState((s) => {
+                const list = studio.parts.map((_, i) => (i === at ? result : s.results?.[key]?.[i] || null));
+                const done = list.every(Boolean);
+                return {
+                  ...s,
+                  results: { ...s.results, [key]: list },
+                  plays: done ? { ...s.plays, [key]: { game, summary: list.map(resultSummary).join(" · ").slice(0, 200) } } : s.plays,
+                };
+              });
+            }}
+          />
+        )}
         {mode === "basic" && (
           <section>
             <h2 className="text-[16px] font-bold leading-[24px] text-ink-2">오늘의 직접 적용 과제</h2>
@@ -1862,6 +1907,25 @@ export function Lesson({ active, nav, route, state, setState }) {
             <p>{mode === "quiz" ? quiz.game.explanation : mode === "project" ? final.explanation : practice.learn}</p>
           </MintCard>
         )}
+        {mode === "studio" && (
+          <MintCard title="배운 내용" className="a-up mt-[22px]">
+            {studio.parts.map((part, i) => (
+              <p key={i} className={i ? "mt-[6px]" : ""}>
+                {part.explanation}
+              </p>
+            ))}
+          </MintCard>
+        )}
+        {mode === "studio" &&
+          studio.parts.map(
+            (part, i) =>
+              results[i] && (
+                <section key={i} className="lesson-game a-up mt-[12px]" aria-label={`${part.title} 결과`} style={delay(0.04)}>
+                  <h2 className="section-title">{part.title} 결과</h2>
+                  <ResultView data={part} result={results[i]} />
+                </section>
+              ),
+          )}
         {mode === "plan" && planReady(plan) && (
           <MintCard title={`나의 ${final.name} 계획서`} className="a-up mt-[22px]">
             <PlanSummary final={final} plan={plan} />
@@ -2065,7 +2129,12 @@ export function Graduation({ active, nav, state }) {
 function reportText(state, d) {
   const { completed, skipped, passed } = progressOf(state.journeys[d.id], d.lessons.length);
   const notes = d.lessons
-    .map((lesson, i) => `${stageLabel(d, i)}. ${lesson}${skipped.includes(i) ? " [미이수]" : ""}\n${state.notes[`${d.id}-${i}`] || "기록 없음"}`)
+    .map((lesson, i) => {
+      // 학과 전용 체험의 결과(스케치 점수, 색 일치율 등)를 한 줄로 덧붙인다.
+      const results = (state.results?.[`${d.id}-${i}`] || []).filter(Boolean);
+      const played = results.length ? `\n체험 결과: ${results.map(resultSummary).join(" · ")}` : "";
+      return `${stageLabel(d, i)}. ${lesson}${skipped.includes(i) ? " [미이수]" : ""}${played}\n${state.notes[`${d.id}-${i}`] || "기록 없음"}`;
+    })
     .join("\n\n");
   const plan = state.capstones[d.id];
   const final = finalOf(d);

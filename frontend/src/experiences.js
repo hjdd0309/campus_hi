@@ -1,8 +1,10 @@
 // 체험 틀(A·B·C·D·F·G)의 데이터 형식 검사와 채점, 그리고 지금 쓰는 체험 데이터. 화면은 Templates.jsx에 있다.
 // 틀(코드)은 그대로 두고 데이터만 더해 체험을 늘린다(개발기획서_체험구조.md 2-3).
 //   A 문지르기·칠하기 / B 순서 맞추기 / C 분류하기 / D 반응 실험 / F 계획 조립 / G AI 가르치기
+//   H 그리기 / I 기억해서 맞추기 (형식 검사와 채점은 studio.js)
 //   (E 장면에서 찾기는 그림이 준비된 뒤에 만든다)
 import { scramble, shuffle } from "./lessonGames.js";
+import { studioTemplates } from "./studio.js";
 
 const text = (value, max) =>
   typeof value === "string" && value.trim() && [...value].length <= max ? value : null;
@@ -196,16 +198,22 @@ export const templates = {
   D: { title: "반응 실험", clean: cleanReaction },
   F: { title: "계획 조립", clean: cleanPlan },
   G: { title: "AI 가르치기", clean: cleanTrain },
+  ...Object.fromEntries(Object.entries(studioTemplates).map(([id, { title, clean }]) => [id, { title, clean }])),
 };
 
 // 체험 데이터를 검사한다. 형식이 맞지 않으면 null이다.
 // learn(알아두기)은 수업의 "배우기"와 "기록" 단계에 보여주는 2~3줄 설명으로, 없어도 된다.
+// cards(배우기 카드)는 그 체험의 원리를 2~3장으로 나눠 설명하는 카드로, 없어도 된다: [{ title, body }].
 export function cleanExperience(raw) {
   if (!raw || typeof raw !== "object" || !Object.hasOwn(templates, raw.template)) return null;
   const body = templates[raw.template].clean(raw);
   const learn = raw.learn === undefined || raw.learn === "" ? "" : text(raw.learn, 120);
-  return body && text(raw.title, 20) && text(raw.task, 60) && learn !== null
-    ? { template: raw.template, title: raw.title, task: raw.task, learn, ...body }
+  const cards =
+    raw.cards === undefined
+      ? []
+      : all(list(raw.cards, 2, 3)?.map((card) => (text(card?.title, 16) && text(card.body, 120) ? { title: card.title, body: card.body } : null)));
+  return body && text(raw.title, 20) && text(raw.task, 60) && learn !== null && cards
+    ? { template: raw.template, title: raw.title, task: raw.task, learn, ...(cards.length ? { cards } : {}), ...body }
     : null;
 }
 
