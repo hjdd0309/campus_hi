@@ -1763,6 +1763,8 @@ export function Lesson({ active, nav, route, state, setState }) {
   };
   const next = d.lessons[index + 1];
   const written = !!draft.trim();
+  // 학과 전용 체험의 기록 질문(체험 데이터의 question). 한 줄 기록 위에 보여준다.
+  const questions = mode === "studio" ? studio.parts.map((part) => part.question).filter(Boolean) : [];
 
   let body;
   let action;
@@ -1938,6 +1940,11 @@ export function Lesson({ active, nav, route, state, setState }) {
         )}
         <label className="note-card a-up mt-[16px] block" style={delay(0.12)}>
           <strong>{isFinal ? "체험을 마치며 남기는 생각" : "한 줄 기록"}</strong>
+          {questions.map((question, i) => (
+            <span key={i} className="mt-[4px] block text-[13px] leading-[20px] text-mint-deep">
+              {question}
+            </span>
+          ))}
           <textarea
             className="compact"
             rows={2}

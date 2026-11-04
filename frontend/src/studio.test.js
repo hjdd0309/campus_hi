@@ -32,14 +32,56 @@ import {
   median,
   predictTap,
   tapLaw,
+  judgePins,
+  lineDistance,
+  matchPins,
+  pointDistance,
+  starsFor,
+  vanishStars,
 } from "./studio.js";
 import { cleanExperience } from "./experiences.js";
-import { cleanStudio, departmentData, studioFor, subjectConfirmed } from "./departmentData.js";
+import { cleanStudio, departmentData, studioFor, subjectConfirmed, vanishingRounds } from "./departmentData.js";
 import { completeLesson, createDepartment, loadState, STORAGE_KEY, studioOf, yearSubjects } from "./model.js";
 import { isGame } from "./games.js";
 
 const khu = departmentData["경희대학교|산업디자인학과"];
-const sketch = khu.years[1].parts[0];
+const vanish = khu.years[1].parts[0];
+// 예전 1학년 투시 스케치(틀 H) 데이터. 지금 데이터에서는 소실점 탐정(틀 M)으로 바뀌었지만, 예전 기록을 읽으려고 틀 H를 남겨 두어 여기서 계속 검사한다.
+const sketch = cleanExperience({
+            template: "H",
+            title: "투시 스케치",
+            task: "소실점을 보며 상자를 그리고, 가이드선을 켜고 다시 그려 점수를 비교해요.",
+            cards: [
+              {
+                title: "소실점과 눈높이선",
+                body: "멀리 있는 것은 작아 보여서, 나란한 선도 멀어질수록 한 점으로 모여 보여요. 이 점이 소실점이에요. 땅과 나란한 선의 소실점은 내 눈높이의 수평선(눈높이선) 위에 생겨요.",
+              },
+              {
+                title: "2점 투시",
+                body: "고개를 들거나 숙이지 않고 상자를 모서리 쪽에서 보면 소실점이 양쪽에 하나씩 생겨요. 세로 모서리는 똑바로 세우고, 나머지 모서리는 두 소실점 중 하나를 향해요.",
+              },
+              {
+                title: "가이드선",
+                body: "디자이너는 형태를 그리기 전에 소실점에서 연한 가이드선을 먼저 긋기도 해요. 가이드 없이 한 번, 가이드를 켜고 한 번 그려 비교해 봐요.",
+              },
+            ],
+            vanishing: [12, 308],
+            horizon: 70,
+            edge: { x: 150, top: 115, bottom: 195 },
+            rounds: [
+              { guide: false, label: "가이드 없이" },
+              { guide: true, label: "가이드선 켜고" },
+            ],
+            minLines: 6,
+            maxLines: 14,
+            prompt:
+              "굵은 앞 모서리에서 시작해 상자를 그려요. 가로로 뻗는 모서리는 양쪽 소실점을 향하게, 세로 모서리는 똑바로 세워요. 선을 6개 이상 그은 뒤 채점해요.",
+            guideTip: "연한 선은 소실점에서 뻗어 나온 가이드선이에요. 가이드선에 겹쳐 6개 이상 그어 보세요.",
+            improved: "가이드선을 켜니 선이 투시 방향에 더 잘 맞았어요.",
+            notImproved: "이번엔 점수가 오르지 않았어요. 가이드선에 선을 겹쳐 다시 그어 보세요.",
+            explanation:
+              "2점 투시에서 같은 방향으로 뻗은 가로 모서리는 눈높이선 위의 한 점(소실점)으로 모이고, 세로 모서리는 똑바로 서요. 디자이너는 가이드선을 먼저 긋고 그 위에 형태를 올려 정확한 스케치를 그려요.",
+          });
 const recall = khu.years[1].parts[1];
 const interview = khu.years[2].parts[0];
 const handle = khu.years[2].parts[1];
@@ -75,7 +117,9 @@ const rotate = (p, q, deg) => {
 test("그리기·색 맞추기 데이터는 형식 검사를 통과하고, 형식이 틀리면 거른다", () => {
   assert.ok(khu.source, "출처가 있어야 한다");
   assert.ok(khu.years[1], "1학년 형식이 틀림");
+  assert.ok(sketch, "예전 투시 스케치(H) 데이터 형식이 틀림");
   assert.equal(sketch.template, "H");
+  assert.equal(vanish.template, "M");
   assert.equal(recall.template, "I");
   assert.equal(sketch.cards.length, 3);
   assert.equal(cleanExperience({ ...sketch, vanishing: [] }), null);
@@ -99,6 +143,7 @@ test("그리기·색 맞추기 데이터는 형식 검사를 통과하고, 형�
   assert.ok(cleanStudio({ ...entry, subjects: [{ name: "디자인비즈니스", source: "편성표", alias: "산업디자인비지니스" }] }));
   assert.equal(cleanStudio({ ...entry, parts: [] }), null);
   assert.equal(cleanStudio({ ...entry, parts: [{ ...sketch, template: "Z" }] }), null);
+  assert.ok(cleanStudio({ ...entry, parts: [vanish, recall] }));
 });
 
 test("학과 전용 체험의 과목은 출처(공시 교과목 또는 학교 편성표)에서 그 학년 과목으로 확인된다", () => {
@@ -249,7 +294,7 @@ test("저장된 결과는 형식이 맞는 것만 받고, 평균은 다시 계�
 const CURRICULUM = ["3D Design 1", "UX디자인", "기초산업디자인 1", "드로잉", "평면디자인", "산업디자인리서치", "서비스디자인", "입체디자인"];
 const make = () => createDepartment("산업디자인학과", "경희대학교", CURRICULUM, "예체능", null, "4년", "서울특별시", null, null, null, true, true);
 
-test("학과 전용 체험: 경희대 산업디자인 1학년은 드로잉·평면디자인으로 투시 스케치와 색 맞추기를 한다", () => {
+test("학과 전용 체험: 경희대 산업디자인 1학년은 드로잉·평면디자인으로 소실점 탐정과 색 맞추기를 한다", () => {
   assert.ok(studioFor("경희대학교", "산업디자인학과", 1), "1학년 전용 체험이 공개되어 있어야 한다");
   assert.equal(studioFor("경희대학교", "시각디자인학과", 1), null);
   assert.equal(studioFor("경희대학교", "산업디자인학과", 4), null);
@@ -287,23 +332,52 @@ test("학과 전용 체험: 체험을 모두 마쳐야 완료되고, 결과는 �
   const key = `${d.id}-0`;
   const base = { ...loadState({ getItem: () => null }), catalog: [d], current: d.id, journeys: { [d.id]: { completed: 0, paused: false } } };
   assert.equal(completeLesson(base, d.id, 0, "").journeys[d.id].completed, 0);
-  const drawn = { template: "H", rounds: [{ guide: false, strokes: [[[0, 0], [10, 10]]], score: 60 }, { guide: true, strokes: [[[0, 0], [10, 90]]], score: 80 }] };
+  const found = { template: "M", title: "소실점 탐정", subject: "드로잉", rounds: [{ type: "pin", stars: 3, distance: 4.2 }, { type: "pin", stars: 2, distance: 18 }, { type: "pick", correct: true }] };
   const colored = { template: "I", rounds: recall.targets.map((target) => ({ target, mine: target, score: 100 })), average: 100 };
-  const played = { ...base, results: { [key]: [drawn, colored] }, plays: { [key]: { game: "studio:1", summary: "투시 스케치 60점 → 80점 · 색 맞추기 평균 100%" } } };
+  const played = { ...base, results: { [key]: [found, colored] }, plays: { [key]: { game: "studio:1", summary: "드로잉 · 소실점 탐정 — 별 5개 · 틀린 투시 1/1 맞힘 · 색 맞추기 평균 100%" } } };
   assert.equal(completeLesson(played, d.id, 0, "").journeys[d.id].completed, 1);
   const stored = JSON.parse(JSON.stringify(played));
   const loaded = loadState({ getItem: (name) => (name === STORAGE_KEY ? JSON.stringify(stored) : null) });
-  assert.deepEqual(loaded.results[key], [drawn, colored]);
+  assert.deepEqual(loaded.results[key], [found, colored]);
   assert.equal(loaded.plays[key].game, "studio:1");
   assert.equal(loaded.catalog[0].lessons[0], "드로잉 · 평면디자인");
+  assert.deepEqual(loaded.archive, []);
   // 형식이 틀린 결과, 틀이 맞지 않는 결과, 전용 체험이 아닌 자리의 결과는 버린다.
   const broken = loadState({
     getItem: (name) =>
-      name === STORAGE_KEY ? JSON.stringify({ ...stored, results: { [key]: [colored, { template: "H", rounds: [] }], [`${d.id}-1`]: [drawn] } }) : null,
+      name === STORAGE_KEY ? JSON.stringify({ ...stored, results: { [key]: [{ ...found, rounds: [] }, { template: "I", rounds: [] }], [`${d.id}-1`]: [found] } }) : null,
   });
   assert.deepEqual(broken.results, {});
-  const half = loadState({ getItem: (name) => (name === STORAGE_KEY ? JSON.stringify({ ...stored, results: { [key]: [drawn, null] } }) : null) });
-  assert.deepEqual(half.results[key], [drawn, null]);
+  const half = loadState({ getItem: (name) => (name === STORAGE_KEY ? JSON.stringify({ ...stored, results: { [key]: [found, null] } }) : null) });
+  assert.deepEqual(half.results[key], [found, null]);
+});
+
+test("학과 전용 체험: 투시 스케치(H)로 저장된 1학년 결과는 소실점 탐정 자리에 넣지 않고 리포트의 이전 체험 기록으로 옮긴다", () => {
+  const d = make();
+  const key = `${d.id}-0`;
+  const drawn = { template: "H", rounds: [{ guide: false, strokes: [[[0, 0], [10, 10]]], score: 60 }, { guide: true, strokes: [[[0, 0], [10, 90]]], score: 80 }] };
+  const colored = { template: "I", rounds: recall.targets.map((target) => ({ target, mine: target, score: 100 })), average: 100 };
+  const stored = {
+    ...JSON.parse(JSON.stringify(loadState({ getItem: () => null }))),
+    catalog: [d],
+    current: d.id,
+    journeys: { [d.id]: { completed: 1, paused: false } },
+    results: { [key]: [drawn, colored] },
+    plays: { [key]: { game: "studio:1", summary: "투시 스케치 60점 → 80점 · 색 맞추기 평균 100%" } },
+    notes: { [key]: "상자가 생각보다 어려웠다" },
+  };
+  const loaded = loadState({ getItem: (name) => (name === STORAGE_KEY ? JSON.stringify(stored) : null) });
+  // 색 맞추기 결과는 그대로, 바뀐 자리의 결과는 비워 새 체험을 할 수 있게 한다.
+  assert.deepEqual(loaded.results[key], [null, colored]);
+  assert.deepEqual(loaded.archive, [{ id: d.id, title: "드로잉 · 평면디자인 · 바뀌기 전 체험", note: "투시 스케치 60점 → 80점" }]);
+  // 진행도, 한 줄 기록, 수업을 마쳤다는 기록은 그대로다.
+  assert.equal(loaded.journeys[d.id].completed, 1);
+  assert.equal(loaded.notes[key], "상자가 생각보다 어려웠다");
+  assert.equal(loaded.plays[key].game, "studio:1");
+  // 저장했다 다시 불러와도 이전 체험 기록이 겹치지 않는다.
+  const again = loadState({ getItem: (name) => (name === STORAGE_KEY ? JSON.stringify(JSON.parse(JSON.stringify(loaded))) : null) });
+  assert.deepEqual(again.archive, loaded.archive);
+  assert.deepEqual(again.results[key], [null, colored]);
 });
 
 test("학과 전용 체험: 전용 체험이 생기기 전에 입학해 예전 수업으로 저장된 학과도, 불러오면 지금 체험으로 바뀐다", () => {
@@ -526,4 +600,103 @@ test("경희대 산업디자인 3학년: UX디자인·서비스디자인으로 �
   const stored = JSON.stringify({ catalog: [d], journeys: { [d.id]: { completed: 2, paused: false } }, results: { [key]: results } });
   const loaded = loadState({ getItem: (name) => (name === STORAGE_KEY ? stored : null) });
   assert.deepEqual(loaded.results[key], results);
+});
+
+test("소실점 탐정(M): 거리와 별 판정은 경계값에서 정해진 대로 나뉜다", () => {
+  assert.equal(pointDistance([0, 0], [3, 4]), 5);
+  assert.equal(lineDistance([0, 5], [0, 0], [10, 0]), 5);
+  assert.equal(lineDistance([3, 4], [0, 0], [0, 0]), 5, "길이가 0인 선은 점까지의 거리");
+  assert.equal(starsFor(0), 3);
+  assert.equal(starsFor(11.99), 3);
+  assert.equal(starsFor(12), 2);
+  assert.equal(starsFor(29.99), 2);
+  assert.equal(starsFor(30), 1);
+  assert.equal(starsFor(500), 1);
+});
+
+test("소실점 탐정(M): 핀이 둘이면 순서와 상관없이 가까운 소실점끼리 짝짓고 평균 거리로 판정한다", () => {
+  const answers = [[20, 200], [340, 200]];
+  // 정답 그대로, 뒤바꿔 놓아도 별 3개.
+  assert.deepEqual(judgePins([[20, 200], [340, 200]], answers), { pinOf: [0, 1], distances: [0, 0], average: 0, distance: 0, stars: 3 });
+  const swapped = judgePins([[340, 200], [20, 200]], answers);
+  assert.deepEqual(swapped.pinOf, [1, 0]);
+  assert.equal(swapped.stars, 3);
+  // 평균 거리: (10 + 20) / 2 = 15 → 별 2개. 순서를 바꿔도 같다.
+  const near = judgePins([[30, 200], [340, 220]], answers);
+  assert.equal(near.distance, 15);
+  assert.equal(near.stars, 2);
+  assert.equal(judgePins([[340, 220], [30, 200]], answers).distance, 15);
+  // 한 핀만 맞고 다른 핀이 멀면 평균이 커진다: (0 + 100) / 2 = 50 → 별 1개.
+  assert.equal(judgePins([[20, 200], [240, 200]], answers).stars, 1);
+  // 두 핀을 한 소실점에 겹쳐 놓아도 한 핀은 다른 소실점과 짝지어진다.
+  const stacked = judgePins([[20, 200], [20, 200]], answers);
+  assert.equal(stacked.distance, 160);
+  assert.equal(stacked.stars, 1);
+  // 핀 하나: 거리 그대로. 소수 첫째 자리로 반올림한다.
+  const one = judgePins([[183, 174]], [[180, 170]]);
+  assert.equal(one.distance, 5);
+  assert.equal(one.stars, 3);
+  assert.equal(judgePins([[181, 171]], [[180, 170]]).distance, 1.4);
+  assert.equal(matchPins([[0, 0], [10, 0]], [[0, 0], [10, 0]]).average, 0);
+});
+
+test("소실점 탐정(M): 1학년 데이터는 형식 검사를 통과하고, 모서리를 늘리면 정답 소실점을 지난다", () => {
+  assert.equal(vanish.title, "소실점 탐정");
+  assert.equal(vanish.cards.length, 2);
+  assert.equal(vanish.question, "투시를 알고 나서 주변 물건이 다르게 보였나요?");
+  assert.deepEqual(vanish.rounds.map((round) => round.type), ["pin", "pin", "pick"]);
+  assert.deepEqual(vanish.rounds.map((round) => round.id), vanishingRounds.map((round) => round.id));
+  // 장면의 선 중 늘리면 소실점을 지나는 선(복도 바닥·천장, 상자 위·아래 모서리)도 정답과 맞는다.
+  const [r1, r2, r3] = vanish.rounds;
+  for (const [x1, y1, x2, y2] of r1.scene.slice(0, 4)) assert.ok(lineDistance(r1.answer[0], [x1, y1], [x2, y2]) < 0.5);
+  for (const edge of [...r1.edges, ...r2.edges]) {
+    const round = r1.edges.includes(edge) ? r1 : r2;
+    assert.ok(lineDistance(round.answer[edge.vp], edge.from, edge.to) < 0.5);
+  }
+  // 2점 투시의 두 소실점은 같은 높이(눈높이)에 있다.
+  assert.equal(r2.answer[0][1], r2.answer[1][1]);
+  // 처음 핀 자리에서는 별 1개다(해볼 것이 있다).
+  assert.equal(judgePins(r1.pinStart, r1.answer).stars, 1);
+  assert.equal(judgePins(r2.pinStart, r2.answer).stars, 1);
+  // 틀린 투시(C)는 뒷면이 앞면보다 크다: 앞면 40×40, 뒷면 50×50.
+  assert.equal(r3.answer, "c");
+  assert.equal(r3.options.length, 3);
+});
+
+test("소실점 탐정(M): 형식이 틀린 데이터는 거른다", () => {
+  const [r1, r2, r3] = vanishingRounds;
+  const check = (rounds) => cleanExperience({ ...vanish, rounds });
+  assert.ok(check([r1, r2, r3]));
+  // 모서리를 늘려도 정답을 지나지 않으면(그림과 정답이 다르면) 거른다.
+  assert.equal(check([{ ...r1, answer: [[180, 190]] }, r3]), null);
+  assert.equal(check([{ ...r1, edges: [{ ...r1.edges[0], to: [90, 308] }, ...r1.edges.slice(1)] }, r3]), null);
+  // 장면 밖 좌표, 핀 수와 정답 수가 다름, 소실점에 모서리가 하나뿐, 처음 핀이 정답 가까이.
+  assert.equal(check([{ ...r1, answer: [[400, 170]] }, r3]), null);
+  assert.equal(check([{ ...r2, pinStart: [[90, 340]] }, r3]), null);
+  assert.equal(check([{ ...r2, edges: r2.edges.slice(0, 3) }, r3]), null);
+  assert.equal(check([{ ...r1, pinStart: [[180, 180]] }, r3]), null);
+  assert.equal(check([{ ...r1, edges: [{ ...r1.edges[0], vp: 1 }, ...r1.edges.slice(1)] }, r3]), null);
+  // 고르기: 정답이 보기에 없음, 스케치 좌표가 120 밖, 보기 id 겹침, 핀 라운드가 하나도 없음.
+  assert.equal(check([r1, { ...r3, answer: "d" }]), null);
+  assert.equal(check([r1, { ...r3, options: [{ id: "a", lines: [[0, 0, 130, 0]] }, r3.options[1]] }]), null);
+  assert.equal(check([r1, { ...r3, options: [r3.options[0], r3.options[0]] }]), null);
+  assert.equal(check([r3, { ...r3, id: "r4" }]), null);
+  assert.equal(check([r1, { ...r3, type: "guess" }]), null);
+  assert.equal(check([r1, { ...r1 }]), null, "라운드 id가 겹침");
+  assert.equal(cleanExperience({ ...vanish, subject: "" }), null);
+  assert.equal(cleanExperience({ ...vanish, question: "가".repeat(41) }), null);
+});
+
+test("소실점 탐정(M): 결과를 저장하고 '과목 · 체험 — 별 N개'로 요약한다", () => {
+  const found = { template: "M", title: "소실점 탐정", subject: "드로잉", rounds: [{ type: "pin", stars: 3, distance: 4.2 }, { type: "pin", stars: 2, distance: 18 }, { type: "pick", correct: false }] };
+  assert.deepEqual(cleanResult(found), found);
+  assert.deepEqual(vanishStars(found), { stars: 5, max: 6 });
+  assert.equal(resultSummary(found), "드로잉 · 소실점 탐정 — 별 5개 · 틀린 투시 0/1 맞힘");
+  assert.equal(resultSummary({ ...found, rounds: found.rounds.slice(0, 2) }), "드로잉 · 소실점 탐정 — 별 5개");
+  assert.equal(cleanResult({ ...found, rounds: [{ type: "pin", stars: 4, distance: 1 }, found.rounds[2]] }), null);
+  assert.equal(cleanResult({ ...found, rounds: [{ type: "pin", stars: 3, distance: -1 }, found.rounds[2]] }), null);
+  assert.equal(cleanResult({ ...found, rounds: [found.rounds[2], found.rounds[2]] }), null, "핀 라운드가 없음");
+  assert.equal(cleanResult({ ...found, rounds: [found.rounds[0], { type: "pick", correct: "yes" }] }), null);
+  assert.equal(cleanResult({ ...found, rounds: [found.rounds[0], null] }), null, "마치지 않은 라운드");
+  assert.equal(cleanResult({ ...found, subject: "" }), null);
 });

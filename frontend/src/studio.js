@@ -5,6 +5,8 @@
 //   J 대화로 알아내기: 등장인물과 대화하며 턴마다 질문을 고른다. 열린 질문을 고르면 인사이트가 드러나고, 마지막에 컨셉을 고른다.
 //   K 조절해서 시험하기: 슬라이더로 치수를 바꾸고, 사람마다의 측정값과 규칙으로 편한지 계산한다. 모두 편한 값을 찾으면 끝난다.
 //   L 재어서 법칙 찾기: 너비와 거리가 다른 두 막대를 번갈아 누르는 시간을 재고, 내 기록으로 피츠의 법칙 직선을 구한다.
+//   M 모이는 점 찾기: 장면의 모서리가 모이는 점(소실점)에 핀을 끌어다 놓고 거리로 별을 받는다. 그림 여러 장 중 틀린 것을 고르는 라운드를 섞을 수 있다.
+//     H(투시 스케치)는 지금 데이터에서 쓰지 않지만, 예전에 저장된 결과를 읽어 리포트에 옮기려고 남겨 둔다(model.js의 loadState).
 // 학과 전용 체험에는 기존 틀 C(분류하기)도 쓸 수 있다. 결과는 요약 한 줄로 저장한다(cleanSummaryResult).
 
 const text = (value, max) => (typeof value === "string" && value.trim() && [...value].length <= max ? value : null);
@@ -553,6 +555,125 @@ export function tapSummary(result) {
 }
 
 /* ---------------------------------------------------------------- */
+/* M 모이는 점 찾기 (소실점 탐정)                                        */
+/* ---------------------------------------------------------------- */
+
+// 장면(데이터와 기록의 좌표 단위)과 고르기 라운드의 작은 스케치 크기. 화면은 폭에 맞춰 늘린다.
+export const VANISH = { width: 360, height: 400 };
+export const THUMB = 120;
+// 핀과 정답의 거리(장면 좌표)에 따른 별: 12 미만 3개, 30 미만 2개, 그 밖은 1개.
+export const STAR_STEPS = [12, 30];
+// 데이터 검사: 모서리를 늘린 선이 정답 소실점에서 이만큼 안쪽으로 지나야 한다(좌표를 반올림한 오차 정도).
+const EDGE_TOLERANCE = 2;
+
+const pointIn = (p, width, height) => Array.isArray(p) && p.length === 2 && num(p[0], 0, width) && num(p[1], 0, height);
+const segmentIn = (s, width, height) => Array.isArray(s) && s.length === 4 && pointIn([s[0], s[1]], width, height) && pointIn([s[2], s[3]], width, height);
+export const pointDistance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+// 점 p에서 a, b를 지나는 직선까지의 거리.
+export function lineDistance(p, a, b) {
+  const length = pointDistance(a, b);
+  return length ? Math.abs((b[0] - a[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (b[1] - a[1])) / length : pointDistance(p, a);
+}
+
+function cleanPinRound(raw) {
+  const { width, height } = VANISH;
+  const scene = all(list(raw.scene, 1, 30)?.map((s) => (segmentIn(s, width, height) ? [...s] : null)));
+  const answer = all(list(raw.answer, 1, 2)?.map((p) => (pointIn(p, width, height) ? [...p] : null)));
+  const pinStart = answer && all(list(raw.pinStart, answer.length, answer.length)?.map((p) => (pointIn(p, width, height) ? [...p] : null)));
+  const edges =
+    answer &&
+    all(
+      list(raw.edges, 1, 8)?.map((edge) =>
+        edge && pointIn(edge.from, width, height) && pointIn(edge.to, width, height) && int(edge.vp, 0, answer.length - 1) && pointDistance(edge.from, edge.to) >= 10
+          ? { from: [...edge.from], to: [...edge.to], vp: edge.vp }
+          : null,
+      ),
+    );
+  if (!scene || !answer || !pinStart || !edges || !text(raw.hint, 60)) return null;
+  // 모서리는 늘리면 제 소실점을 지나야 하고(데이터가 그림과 맞는지), 소실점마다 모서리가 둘 이상 있어야 한다.
+  if (!edges.every((edge) => lineDistance(answer[edge.vp], edge.from, edge.to) <= EDGE_TOLERANCE)) return null;
+  if (!answer.every((_, i) => edges.filter((edge) => edge.vp === i).length >= 2)) return null;
+  // 핀이 처음부터 정답 가까이 있으면 해볼 것이 없다.
+  if (matchPins(pinStart, answer).average < STAR_STEPS[1]) return null;
+  return { hint: raw.hint, scene, edges, answer, pinStart };
+}
+
+function cleanPickRound(raw) {
+  const options = all(
+    list(raw.options, 2, 4)?.map((option) => {
+      const lines = all(list(option?.lines, 1, 20)?.map((s) => (segmentIn(s, THUMB, THUMB) ? [...s] : null)));
+      return lines && typeof option.id === "string" && /^[a-z]$/.test(option.id) ? { id: option.id, lines } : null;
+    }),
+  );
+  return options && distinctIds(options) && options.some((option) => option.id === raw.answer) ? { options, answer: raw.answer } : null;
+}
+
+function cleanVanish(raw) {
+  const rounds = all(
+    list(raw.rounds, 2, 5)?.map((round) => {
+      if (!round || !id(round.id) || !text(round.title, 24) || !text(round.explain, 120)) return null;
+      const body = round.type === "pin" ? cleanPinRound(round) : round.type === "pick" ? cleanPickRound(round) : null;
+      return body && { id: round.id, type: round.type, title: round.title, explain: round.explain, ...body };
+    }),
+  );
+  return rounds &&
+    distinctIds(rounds) &&
+    rounds.some((round) => round.type === "pin") &&
+    text(raw.subject, 20) &&
+    text(raw.done, 60) &&
+    text(raw.explanation, 160)
+    ? { subject: raw.subject, rounds, done: raw.done, explanation: raw.explanation }
+    : null;
+}
+
+// 핀과 정답 소실점을 짝짓는다. 핀의 순서는 상관없이, 거리의 합이 가장 작은 짝을 고른다(같으면 앞의 짝).
+// 돌려주는 pinOf[i]는 정답 i와 짝인 핀의 번호, distances[i]는 그 거리, average는 평균 거리다.
+export function matchPins(pins, answers) {
+  const permutations = (items) =>
+    items.length <= 1 ? [items] : items.flatMap((item, i) => permutations([...items.slice(0, i), ...items.slice(i + 1)]).map((rest) => [item, ...rest]));
+  let best = null;
+  for (const pinOf of permutations(answers.map((_, i) => i))) {
+    const distances = answers.map((answer, i) => pointDistance(pins[pinOf[i]], answer));
+    const total = distances.reduce((sum, value) => sum + value, 0);
+    if (!best || total < best.total) best = { pinOf, distances, total };
+  }
+  return { pinOf: best.pinOf, distances: best.distances, average: best.total / answers.length };
+}
+
+// 평균 거리로 별(1~3개)을 매긴다.
+export const starsFor = (distance) => (distance < STAR_STEPS[0] ? 3 : distance < STAR_STEPS[1] ? 2 : 1);
+
+// 핀 라운드 판정: 짝지은 평균 거리(소수 첫째 자리)와 별.
+export function judgePins(pins, answers) {
+  const match = matchPins(pins, answers);
+  return { ...match, distance: Math.round(match.average * 10) / 10, stars: starsFor(match.average) };
+}
+
+// 저장된 결과: { template: "M", title, subject, rounds: [{ type: "pin", stars, distance } | { type: "pick", correct }] }.
+function cleanVanishResult(raw) {
+  const rounds = all(
+    list(raw?.rounds, 2, 5)?.map((round) => {
+      if (round?.type === "pin") return int(round.stars, 1, 3) && num(round.distance, 0, 1000) ? { type: "pin", stars: round.stars, distance: round.distance } : null;
+      if (round?.type === "pick") return typeof round.correct === "boolean" ? { type: "pick", correct: round.correct } : null;
+      return null;
+    }),
+  );
+  return rounds && rounds.some((round) => round.type === "pin") && text(raw.title, 20) && text(raw.subject, 20)
+    ? { template: "M", title: raw.title, subject: raw.subject, rounds }
+    : null;
+}
+// 별 합계와 최대 별 수(핀 라운드마다 3개).
+export function vanishStars(result) {
+  const pins = result.rounds.filter((round) => round.type === "pin");
+  return { stars: pins.reduce((sum, round) => sum + round.stars, 0), max: pins.length * 3 };
+}
+export function vanishSummary(result) {
+  const picks = result.rounds.filter((round) => round.type === "pick");
+  const picked = picks.length ? ` · 틀린 투시 ${picks.filter((round) => round.correct).length}/${picks.length} 맞힘` : "";
+  return `${result.subject} · ${result.title} — 별 ${vanishStars(result).stars}개${picked}`;
+}
+
+/* ---------------------------------------------------------------- */
 /* 학과 전용 체험에서 쓰는 기존 틀(C 분류하기)의 결과                      */
 /* ---------------------------------------------------------------- */
 
@@ -571,6 +692,7 @@ export const studioTemplates = {
   J: { title: "대화로 알아내기", clean: cleanInterview, cleanResult: cleanInterviewResult, summary: interviewSummary },
   K: { title: "조절해서 시험하기", clean: cleanSim, cleanResult: cleanSimResult, summary: simSummary },
   L: { title: "재어서 법칙 찾기", clean: cleanTap, cleanResult: cleanTapResult, summary: tapSummary },
+  M: { title: "모이는 점 찾기", clean: cleanVanish, cleanResult: cleanVanishResult, summary: vanishSummary },
 };
 
 // 저장된 결과 하나를 검사한다. 틀을 모르거나 형식이 틀리면 null.

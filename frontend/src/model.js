@@ -3,7 +3,7 @@ import { cleanLessonGames } from "./lessonGames.js";
 import { experiences } from "./experiences.js";
 import { groupExperience, groupOf, PRACTICE_SUBJECTS } from "./groups.js";
 import { studioFor, subjectConfirmed } from "./departmentData.js";
-import { cleanResult } from "./studio.js";
+import { cleanResult, resultSummary } from "./studio.js";
 
 export const STORAGE_KEY = "hi-campus-v4";
 // 예전 저장 데이터: [저장 키, 그때의 체험 단계 수]. 0이면 학년별 구조다.
@@ -545,15 +545,22 @@ export function loadState(storage) {
         if (!studio || !Array.isArray(parts) || parts.length !== studio.parts.length) continue;
         const kept = parts.map((part, i) => {
           const result = part === null ? null : cleanResult(part);
-          return result && result.template === studio.parts[i].template ? result : null;
+          if (result && result.template !== studio.parts[i].template) {
+            // 그 자리의 체험이 다른 틀로 바뀌었으면(투시 스케치 → 소실점 탐정 등) 예전 결과를 리포트의 이전 체험 기록으로 옮긴다.
+            archive.push({ id: d.id, title: `${d.lessons[Number(match[2])] || ""} · 바뀌기 전 체험`.slice(0, 60), note: resultSummary(result).slice(0, 3000) });
+            return null;
+          }
+          return result;
         });
         if (kept.some(Boolean)) results[key] = kept;
       }
     // 지난 버전에서 옮겨 둔 기록. 학과가 남아 있는 것만 둔다.
     if (Array.isArray(value.archive))
       for (const item of value.archive)
-        if (validIds.has(item?.id) && typeof item.title === "string" && typeof item.note === "string" && item.note.trim())
-          archive.push({ id: item.id, title: item.title.slice(0, 60), note: item.note.slice(0, 3000) });
+        if (validIds.has(item?.id) && typeof item.title === "string" && typeof item.note === "string" && item.note.trim()) {
+          const moved = { id: item.id, title: item.title.slice(0, 60), note: item.note.slice(0, 3000) };
+          if (!archive.some((other) => other.id === moved.id && other.title === moved.title && other.note === moved.note)) archive.push(moved);
+        }
     return {
       ...structuredClone(initialState),
       catalog,

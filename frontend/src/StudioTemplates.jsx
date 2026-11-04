@@ -22,12 +22,17 @@ import {
   median,
   predictTap,
   tapLaw,
+  VANISH,
+  THUMB,
+  judgePins,
+  matchPins,
+  vanishStars,
 } from "./studio.js";
 import { templates } from "./experiences.js";
 import { shuffle } from "./lessonGames.js";
 import { Experience } from "./Templates.jsx";
 
-// 학과 전용 체험의 화면: 배우기 카드, 체험 여러 개를 차례로 하는 틀, 틀 H(그리기)·I(기억해서 맞추기)·J(대화로 알아내기)·K(조절해서 시험하기), 결과 요약.
+// 학과 전용 체험의 화면: 배우기 카드, 체험 여러 개를 차례로 하는 틀, 틀 H(그리기)·I(기억해서 맞추기)·J(대화로 알아내기)·K(조절해서 시험하기)·L(재어서 법칙 찾기)·M(모이는 점 찾기), 결과 요약.
 // 형식 검사와 채점은 studio.js에 있다. 틀은 onComplete(결과)를 부르고, 결과는 수업 화면이 저장한다.
 
 const { width: W, height: H } = SKETCH;
@@ -172,6 +177,7 @@ export function ResultView({ data, result }) {
       </div>
     );
   if (result.template === "L") return <TapLaw data={data} rounds={result.rounds} small />;
+  if (result.template === "M") return <VanishResult data={data} result={result} />;
   if (result.summary !== undefined) return <p className="body-copy">{result.summary}</p>;
   if (result.template === "K") {
     const values = Object.fromEntries(data.params.map((param, i) => [param.id, result.params[i]?.value]));
@@ -1182,9 +1188,299 @@ function TapApply({ data, line }) {
 }
 const seconds = (ms) => `${(ms / 1000).toFixed(2)}초`;
 
+/* ---- M 모이는 점 찾기 (소실점 탐정) ---- */
+
+const { width: VW, height: VH } = VANISH;
+const SCENE_INK = "#5b3a24";
+const PIN_MINT = "#14b8ad";
+const ANSWER_FILL = "#ffd23f";
+const ANSWER_LINE = "#f0b400";
+const ANSWER_INK = "#7a5200";
+const PIN_STEP = { small: 4, big: 16 };
+const STAR_WORDS = { 3: "정확해요! 소실점을 딱 찾았어요.", 2: "거의 맞았어요. 노란 점과 비교해 보세요.", 1: "조금 멀어요. 노란 선이 어디서 만나는지 보세요." };
+const clampScene = ([x, y]) => [Math.min(VW, Math.max(0, x)), Math.min(VH, Math.max(0, y))];
+
+// 화면 좌표(포인터)를 장면 좌표로 바꾼다. 앱 전체를 CSS로 확대·축소해도 getScreenCTM이 그만큼을 함께 계산한다.
+function scenePoint(svg, e) {
+  const ctm = svg?.getScreenCTM();
+  if (!ctm) return null;
+  const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+  return clampScene([p.x, p.y]);
+}
+
+function Stars({ n, max = 3 }) {
+  return (
+    <span className="vanish-stars" role="img" aria-label={`별 ${max}개 중 ${n}개`}>
+      {"★".repeat(n)}
+      <span className="is-off">{"★".repeat(max - n)}</span>
+    </span>
+  );
+}
+
+function PinRound({ round, onJudge, onReset }) {
+  const [pins, setPins] = useState(() => round.pinStart.map((p) => [...p]));
+  const [judged, setJudged] = useState(null);
+  const drag = useRef(null);
+  const board = useRef(null);
+  // 모서리마다 점선을 그을 핀: 판정과 같은 방법(가까운 쪽끼리)으로 짝짓는다.
+  const { pinOf } = matchPins(pins, round.answer);
+  const place = (i, p) => setPins((list) => list.map((q, j) => (j === i ? clampScene(p) : q)));
+
+  const down = (e) => {
+    if (judged || e.button > 0) return;
+    const p = scenePoint(board.current, e);
+    if (!p) return;
+    e.preventDefault();
+    const grabbed = e.target.closest?.("[data-pin]");
+    // 핀을 잡으면 잡은 자리를 유지하고, 빈 곳을 누르면 가장 가까운 핀이 그 자리로 온다.
+    const gap = (q) => Math.hypot(q[0] - p[0], q[1] - p[1]);
+    const i = grabbed ? Number(grabbed.dataset.pin) : pins.reduce((best, q, j) => (gap(q) < gap(pins[best]) ? j : best), 0);
+    const offset = grabbed ? [pins[i][0] - p[0], pins[i][1] - p[1]] : [0, 0];
+    board.current.setPointerCapture?.(e.pointerId);
+    drag.current = { i, id: e.pointerId, offset };
+    if (!grabbed) place(i, p);
+  };
+  const move = (e) => {
+    if (!drag.current || drag.current.id !== e.pointerId) return;
+    const p = scenePoint(board.current, e);
+    if (!p) return;
+    e.preventDefault();
+    const { i, offset } = drag.current;
+    place(i, [p[0] + offset[0], p[1] + offset[1]]);
+  };
+  const up = () => {
+    drag.current = null;
+  };
+  // 키보드: 핀에 초점을 두고 방향키로 옮긴다(Shift를 누르면 크게).
+  const key = (i) => (e) => {
+    if (judged) return;
+    const step = e.shiftKey ? PIN_STEP.big : PIN_STEP.small;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (!moves[e.key]) return;
+    e.preventDefault();
+    place(i, [pins[i][0] + moves[e.key][0], pins[i][1] + moves[e.key][1]]);
+  };
+  function judge() {
+    const result = judgePins(pins, round.answer);
+    setJudged(result);
+    onJudge({ type: "pin", stars: result.stars, distance: result.distance });
+  }
+  function retry() {
+    setPins(round.pinStart.map((p) => [...p]));
+    setJudged(null);
+    onReset();
+  }
+
+  const many = pins.length > 1;
+  return (
+    <div>
+      <p className="body-copy">
+        {round.hint} {many ? "핀 두 개를" : "핀을"} 끌어서 선이 모이는 곳에 놓고 확인을 눌러요.
+      </p>
+      <svg
+        ref={board}
+        viewBox={`0 0 ${VW} ${VH}`}
+        className={`studio-board vanish-board ${judged ? "is-judged" : ""}`}
+        role="group"
+        aria-label={`${round.title} 장면`}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+        onLostPointerCapture={up}
+      >
+        <rect width={VW} height={VH} fill="#fff" />
+        {judged &&
+          round.edges.map((edge, i) => {
+            const [x, y] = round.answer[edge.vp];
+            return <line key={`a${i}`} x1={edge.from[0]} y1={edge.from[1]} x2={x} y2={y} stroke={ANSWER_LINE} strokeWidth="2.4" strokeLinecap="round" />;
+          })}
+        {round.scene.map(([x1, y1, x2, y2], i) => (
+          <line key={`s${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={SCENE_INK} strokeWidth="3" strokeLinecap="round" />
+        ))}
+        {round.edges.map((edge, i) => {
+          const [x, y] = pins[pinOf[edge.vp]];
+          return <line key={`d${i}`} x1={edge.from[0]} y1={edge.from[1]} x2={x} y2={y} stroke={PIN_MINT} strokeWidth="2" strokeDasharray="7 6" strokeLinecap="round" />;
+        })}
+        {pins.map(([x, y], i) => (
+          <g
+            key={`p${i}`}
+            data-pin={i}
+            className="vanish-pin"
+            tabIndex={judged ? -1 : 0}
+            role="button"
+            aria-roledescription="끌 수 있는 핀"
+            aria-label={`${many ? `핀 ${i + 1}` : "핀"}, 가로 ${Math.round(x)}, 세로 ${Math.round(y)}. 방향키로 옮겨요.`}
+            onKeyDown={key(i)}
+          >
+            <circle cx={x} cy={y} r="24" fill="transparent" />
+            <circle className="vanish-pin-ring" cx={x} cy={y} r="13" fill={PIN_MINT} stroke="#fff" strokeWidth="3" />
+            {many && (
+              <text x={x} y={y + 4.5} textAnchor="middle" fontSize="12" fontWeight="700" fill="#fff" pointerEvents="none">
+                {i + 1}
+              </text>
+            )}
+          </g>
+        ))}
+        {judged &&
+          round.answer.map(([x, y], i) => (
+            <g key={`v${i}`} pointerEvents="none">
+              <circle cx={x} cy={y} r="8" fill={ANSWER_FILL} stroke={ANSWER_INK} strokeWidth="2" />
+              <text x={Math.min(VW - 22, Math.max(22, x))} y={y < 40 ? y + 26 : y - 14} textAnchor="middle" fontSize="12" fontWeight="700" fill={ANSWER_INK}>
+                소실점
+              </text>
+            </g>
+          ))}
+      </svg>
+      {!judged ? (
+        <button className="button mt-[12px]" onClick={judge}>
+          확인
+        </button>
+      ) : (
+        <div role="status" className="mt-[10px]">
+          <p className="studio-big">
+            <Stars n={judged.stars} />
+          </p>
+          <p className="body-copy text-center">{STAR_WORDS[judged.stars]}</p>
+          <p className="studio-legend justify-center" aria-hidden="true">
+            <i style={{ background: SCENE_INK }} /> 장면 <i style={{ background: PIN_MINT }} /> 내 핀까지 <i style={{ background: ANSWER_LINE }} /> 정답 소실점까지
+          </p>
+          <p className="body-copy">{round.explain}</p>
+          <button className="text-button" onClick={retry}>
+            이 라운드 다시 하기
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Thumb({ lines }) {
+  return (
+    <svg viewBox={`0 0 ${THUMB} ${THUMB}`} aria-hidden="true">
+      {lines.map(([x1, y1, x2, y2], i) => (
+        <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={SCENE_INK} strokeWidth="2" strokeLinecap="round" />
+      ))}
+    </svg>
+  );
+}
+
+function PickRound({ round, onJudge, onReset }) {
+  const [picked, setPicked] = useState(null);
+  const letter = (id) => id.toUpperCase();
+  function pick(id) {
+    setPicked(id);
+    onJudge({ type: "pick", correct: id === round.answer });
+  }
+  return (
+    <div>
+      <p className="body-copy">스케치 {round.options.length}장 중 투시가 틀린 것 하나를 골라요.</p>
+      <div className="vanish-picks" role="group" aria-label="스케치 고르기">
+        {round.options.map((option) => {
+          const mark = picked === null ? "" : option.id === round.answer ? "is-answer" : option.id === picked ? "is-wrong" : "";
+          return (
+            <button
+              key={option.id}
+              className={`vanish-pick ${mark}`}
+              onClick={() => pick(option.id)}
+              disabled={picked !== null}
+              aria-label={`스케치 ${letter(option.id)}${mark === "is-answer" ? " (정답)" : mark === "is-wrong" ? " (내가 고른 오답)" : ""}`}
+            >
+              <Thumb lines={option.lines} />
+              <span>{letter(option.id)}</span>
+            </button>
+          );
+        })}
+      </div>
+      {picked !== null && (
+        <div role="status" className="mt-[10px]">
+          <p className="studio-big">{picked === round.answer ? "정답이에요!" : `아쉬워요. 정답은 ${letter(round.answer)}예요.`}</p>
+          <p className="body-copy">{round.explain}</p>
+          <button
+            className="text-button"
+            onClick={() => {
+              setPicked(null);
+              onReset();
+            }}
+          >
+            다시 고르기
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VanishResult({ data, result }) {
+  const { stars, max } = vanishStars(result);
+  return (
+    <div>
+      <ul className="vanish-score">
+        {result.rounds.map((round, i) => (
+          <li key={i}>
+            <span>
+              {i + 1}. {data.rounds?.[i]?.title || `${i + 1}라운드`}
+            </span>
+            {round.type === "pin" ? <Stars n={round.stars} /> : <b className={round.correct ? "is-right" : "is-wrong"}>{round.correct ? "정답" : "오답"}</b>}
+          </li>
+        ))}
+      </ul>
+      <p className="studio-big">
+        총 별 <b>{stars}</b> / {max}개
+      </p>
+      {data.done && <p className="body-copy text-center">{data.done}</p>}
+    </div>
+  );
+}
+
+export function Vanish({ data, onComplete }) {
+  const [at, setAt] = useState(0);
+  const [records, setRecords] = useState([]);
+  const [result, setResult] = useState(null);
+  const round = data.rounds[at];
+  const last = at === data.rounds.length - 1;
+  const record = (value) => setRecords((list) => Object.assign([...list], { [at]: value }));
+
+  function next() {
+    if (!last) return setAt(at + 1);
+    const value = { template: "M", title: data.title, subject: data.subject, rounds: data.rounds.map((_, i) => records[i]) };
+    setResult(value);
+    onComplete(value);
+  }
+  function restart() {
+    setAt(0);
+    setRecords([]);
+    setResult(null);
+  }
+
+  if (result)
+    return (
+      <div role="status">
+        <VanishResult data={data} result={result} />
+        <button className="text-button mt-[8px]" onClick={restart}>
+          처음부터 다시 →
+        </button>
+      </div>
+    );
+  const Round = round.type === "pin" ? PinRound : PickRound;
+  return (
+    <div>
+      <p className="game-progress" role="status">
+        {at + 1} / {data.rounds.length} 라운드 · {round.title}
+      </p>
+      <Round key={at} round={round} onJudge={record} onReset={() => record(undefined)} />
+      {records[at] && (
+        <button className="button mt-[12px]" onClick={next}>
+          {last ? "결과 보기" : "다음 라운드 →"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ---- 기존 틀(C 분류하기)을 학과 전용 체험에서 쓸 때: 요약 한 줄을 결과로 저장한다. ---- */
 function SummaryGame({ data, onComplete }) {
   return <Experience data={data} onComplete={(summary) => onComplete({ template: data.template, summary })} />;
 }
 
-const games = { H: Sketch, I: Recall, J: Interview, K: Simulation, L: Tap, C: SummaryGame };
+const games = { H: Sketch, I: Recall, J: Interview, K: Simulation, L: Tap, M: Vanish, C: SummaryGame };

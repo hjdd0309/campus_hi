@@ -1260,3 +1260,91 @@ body {
   margin: 4px 0 0;
   padding-left: 16px;
 }
+
+/* ---- M 모이는 점 찾기(소실점 탐정) ---- */
+.vanish-board {
+  cursor: default;
+}
+.vanish-board:not(.is-judged) .vanish-pin {
+  cursor: grab;
+}
+.vanish-pin:focus {
+  outline: none;
+}
+.vanish-pin:focus-visible .vanish-pin-ring {
+  stroke: #202b3c;
+}
+.vanish-stars {
+  font-size: 26px;
+  letter-spacing: 2px;
+  color: #f0b400;
+}
+.vanish-stars .is-off {
+  color: #d1d5da;
+}
+.vanish-picks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.vanish-pick {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 2px solid #e2e5e8;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  color: #302b27;
+  cursor: pointer;
+}
+.vanish-pick svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.vanish-pick:not(:disabled):hover {
+  border-color: #27d8cd;
+}
+.vanish-pick:focus-visible {
+  outline: 2px solid #087f77;
+  outline-offset: 2px;
+}
+.vanish-pick:disabled {
+  cursor: default;
+}
+.vanish-pick.is-answer {
+  border-color: #087f77;
+  background: #e8faf7;
+}
+.vanish-pick.is-wrong {
+  border-color: #e5484d;
+}
+.vanish-score {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+.vanish-score li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #e8faf7;
+  font-size: 13px;
+  color: #302b27;
+}
+.vanish-score .vanish-stars {
+  font-size: 18px;
+}
+.vanish-score b.is-right {
+  color: #087f77;
+}
+.vanish-score b.is-wrong {
+  color: #c62f35;
+}

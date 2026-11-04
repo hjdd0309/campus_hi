@@ -204,6 +204,7 @@ export const templates = {
 // 체험 데이터를 검사한다. 형식이 맞지 않으면 null이다.
 // learn(알아두기)은 수업의 "배우기"와 "기록" 단계에 보여주는 2~3줄 설명으로, 없어도 된다.
 // cards(배우기 카드)는 그 체험의 원리를 2~3장으로 나눠 설명하는 카드로, 없어도 된다: [{ title, body }].
+// question(기록 질문)은 수업의 "기록" 단계에서 한 줄 기록을 쓰기 전에 보여주는 질문으로, 없어도 된다.
 export function cleanExperience(raw) {
   if (!raw || typeof raw !== "object" || !Object.hasOwn(templates, raw.template)) return null;
   const body = templates[raw.template].clean(raw);
@@ -211,9 +212,10 @@ export function cleanExperience(raw) {
   const cards =
     raw.cards === undefined
       ? []
-      : all(list(raw.cards, 2, 3)?.map((card) => (text(card?.title, 16) && text(card.body, 120) ? { title: card.title, body: card.body } : null)));
-  return body && text(raw.title, 20) && text(raw.task, 60) && learn !== null && cards
-    ? { template: raw.template, title: raw.title, task: raw.task, learn, ...(cards.length ? { cards } : {}), ...body }
+      : all(list(raw.cards, 2, 3)?.map((card) => (text(card?.title, 20) && text(card.body, 120) ? { title: card.title, body: card.body } : null)));
+  const question = raw.question === undefined ? "" : text(raw.question, 40);
+  return body && text(raw.title, 20) && text(raw.task, 60) && learn !== null && cards && question !== null
+    ? { template: raw.template, title: raw.title, task: raw.task, learn, ...(cards.length ? { cards } : {}), ...(question ? { question } : {}), ...body }
     : null;
 }
 
