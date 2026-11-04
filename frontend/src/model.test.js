@@ -35,6 +35,8 @@ import {
   electiveOf,
   electiveSubjects,
   saveElective,
+  completedElectives,
+  electiveReportText,
 } from "./model.js";
 
 const TOTAL = departments[0].lessons.length;
@@ -838,4 +840,53 @@ test("선택 체험 기록은 다시 불러와도 남고, 잘못된 항목은 �
   assert.deepEqual(loaded.journeys[partner.id].completed, 1);
   assert.deepEqual(loadState(only(STORAGE_KEY, { ...saved, electives: [1, 2] })).electives, {});
   assert.deepEqual(loadState(only(STORAGE_KEY, { journeys: {} })).electives, {});
+});
+
+test("리포트의 선택 체험은 그 학과에서 마친 것만 학년 순서로 담고, 없으면 묶음을 넣지 않는다", () => {
+  const partner = pharm("경희대학교", true);
+  const other = pharm("나다대학교", true);
+  let s = {
+    ...structuredClone(initialState),
+    catalog: [partner, other],
+    journeys: { [partner.id]: { completed: 1, skipped: [] }, [other.id]: { completed: 0, skipped: [] } },
+  };
+  // 아무것도 마치지 않았으면 묶음이 없다.
+  assert.deepEqual(completedElectives(s, partner), []);
+  assert.equal(electiveReportText(s, partner), "");
+  // 2학년 과목을 먼저 마치고, 1학년 과목은 나중에 마친다. 쓰는 중(done 아님)인 과목과 다른 학과의 기록은 빠진다.
+  s = saveElective(s, partner.id, "미생물학", { note: "균을 길러 봤다", done: true });
+  s = saveElective(s, partner.id, "유기화학", { summary: "5쌍 짝 맞추기 · 틀린 시도 0번", done: true });
+  s = saveElective(s, partner.id, "생리학", { note: "쓰는 중" });
+  s = saveElective(s, other.id, "약품분석학", { note: "다른 학과", done: true });
+  assert.deepEqual(completedElectives(s, partner), [
+    { subject: "유기화학", summary: "5쌍 짝 맞추기 · 틀린 시도 0번", note: "" },
+    { subject: "미생물학", summary: "", note: "균을 길러 봤다" },
+  ]);
+  assert.equal(
+    electiveReportText(s, partner),
+    "\n\n선택 체험 (졸업 진행과 별개로 해본 과목이에요)\n- 유기화학\n해본 결과: 5쌍 짝 맞추기 · 틀린 시도 0번\n\n- 미생물학\n균을 길러 봤다",
+  );
+  assert.deepEqual(completedElectives(s, other).map((item) => item.subject), ["약품분석학"]);
+  // 데이터가 바뀌어 지금 목록에 없는 과목도 마친 기록이면 뒤에 남는다.
+  const moved = { ...s, electives: { ...s.electives, [`${partner.id}|없어진과목`]: { done: true, note: "예전 기록", summary: "" } } };
+  assert.deepEqual(completedElectives(moved, partner).map((item) => item.subject), ["유기화학", "미생물학", "없어진과목"]);
+  // 졸업 진행은 그대로다.
+  assert.deepEqual(progressOf(s.journeys[partner.id], partner.lessons.length).passed, 1);
+  assert.equal(completedElectives(s, null).length, 0);
+});
+
+test("선택 체험이 생기기 전에 저장한 기록도 그대로 불러오고, 리포트에는 선택 체험 묶음이 없다", () => {
+  const partner = pharm("경희대학교", true);
+  const old = {
+    catalog: [JSON.parse(JSON.stringify(partner))],
+    journeys: { [partner.id]: { completed: partner.lessons.length, skipped: [] } },
+    notes: { [`${partner.id}-0`]: "예전 기록" },
+  };
+  const loaded = loadState(only(STORAGE_KEY, old));
+  assert.deepEqual(loaded.electives, {});
+  assert.equal(loaded.notes[`${partner.id}-0`], "예전 기록");
+  assert.equal(progressOf(loaded.journeys[partner.id], partner.lessons.length).finished, true);
+  assert.equal(electiveReportText(loaded, partner), "");
+  // electives가 없는 state(예전 형식)를 그대로 넘겨도 깨지지 않는다.
+  assert.equal(electiveReportText({ ...loaded, electives: undefined }, partner), "");
 });

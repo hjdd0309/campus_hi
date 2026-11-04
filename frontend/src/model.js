@@ -775,6 +775,28 @@ export function saveElective(state, id, subject, changes) {
   };
   return { ...state, electives: { ...state.electives, [key]: next } };
 }
+// 리포트에 넣을 선택 체험: 그 학과에서 마친(done) 것만 [{ subject, summary, note }]. 학년 순서(electiveSubjects)대로 두고,
+// 데이터가 바뀌어 지금 목록에 없는 과목도 마친 기록이면 뒤에 둔다. 졸업 진행(이수·진행률)과는 상관없다.
+export function completedElectives(state, d) {
+  if (!d?.id) return [];
+  const prefix = `${d.id}|`;
+  const order = electiveSubjects(d);
+  const rank = (subject) => (order.includes(subject) ? order.indexOf(subject) : order.length);
+  return Object.entries(state.electives || {})
+    .filter(([key, item]) => key.startsWith(prefix) && item?.done === true)
+    .map(([key, item]) => ({ subject: key.slice(prefix.length), summary: item.summary || "", note: item.note || "" }))
+    .filter((item) => item.subject.trim())
+    .sort((a, b) => rank(a.subject) - rank(b.subject));
+}
+// 내려받는 체험 리포트의 선택 체험 묶음. 마친 선택 체험이 없으면 빈 문자열(묶음을 넣지 않는다).
+export function electiveReportText(state, d) {
+  const items = completedElectives(state, d);
+  if (!items.length) return "";
+  const lines = items.map(
+    ({ subject, summary, note }) => `- ${subject}${summary.trim() ? `\n해본 결과: ${summary}` : ""}${note.trim() ? `\n${note}` : ""}`,
+  );
+  return `\n\n선택 체험 (졸업 진행과 별개로 해본 과목이에요)\n${lines.join("\n\n")}`;
+}
 function cleanElectives(value, validIds) {
   const kept = {};
   if (!value || typeof value !== "object" || Array.isArray(value)) return kept;

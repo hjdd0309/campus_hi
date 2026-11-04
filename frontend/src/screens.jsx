@@ -48,6 +48,8 @@ import {
   electiveOf,
   electiveSubjects,
   saveElective,
+  completedElectives,
+  electiveReportText,
 } from "./model.js";
 import { isLessonType, lessonTypes } from "./lessonGames.js";
 import LessonGame, { useLessonGame } from "./Games.jsx";
@@ -263,11 +265,12 @@ function latestJourney(state) {
 /**
  * 화면에 필요한 학과나 진행 기록이 없으면 처음 화면으로 돌려보낸다.
  * 뒤에 깔려 있는 화면은 다른 학과를 보는 중일 수 있으므로, 맨 위 화면일 때만 확인한다.
+ * to에 "home"을 주면 처음 화면 대신 홈으로 보낸다(입학한 학과가 있을 때).
  */
-function useGuard(ok, nav, active) {
+function useGuard(ok, nav, active, to = "splash") {
   useEffect(() => {
-    if (active && !ok) nav.reset(["splash"]);
-  }, [ok, nav, active]);
+    if (active && !ok) nav.reset([to]);
+  }, [ok, nav, active, to]);
 }
 
 const hasBatchim = (word) => {
@@ -2083,7 +2086,8 @@ export function Elective({ active, nav, route, state, setState }) {
   const scroller = useRef(null);
   const heading = useRef(null);
   const moved = useRef(false);
-  useGuard(ok, nav, active);
+  // 잘못 들어오면(입학하지 않음, 비제휴, 목록에 없는 과목, 다른 학과를 보는 중) 입학한 학과가 있으면 홈으로, 없으면 처음 화면으로 보낸다.
+  useGuard(ok, nav, active, latestJourney(state) ? "home" : "splash");
   useEffect(() => () => window.clearTimeout(timer.current), []);
   // 단계를 옮기면 맨 위로 올리고 제목에 초점을 둔다(스크린 리더가 새 단계를 읽게).
   useEffect(() => {
@@ -2287,13 +2291,26 @@ export function Graduation({ active, nav, state }) {
   // 휴강한 과목은 이수에 넣지 않는다.
   const done = useCountUp(ok ? v.passed : 0, 900, 800);
   const pct = useCountUp(ok ? Math.round((v.passed / v.total) * 100) : 0, 1200, 900);
+  // 마친 선택 체험. 졸업 진행과 별개라 이수·진행률에는 넣지 않고, 리포트 아래에 따로 묶어 보여준다.
+  const electives = ok ? completedElectives(state, v.d) : [];
+  // 선택 체험 묶음은 길이가 정해져 있지 않아(기록 길이, 과목 수) 그려진 높이만큼 화면을 늘려 스크롤되게 한다.
+  const extra = useRef(null);
+  const [extraH, setExtraH] = useState(0);
+  useLayoutEffect(() => {
+    if (!extra.current) return setExtraH(0);
+    const update = () => setExtraH(extra.current?.offsetHeight || 0);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(extra.current);
+    return () => observer.disconnect();
+  }, [electives.length > 0]);
   useGuard(ok, nav, active);
   if (!ok) return null;
   const { d, total, skipped } = v;
   const title = `${d.school} ${d.name}`;
   return (
     <Screen
-      h={754}
+      h={electives.length ? Math.max(754, 507 + 262 + extraH + 24) : 754}
       foot={754}
       veil="#feeaa0"
       footer={
@@ -2364,6 +2381,31 @@ export function Graduation({ active, nav, state }) {
             {lastNote(state, d) || "남긴 기록이 없어요."}
           </div>
         </div>
+        {electives.length > 0 && (
+          <section
+            ref={extra}
+            aria-labelledby="grad-electives"
+            className="a-up absolute left-[20.5px] top-[262px] w-[360px]"
+            style={delay(0.95)}
+          >
+            <h2 id="grad-electives" className="text-[13px] font-bold leading-[20px] text-mint-deep">
+              선택 체험 <span className="font-normal text-gray">· 졸업 진행과 별개로 해본 과목</span>
+            </h2>
+            <ul className="mt-[6px] grid gap-[10px]">
+              {electives.map(({ subject, summary, note }) => (
+                <li key={subject} className="text-[12px] leading-[18px] text-ink-2">
+                  <strong className="block truncate font-semibold">{subject}</strong>
+                  {summary.trim() && <span className="block truncate text-mint-deep">{summary}</span>}
+                  {note.trim() && (
+                    <span className="report-text" style={{ WebkitLineClamp: 2 }}>
+                      {note}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </Screen>
   );
@@ -2397,7 +2439,8 @@ function reportText(state, d) {
   const status = skipped.length
     ? `${completed} / ${d.lessons.length} 진행 · 이수 ${passed} · 미이수 ${skipped.length}`
     : `${completed} / ${d.lessons.length} 완료`;
-  return `${d.school} ${d.name} 체험 리포트\n\n${status}\n\n${notes}${planText}${archiveText}`;
+  // 선택 체험은 학년별 수업과 섞지 않고 따로 묶는다(마친 것이 없으면 빈 문자열).
+  return `${d.school} ${d.name} 체험 리포트\n\n${status}\n\n${notes}${planText}${electiveReportText(state, d)}${archiveText}`;
 }
 
 function download(name, text) {
