@@ -45,6 +45,9 @@ import {
   showsExampleNote,
   homeSubjects,
   studioOf,
+  electiveOf,
+  electiveSubjects,
+  saveElective,
 } from "./model.js";
 import { isLessonType, lessonTypes } from "./lessonGames.js";
 import LessonGame, { useLessonGame } from "./Games.jsx";
@@ -181,10 +184,11 @@ function YearSubjects({ years }) {
 const ESTIMATED_NOTE = "과목의 학년은 보통 듣는 시기를 기준으로 했어요. 실제 편성과 다를 수 있고, 학년을 알 수 없는 과목은 넣지 않았어요.";
 
 /**
- * 홈의 "이 학년 때 이런 과목을 들어요". 첫 카드는 지금 체험하는 과목(누르면 수업으로), 나머지는 같은 학년의 다른 교과목으로
- * 제휴 대학 전용(노란 제휴 배지, 누르면 제휴 안내 창)이다. 많으면 4개까지 보이고 더 보기로 펼친다.
+ * 홈의 "이 학년 때 이런 과목을 들어요". 첫 카드는 지금 체험하는 과목(누르면 수업으로), 나머지는 같은 학년의 다른 교과목이다.
+ * 제휴 학교(subjects.open)면 바로 해볼 수 있는 선택 체험(흰 카드, 누르면 선택 체험으로)이고, 아니면 제휴 대학 전용
+ * (노란 제휴 배지, 누르면 제휴 안내 창)이다. 많으면 4개까지 보이고 더 보기로 펼친다.
  */
-function HomeSubjects({ subjects, locked, onOpen }) {
+function HomeSubjects({ subjects, locked, onOpen, electiveDone, onElective }) {
   const [opened, setOpened] = useState(false);
   const { year, main, others, estimated } = subjects;
   const more = others.length > SHOWN_SUBJECTS && !opened;
@@ -205,7 +209,23 @@ function HomeSubjects({ subjects, locked, onOpen }) {
             <span className="shrink-0 text-[12.5px] font-semibold text-mint-deep">{main.done ? "완료 ✓" : "체험하기"}</span>
           </button>
         </li>
-        {shown.map((name) => {
+        {subjects.open &&
+          shown.map((name) => {
+            const done = electiveDone(name);
+            return (
+              <li key={name}>
+                <button
+                  onClick={() => onElective(name)}
+                  aria-label={`${name}, 선택 체험, ${done ? "완료" : "체험하기"}`}
+                  className="pressable flex min-h-[52px] w-full items-center gap-[10px] rounded-[12px] border border-line bg-white px-[14px] py-[8px] text-left"
+                >
+                  <span className="min-w-0 flex-1 truncate text-[14px] text-ink-2">{name}</span>
+                  <span className="shrink-0 text-[12.5px] font-semibold text-mint-deep">{done ? "완료 ✓" : "체험하기"}</span>
+                </button>
+              </li>
+            );
+          })}
+        {!subjects.open && shown.map((name) => {
           const left = locked.curious(name);
           return (
             <li key={name}>
@@ -1504,7 +1524,14 @@ export function Home({ active, nav, state, setState }) {
       </button>
       {subjects && (
         <div ref={section} className="a-up absolute left-[21px] w-[365px]" style={{ top: 524, ...delay(0.33) }}>
-          <HomeSubjects key={`${d.id}-${subjects.year}`} subjects={subjects} locked={locked} onOpen={open} />
+          <HomeSubjects
+            key={`${d.id}-${subjects.year}`}
+            subjects={subjects}
+            locked={locked}
+            onOpen={open}
+            electiveDone={(name) => !!electiveOf(state, d.id, name)?.done}
+            onElective={(name) => nav.push("elective", { subject: name })}
+          />
         </div>
       )}
       <T y={535.5 + shift} size={15} left={21} className="a-up font-bold text-ink-2" style={delay(0.36)}>
@@ -2035,6 +2062,219 @@ export function Lesson({ active, nav, route, state, setState }) {
 /* 15 · 졸업                                                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 선택 체험: 제휴 학교 홈에서 고른 같은 학년의 다른 과목을 수업과 같은 3단계(배우기 → 직접 해보기 → 기록)로 해본다.
+ * 검증된 연습 문제가 있으면 그 문제로, 없으면(404·422) 관찰 과제로 진행한다. 기록은 state.electives에 남고 졸업 진행과는 별개다.
+ */
+export function Elective({ active, nav, route, state, setState }) {
+  const [v] = useState(() => view(state));
+  const subject = typeof route?.params?.subject === "string" ? route.params.subject : "";
+  const ok = !!v?.journey && v.d.partner === true && !!subject && electiveSubjects(v.d).includes(subject);
+  const year = ok ? yearSubjects(v.d)?.years.find((item) => item.others.includes(subject))?.year : null;
+  const quiz = useLessonGame(ok ? subject : null);
+  const saved = ok ? electiveOf(state, v.d.id, subject) : null;
+  const [draft, setDraft] = useState(() => saved?.note || "");
+  // 이미 기록이 있는 과목은 기록 단계부터 연다.
+  const [step, setStep] = useState(() => (saved && (saved.done || saved.note || saved.summary) ? 2 : 0));
+  const [reached, setReached] = useState(step);
+  const [notice, setNotice] = useState("");
+  const [shake, setShake] = useState(0);
+  const timer = useRef(0);
+  const scroller = useRef(null);
+  const heading = useRef(null);
+  const moved = useRef(false);
+  useGuard(ok, nav, active);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  // 단계를 옮기면 맨 위로 올리고 제목에 초점을 둔다(스크린 리더가 새 단계를 읽게).
+  useEffect(() => {
+    if (!moved.current) return;
+    if (scroller.current) scroller.current.scrollTop = 0;
+    heading.current?.focus({ preventScroll: true });
+  }, [step]);
+  if (!ok) return null;
+
+  const { d } = v;
+  // quiz.status: loading | error | ready(연습 문제) | basic(관찰 과제)
+  const mode = quiz.status === "ready" ? "quiz" : quiz.status;
+  const played = mode === "quiz" ? saved?.summary || "" : "";
+  // 연습 문제는 다 풀어야(요약이 저장돼야) 기록으로 넘어간다. 관찰 과제는 해보고 바로 기록한다.
+  const tried = mode === "basic" || !!saved?.done || !!saved?.summary;
+  const warn = (message) => {
+    setNotice(message);
+    setShake((n) => n + 1);
+  };
+  const go = (next) => {
+    moved.current = true;
+    setNotice("");
+    setStep(next);
+    setReached((r) => Math.max(r, next));
+  };
+  // 입력할 때마다 전체 상태를 저장하지 않도록 잠시 모았다가 저장한다.
+  const edit = (text) => {
+    setDraft(text);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState((s) => saveElective(s, d.id, subject, { note: text })), 400);
+  };
+  const finish = () => {
+    if (!tried) return warn("먼저 직접 해보기를 끝까지 해보세요.");
+    window.clearTimeout(timer.current);
+    setState((s) => saveElective(s, d.id, subject, { note: draft, done: true }));
+    nav.back();
+  };
+  const written = !!draft.trim();
+
+  let body;
+  let action;
+  if (step === 0) {
+    body = (
+      <>
+        {mode === "loading" && (
+          <p className="a-up mt-[22px] text-[13.5px] text-ink-3" role="status">
+            연습 문제를 불러오는 중이에요…
+          </p>
+        )}
+        {mode === "error" && (
+          <div className="a-up mt-[22px]" role="alert">
+            <p className="body-copy">{quiz.message}</p>
+            <button className="button" onClick={quiz.retry}>
+              다시 시도
+            </button>
+            <button className="text-button ml-[14px]" onClick={quiz.skip}>
+              연습 문제 없이 진행하기 →
+            </button>
+          </div>
+        )}
+        {(mode === "quiz" || mode === "basic") && (
+          <MintCard title="이 수업에서 해볼 것" className="a-up mt-[22px]">
+            <p style={delay(0.12)}>
+              {mode === "quiz" ? quizTask(quiz.game) : "일상에서 이 과목의 주제를 찾아 관찰하고, 느낀 점을 한 줄로 남겨요."}
+            </p>
+          </MintCard>
+        )}
+      </>
+    );
+    action = (
+      <FilledButton onClick={() => go(1)} disabled={mode === "loading" || mode === "error"}>
+        직접 해보기
+      </FilledButton>
+    );
+  } else if (step === 1) {
+    body = (
+      <div className="a-up mt-[22px]">
+        {mode === "quiz" && (
+          <LessonGame
+            game={quiz.game}
+            played={played}
+            onComplete={(summary) => {
+              setNotice("");
+              setState((s) => saveElective(s, d.id, subject, { summary }));
+            }}
+          />
+        )}
+        {mode === "basic" && (
+          <section>
+            <h2 className="text-[16px] font-bold leading-[24px] text-ink-2">오늘의 직접 적용 과제</h2>
+            <ol className="mt-[8px] grid gap-[4px] text-[13.5px] leading-[22px] text-ink-3">
+              {basicTasks(subject, true).map((item, i) => (
+                <li key={i}>
+                  {"①②③"[i]} {item}
+                </li>
+              ))}
+            </ol>
+            <p className="footnote">과제를 해본 뒤 다음 단계에서 한 줄로 기록해요.</p>
+          </section>
+        )}
+        {mode === "loading" && (
+          <p className="text-[13.5px] text-ink-3" role="status">
+            연습 문제를 불러오는 중이에요…
+          </p>
+        )}
+        {mode === "error" && (
+          <div role="alert">
+            <p className="body-copy">{quiz.message}</p>
+            <button className="button" onClick={quiz.retry}>
+              다시 시도
+            </button>
+          </div>
+        )}
+      </div>
+    );
+    action = <FilledButton onClick={() => (tried ? go(2) : warn("먼저 끝까지 해보세요."))}>기록하러 가기</FilledButton>;
+  } else {
+    body = (
+      <>
+        {mode === "quiz" && (
+          <MintCard title="배운 내용" className="a-up mt-[22px]">
+            <p>{quiz.game.explanation}</p>
+          </MintCard>
+        )}
+        {played && (
+          <p className="a-up mt-[14px] text-[13px] leading-[20px] text-mint-deep" style={delay(0.06)}>
+            오늘 해본 것 · {played}
+          </p>
+        )}
+        <label className="note-card a-up mt-[16px] block" style={delay(0.12)}>
+          <strong>한 줄 기록</strong>
+          <textarea
+            className="compact"
+            rows={2}
+            placeholder={mode === "quiz" ? "직접 해보니 어땠나요? 느낀 점을 한 줄로 남겨요." : "어떤 장면을 발견했나요? 한 줄로 남겨요."}
+            value={draft}
+            maxLength={3000}
+            onChange={(e) => edit(e.target.value)}
+          />
+          <small>{draft.length.toLocaleString()} / 3,000자</small>
+        </label>
+      </>
+    );
+    action = <FilledButton onClick={finish}>{written ? "기록 저장하고 완료하기" : "기록 건너뛰고 완료하기"}</FilledButton>;
+  }
+
+  const guide = notice || (step === 2 ? "선택 체험은 졸업 진행과 별개로 기록돼요" : "");
+  return (
+    <Screen
+      foot={700}
+      footer={
+        <>
+          <div className="absolute inset-x-[20px] top-[708px] flex h-[36px] items-center">
+            {step > 0 && (
+              <button onClick={() => go(step - 1)} className="pressable h-[36px] rounded-full border border-line bg-white px-[14px] text-[13px] font-semibold text-slate">
+                ← 이전 단계
+              </button>
+            )}
+          </div>
+          {action}
+          <p
+            key={shake}
+            role="status"
+            className={`absolute inset-x-[20px] top-[818px] overflow-hidden text-ellipsis whitespace-nowrap text-center text-[12.5px] leading-[20px] ${notice ? "a-shake text-mint-deep" : "text-gray"}`}
+          >
+            {guide}
+          </p>
+        </>
+      }
+    >
+      <Header title={`선택 체험 · ${subject}`} onBack={nav.back} />
+      <StepChips step={step} reached={reached} onGo={go} />
+      <div
+        ref={scroller}
+        className="flow no-scrollbar absolute left-0 top-[146px] w-full overflow-y-auto px-[20px] pb-[20px] pt-[18px]"
+        style={{ bottom: "calc(174px - var(--bt) * 1px)" }}
+      >
+        <div key={step}>
+          <h1 ref={heading} tabIndex={-1} className="a-up text-[26px] font-bold leading-[36px] text-navy outline-none">
+            {mode === "quiz" ? quiz.game.title : subject}
+          </h1>
+          <p className="a-up mt-[6px] text-[14px] leading-[22px] text-gray" style={delay(0.06)}>
+            {`${year ? `${year}학년 ` : ""}선택 체험 · ${d.school}`}
+          </p>
+          {body}
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
 function lastNote(state, d) {
   for (let i = d.lessons.length - 1; i >= 0; i--) if (state.notes[`${d.id}-${i}`]) return state.notes[`${d.id}-${i}`];
   return "";
@@ -2274,6 +2514,7 @@ export const SCREENS = {
   welcome: Welcome,
   home: Home,
   lesson: Lesson,
+  elective: Elective,
   grades: Grades,
   diploma: Diploma,
   graduation: Graduation,

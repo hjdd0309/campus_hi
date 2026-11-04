@@ -249,6 +249,8 @@ export const initialState = {
   archive: [],
   // 잠긴 과목에 남긴 "궁금해요": [{ school, course, subject, createdAt }]. 개인 정보 없이 학교·학과·과목만 둔다.
   curious: [],
+  // 제휴 학교 홈에서 고른 같은 학년의 다른 과목(선택 체험): { "학과id|과목": { done, note, summary } }. 졸업 진행(journeys)과 별개다.
+  electives: {},
   onboarded: false,
 };
 // 수집 파이프라인이 검증한 과목별 학년: { subjects: { 과목: 학년 }, source_url, curriculum_year, checked_at }.
@@ -611,6 +613,7 @@ export function loadState(storage) {
           ]),
       ),
       curious: cleanCurious(value.curious),
+      electives: cleanElectives(value.electives, validIds),
       onboarded: !!value.onboarded,
     };
   } catch {
@@ -737,14 +740,52 @@ export function homeSubjects(d, journey) {
   const { completed, finished } = progressOf(journey, d.lessons.length);
   const index = Math.min(completed, d.lessons.length - 1);
   const year = d.yearNumbers[index];
-  // 홈의 다른 과목은 "제휴하면 열리는" 과목으로 보여주므로, 이미 제휴 학교인 학과에는 두지 않는다.
-  const list = d.partner ? null : yearSubjects(d);
+  // 다른 과목은 비제휴 학교에서는 "제휴하면 열리는" 잠긴 과목으로, 제휴 학교에서는 바로 해볼 수 있는 선택 체험(open)으로 보여준다.
+  const list = yearSubjects(d);
   return {
     year,
     main: { index, title: d.lessons[index], done: finished },
     others: list?.years.find((item) => item.year === year)?.others || [],
     estimated: !!list?.estimated,
+    open: d.partner === true,
   };
+}
+
+// 선택 체험: 제휴 학교에서 졸업 진행과 별개로 해보는 같은 학년의 다른 과목.
+const ELECTIVE_NOTE_MAX = 3000;
+const ELECTIVE_SUMMARY_MAX = 200;
+export const electiveKey = (id, subject) => `${id}|${subject}`;
+export const electiveOf = (state, id, subject) => state.electives?.[electiveKey(id, subject)] || null;
+// 선택 체험으로 열 수 있는 과목: 제휴 학교일 때 모든 학년의 다른 과목(중복 없이). 아니면 없다.
+export function electiveSubjects(d) {
+  if (d?.partner !== true) return [];
+  return [...new Set((yearSubjects(d)?.years || []).flatMap((item) => item.others))];
+}
+// 선택 체험 기록을 고친다. 입학한 학과의 선택 체험 과목일 때만 저장한다. done은 한 번 마치면 그대로 둔다.
+export function saveElective(state, id, subject, changes) {
+  const d = [...departments, ...(state.catalog || [])].find((item) => item.id === id);
+  if (!d || !state.journeys?.[id] || typeof subject !== "string" || !electiveSubjects(d).includes(subject)) return state;
+  const key = electiveKey(id, subject);
+  const before = state.electives?.[key] || { done: false, note: "", summary: "" };
+  const pick = (field, max) => (typeof changes?.[field] === "string" ? changes[field].slice(0, max) : before[field]);
+  const next = {
+    done: before.done || changes?.done === true,
+    note: pick("note", ELECTIVE_NOTE_MAX),
+    summary: pick("summary", ELECTIVE_SUMMARY_MAX),
+  };
+  return { ...state, electives: { ...state.electives, [key]: next } };
+}
+function cleanElectives(value, validIds) {
+  const kept = {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return kept;
+  for (const [key, item] of Object.entries(value)) {
+    const id = [...validIds].find((one) => key.startsWith(`${one}|`));
+    const subject = id ? key.slice(id.length + 1) : "";
+    if (!subject.trim() || !item || typeof item !== "object" || Array.isArray(item)) continue;
+    if (typeof item.done !== "boolean" || typeof item.note !== "string" || typeof item.summary !== "string") continue;
+    kept[key] = { done: item.done, note: item.note.slice(0, ELECTIVE_NOTE_MAX), summary: item.summary.slice(0, ELECTIVE_SUMMARY_MAX) };
+  }
+  return kept;
 }
 
 // 잠긴 과목에 남긴 "궁금해요". 같은 학교·학과·과목은 한 번만 남긴다.

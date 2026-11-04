@@ -31,6 +31,10 @@ import {
   cardTone,
   showsExampleNote,
   homeSubjects,
+  electiveKey,
+  electiveOf,
+  electiveSubjects,
+  saveElective,
 } from "./model.js";
 
 const TOTAL = departments[0].lessons.length;
@@ -753,12 +757,85 @@ test("홈의 이 학년 과목은 2·3·4·6년제 모두 학년이 맞고, 다�
   assert.equal(homeSubjects(null, null), null);
 });
 
-test("제휴 학교도 학과 상세에는 학년별 과목을 보여주지만, 홈에는 '제휴하면 열리는' 과목을 두지 않는다", () => {
-  const levels = { 약물학: [2, 3], 생화학: [1, 2], 약제학: [2, 2], 유기화학: [1, 1], 물리약학: [1, 2], 약품분석학: [2, 2], 생리학: [1, 1], 미생물학: [2, 2] };
-  const curriculum = ["약물학", "생화학", "약제학", "약학개론", "유기화학", "물리약학", "약품분석학", "생리학", "미생물학"];
-  const partner = createDepartment("약학과", "경희대학교", curriculum, "의학", null, "6년", "", null, levels, null, true, true);
-  assert.ok(yearSubjects(partner).years.some((item) => item.others.length > 0));
-  assert.deepEqual(homeSubjects(partner, { completed: 1, paused: false }).others, []);
-  const plain = createDepartment("약학과", "가나대학교", curriculum, "의학", null, "6년", "", null, levels);
-  assert.ok(yearSubjects(plain).years.some((item) => item.others.length > 0));
+// 2026-11-04 사용자 결정: 제휴 학교 홈에서도 같은 학년의 다른 과목을 보여주고, 잠금 없이 선택 체험으로 연다(open).
+const pharmLevels = { 약물학: [2, 3], 생화학: [1, 2], 약제학: [2, 2], 유기화학: [1, 1], 물리약학: [1, 2], 약품분석학: [2, 2], 생리학: [1, 1], 미생물학: [2, 2] };
+const pharmCurriculum = ["약물학", "생화학", "약제학", "약학개론", "유기화학", "물리약학", "약품분석학", "생리학", "미생물학"];
+const pharm = (school, partner) => createDepartment("약학과", school, pharmCurriculum, "의학", null, "6년", "", null, pharmLevels, null, partner, partner);
+
+test("홈의 같은 학년 다른 과목은 제휴·비제휴 모두 보여주고, 제휴 학교에서만 열려 있다", () => {
+  const partner = pharm("경희대학교", true);
+  const plain = pharm("가나대학교", false);
+  for (const d of [partner, plain]) {
+    const home = homeSubjects(d, { completed: 1, paused: false });
+    assert.deepEqual(home.others, ["약품분석학", "미생물학"]);
+    assert.deepEqual(home.others, yearSubjects(d).years.find((item) => item.year === 2).others);
+  }
+  assert.equal(homeSubjects(partner, { completed: 1, paused: false }).open, true);
+  assert.equal(homeSubjects(plain, { completed: 1, paused: false }).open, false);
+});
+
+test("선택 체험 과목은 제휴 학교일 때 모든 학년의 다른 과목이고, 지금 체험 과목은 빠진다", () => {
+  const partner = pharm("경희대학교", true);
+  const subjects = electiveSubjects(partner);
+  assert.deepEqual(subjects, ["유기화학", "물리약학", "생리학", "약품분석학", "미생물학"]);
+  assert.equal(new Set(subjects).size, subjects.length);
+  assert.ok(partner.lessons.every((lesson) => !subjects.includes(lesson)));
+  assert.deepEqual(electiveSubjects(pharm("가나대학교", false)), []);
+  assert.deepEqual(electiveSubjects(null), []);
+});
+
+test("선택 체험은 입학한 제휴 학과의 목록에 있는 과목만 저장하고, 졸업 진행은 건드리지 않는다", () => {
+  const partner = pharm("경희대학교", true);
+  const plain = pharm("가나대학교", false);
+  const journeys = { [partner.id]: { completed: 1, skipped: [] }, [plain.id]: { completed: 0, skipped: [] } };
+  const base = { ...structuredClone(initialState), catalog: [partner, plain], journeys };
+  // 저장하지 않는 경우: 입학하지 않은 학과, 비제휴 학과, 목록에 없는 과목.
+  const notEnrolled = { ...base, journeys: { [plain.id]: journeys[plain.id] } };
+  assert.equal(saveElective(notEnrolled, partner.id, "유기화학", { note: "기록" }), notEnrolled);
+  assert.equal(saveElective(base, plain.id, "유기화학", { note: "기록" }), base);
+  assert.equal(saveElective(base, partner.id, "없는과목", { note: "기록" }), base);
+  assert.equal(saveElective(base, partner.id, partner.lessons[0], { note: "기록" }), base);
+  assert.equal(saveElective(base, "missing", "유기화학", { note: "기록" }), base);
+
+  // 기록을 먼저 쓰고 나중에 완료해도 이어진다.
+  let s = saveElective(base, partner.id, "유기화학", { note: "작용기를 정리했다" });
+  assert.deepEqual(electiveOf(s, partner.id, "유기화학"), { done: false, note: "작용기를 정리했다", summary: "" });
+  s = saveElective(s, partner.id, "유기화학", { summary: "5문제 중 5개 맞힘" });
+  s = saveElective(s, partner.id, "유기화학", { done: true });
+  assert.deepEqual(electiveOf(s, partner.id, "유기화학"), { done: true, note: "작용기를 정리했다", summary: "5문제 중 5개 맞힘" });
+  // 완료 뒤 기록만 고쳐도 done은 그대로다.
+  s = saveElective(s, partner.id, "유기화학", { note: "고친 기록", done: false });
+  assert.deepEqual(electiveOf(s, partner.id, "유기화학"), { done: true, note: "고친 기록", summary: "5문제 중 5개 맞힘" });
+  assert.equal(electiveKey(partner.id, "유기화학"), `${partner.id}|유기화학`);
+  assert.equal(electiveOf(s, partner.id, "생리학"), null);
+  // 길이 제한: 기록 3000자, 요약 200자.
+  const long = saveElective(s, partner.id, "생리학", { note: "가".repeat(5000), summary: "나".repeat(500) });
+  assert.equal(electiveOf(long, partner.id, "생리학").note.length, 3000);
+  assert.equal(electiveOf(long, partner.id, "생리학").summary.length, 200);
+  // 졸업 진행은 그대로다.
+  assert.equal(s.journeys, base.journeys);
+  assert.deepEqual(s.journeys, journeys);
+  assert.deepEqual(base.electives, {});
+});
+
+test("선택 체험 기록은 다시 불러와도 남고, 잘못된 항목은 버린다", () => {
+  const partner = pharm("경희대학교", true);
+  let s = { ...structuredClone(initialState), catalog: [partner], journeys: { [partner.id]: { completed: 1, skipped: [] } } };
+  s = saveElective(s, partner.id, "유기화학", { note: "기록", summary: "요약", done: true });
+  s = saveElective(s, partner.id, "생리학", { note: "쓰는 중" });
+  const saved = JSON.parse(JSON.stringify(s));
+  saved.electives["missing|유기화학"] = { done: true, note: "", summary: "" };
+  saved.electives[`${partner.id}|`] = { done: true, note: "", summary: "" };
+  saved.electives[`${partner.id}|   `] = { done: true, note: "", summary: "" };
+  saved.electives[`${partner.id}|약제학`] = { done: "yes", note: "", summary: "" };
+  saved.electives[`${partner.id}|미생물학`] = "완료";
+  saved.electives[`${partner.id}|약품분석학`] = { done: false, note: "다".repeat(4000), summary: "" };
+  const loaded = loadState(only(STORAGE_KEY, saved));
+  assert.deepEqual(Object.keys(loaded.electives).sort(), [`${partner.id}|생리학`, `${partner.id}|약품분석학`, `${partner.id}|유기화학`]);
+  assert.deepEqual(electiveOf(loaded, partner.id, "유기화학"), { done: true, note: "기록", summary: "요약" });
+  assert.deepEqual(electiveOf(loaded, partner.id, "생리학"), { done: false, note: "쓰는 중", summary: "" });
+  assert.equal(electiveOf(loaded, partner.id, "약품분석학").note.length, 3000);
+  assert.deepEqual(loaded.journeys[partner.id].completed, 1);
+  assert.deepEqual(loadState(only(STORAGE_KEY, { ...saved, electives: [1, 2] })).electives, {});
+  assert.deepEqual(loadState(only(STORAGE_KEY, { journeys: {} })).electives, {});
 });
