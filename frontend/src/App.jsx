@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SCREENS } from "./screens.jsx";
 import { STORAGE_KEY, loadState } from "./model.js";
+import { addGhost, makeRoute as make, restoreStack } from "./navStack.js";
 
 // 화면은 402×874 아트보드에 맞춰 그리고, 창 크기에 맞게 통째로 줄이거나 늘린다.
 const W = 402;
@@ -18,16 +19,10 @@ const EXIT = { push: "tr-push-out", fade: "tr-fade-out", rise: "tr-fade-out" };
 // 잠깐 보여주고 넘어가는 화면. 새로고침으로 돌아왔을 때는 그다음 화면을 보여준다.
 const SETTLED = { loading: "result", enrolled: "welcome", grades: "graduation", diploma: "graduation" };
 
-let keySeed = 1;
-const make = (name, params) => ({ name, params, key: keySeed++ });
-
 function initialStack(state) {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(STACK_KEY));
-    if (Array.isArray(saved) && saved.length && saved.every((r) => r && r.name in SCREENS))
-      return saved.map((r, i) =>
-        make(i === saved.length - 1 ? SETTLED[r.name] || r.name : r.name, r.params || undefined),
-      );
+    const restored = restoreStack(JSON.parse(sessionStorage.getItem(STACK_KEY)), SCREENS, SETTLED);
+    if (restored) return restored;
   } catch {
     // 저장된 화면 기록을 읽을 수 없으면 처음부터 시작한다.
   }
@@ -98,7 +93,10 @@ export default function App() {
     const map = { [top.key]: enter };
     if (exitKey !== null) map[exitKey] = exitCls;
     setAnim(map);
-    if (ghost) setGhosts((g) => [...g, { route: ghost, cls: exitCls }]);
+    // 다음 화면 이동이 다시 그리기 전에 또 불려도(StrictMode의 effect 두 번 실행, 타이머와 클릭이 겹칠 때 등)
+    // 지금 스택을 기준으로 하도록 바로 바꿔 둔다. 그러지 않으면 같은 화면이 ghost로 두 번 들어가 key가 겹친다.
+    stackRef.current = next;
+    if (ghost) setGhosts((g) => addGhost(g, { route: ghost, cls: exitCls }, next));
     setStack(next);
     setBusy(true);
     window.setTimeout(() => {
