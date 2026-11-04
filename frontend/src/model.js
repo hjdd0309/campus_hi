@@ -303,7 +303,6 @@ export function createDepartment(
   picks = null,
   partner = false,
   partnerExample = false,
-  override = true,
 ) {
   // 예시 제휴("제휴하면 이렇게 보인다")인지. 예시도 제휴 대학과 똑같이 동작하고 표시만 다르다.
   // null은 예시 여부를 저장하기 전의 기록이라 아직 모른다는 뜻이다(학과 상세가 서버에서 다시 받아 채운다).
@@ -323,10 +322,10 @@ export function createDepartment(
   const final = groupFinal ? asFinal(groupFinal) : finals[finalFor(course, field.id)];
   const theoryYears = yearNumbers.slice(0, practice ? -2 : -1);
   // 학과 전용 체험(departmentData.js)이 있는 학년 자리. 졸업 과제 자리는 바꾸지 않는다.
-  // override가 false면 쓰지 않는다: 전용 체험이 생기기 전에 입학한 학과는 입학할 때 정한 수업을 그대로 둔다.
+  // 이미 입학한 학과도 불러올 때마다 지금 체험으로 다시 정한다(2026-11-04 결정).
   // 과목마다 출처(공시 교과목 또는 학교 편성표)에서 그 학년 과목으로 확인될 때만 쓴다(데이터가 바뀌어 확인되지 않으면 학과군 규칙으로 돌아간다).
   const studios = yearNumbers.map((year, i) => {
-    const studio = override && i < yearNumbers.length - 1 ? studioFor(school, course, year) : null;
+    const studio = i < yearNumbers.length - 1 ? studioFor(school, course, year) : null;
     return studio && studio.subjects.every((subject) => subjectConfirmed(subject, year, curriculum, yearly, studio.source)) ? studio : null;
   });
   // 공시 교과목 이름(별칭 포함)으로 견준다.
@@ -373,8 +372,6 @@ export function createDepartment(
     // 제휴 대학 여부. 화면에 "제휴 학교" 배지와(예시면) 서비스 예시 안내를 표시하는 데만 쓴다.
     partner: partner === true,
     partnerExample: example,
-    // 학과 전용 체험을 쓰는 학과인지(저장해 두고 다시 불러올 때 그대로 쓴다).
-    override: override === true,
     // 학년 자리마다 학과 전용 체험의 실제 과목들(없으면 null). 학년별 과목 목록에 과목마다 따로 보여 준다.
     slotSubjects: studios.map((studio) => studio?.subjects.map((subject) => subject.name) || null),
     lessons: [
@@ -390,7 +387,7 @@ export function createDepartment(
 }
 // 학년 자리의 학과 전용 체험(없으면 null).
 export const studioOf = (d, index) =>
-  d?.override && String(d.games?.[index] || "").startsWith("studio:") ? studioFor(d.school, d.name, d.yearNumbers[index]) : null;
+  String(d?.games?.[index] || "").startsWith("studio:") ? studioFor(d.school, d.name, d.yearNumbers[index]) : null;
 export function loadState(storage) {
   try {
     // stages: 저장 당시의 체험 단계 수. 0이면 지금 구조(학년별)로 저장된 데이터다.
@@ -429,8 +426,6 @@ export function loadState(storage) {
               d.picks,
               d.partner,
               "partnerExample" in d ? d.partnerExample : null,
-              // 전용 체험 여부를 저장하기 전의 기록: 이미 입학한 학과는 예전 수업을 그대로 두고, 둘러보기만 한 학과는 새 체험을 쓴다.
-              typeof d.override === "boolean" ? d.override : !Object.hasOwn(value.journeys || {}, `api:${d.school}:${d.name}`),
             ),
           )
       : [];

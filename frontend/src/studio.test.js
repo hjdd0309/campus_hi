@@ -247,15 +247,13 @@ test("저장된 결과는 형식이 맞는 것만 받고, 평균은 다시 계�
 
 // 경희대 산업디자인학과의 교과목(일부): 1학년 과목과 다른 학년 과목이 섞여 있다.
 const CURRICULUM = ["3D Design 1", "UX디자인", "기초산업디자인 1", "드로잉", "평면디자인", "산업디자인리서치", "서비스디자인", "입체디자인"];
-const make = (override) =>
-  createDepartment("산업디자인학과", "경희대학교", CURRICULUM, "예체능", null, "4년", "서울특별시", null, null, null, true, true, ...(override === undefined ? [] : [override]));
+const make = () => createDepartment("산업디자인학과", "경희대학교", CURRICULUM, "예체능", null, "4년", "서울특별시", null, null, null, true, true);
 
 test("학과 전용 체험: 경희대 산업디자인 1학년은 드로잉·평면디자인으로 투시 스케치와 색 맞추기를 한다", () => {
   assert.ok(studioFor("경희대학교", "산업디자인학과", 1), "1학년 전용 체험이 공개되어 있어야 한다");
   assert.equal(studioFor("경희대학교", "시각디자인학과", 1), null);
   assert.equal(studioFor("경희대학교", "산업디자인학과", 4), null);
   const d = make();
-  assert.equal(d.override, true);
   assert.equal(d.lessons[0], "드로잉 · 평면디자인");
   assert.equal(d.games[0], "studio:1");
   assert.ok(isGame("studio:1"));
@@ -275,7 +273,6 @@ test("학과 전용 체험: 경희대 산업디자인 1학년은 드로잉·평�
   // 다른 학교·학과는 바뀌지 않는다.
   const other = createDepartment("산업디자인학과", "다른대학교", CURRICULUM, "예체능", null, "4년");
   assert.ok(!other.games.some((game) => String(game).startsWith("studio:")));
-  assert.equal(other.override, true);
   // 교과목에 과목이 빠져 있으면 쓰지 않는다.
   // (학년마다 따로 본다: 3학년 과목이 있으면 3학년 전용 체험은 그대로 쓴다.)
   const missing = createDepartment("산업디자인학과", "경희대학교", CURRICULUM.filter((s) => s !== "평면디자인"), "예체능", null, "4년");
@@ -309,24 +306,20 @@ test("학과 전용 체험: 체험을 모두 마쳐야 완료되고, 결과는 �
   assert.deepEqual(half.results[key], [drawn, null]);
 });
 
-test("학과 전용 체험: 생기기 전에 입학한 학과는 입학할 때의 수업을 그대로 둔다", () => {
-  const before = make(false);
-  assert.equal(before.override, false);
-  assert.notEqual(before.lessons[0], "드로잉 · 평면디자인");
-  assert.ok(!before.games.some((game) => String(game).startsWith("studio:")));
-  // override 필드가 없던 예전 기록: 입학한 학과는 예전 수업, 둘러보기만 한 학과는 새 체험.
-  const { override, ...legacy } = JSON.parse(JSON.stringify(before));
-  const enrolled = loadState({
-    getItem: (name) => (name === STORAGE_KEY ? JSON.stringify({ catalog: [legacy], journeys: { [legacy.id]: { completed: 0, paused: false } } }) : null),
-  });
-  assert.equal(enrolled.catalog[0].override, false);
-  assert.equal(enrolled.catalog[0].lessons[0], before.lessons[0]);
-  const browsed = loadState({ getItem: (name) => (name === STORAGE_KEY ? JSON.stringify({ catalog: [legacy] }) : null) });
-  assert.equal(browsed.catalog[0].override, true);
-  assert.equal(browsed.catalog[0].lessons[0], "드로잉 · 평면디자인");
-  // 한번 정해진 값은 그대로 불러온다.
-  const kept = loadState({ getItem: (name) => (name === STORAGE_KEY ? JSON.stringify({ catalog: [JSON.parse(JSON.stringify(before))] }) : null) });
-  assert.equal(kept.catalog[0].override, false);
+test("학과 전용 체험: 전용 체험이 생기기 전에 입학해 예전 수업으로 저장된 학과도, 불러오면 지금 체험으로 바뀐다", () => {
+  const d = make();
+  // 예전 기록: override가 false로 저장되고 학년 자리가 예전 수업(이론 수업·학과군 실습)이던 학과.
+  const old = { ...JSON.parse(JSON.stringify(d)), override: false, lessons: ["산업디자인리서치", "산업디자인사", "디자인 실습", "졸업작품"], games: [null, null, "group:design", null] };
+  const stored = { catalog: [old], journeys: { [d.id]: { completed: 2, paused: false } } };
+  const loaded = loadState({ getItem: (name) => (name === STORAGE_KEY ? JSON.stringify(stored) : null) });
+  assert.equal(loaded.catalog[0].lessons[0], "드로잉 · 평면디자인");
+  assert.equal(loaded.catalog[0].games[0], "studio:1");
+  assert.ok(!("override" in loaded.catalog[0]));
+  // 진행도는 그대로다.
+  assert.equal(loaded.journeys[d.id].completed, 2);
+  // 둘러보기만 한 학과도 같다.
+  const browsed = loadState({ getItem: (name) => (name === STORAGE_KEY ? JSON.stringify({ catalog: [old] }) : null) });
+  assert.equal(browsed.catalog[0].games[0], "studio:1");
 });
 
 test("인터뷰: 열린 질문만 인사이트를 드러내고, 컨셉은 찾은 인사이트에 근거해야 한다", () => {
