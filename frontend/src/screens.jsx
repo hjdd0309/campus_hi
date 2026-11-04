@@ -49,6 +49,11 @@ import {
   electiveOf,
   electiveSubjects,
   saveElective,
+  electiveKey,
+  addArchive,
+  lessonBlock,
+  slotChanged,
+  archiveStaleSlot,
   departmentFrom,
   refreshDepartment,
   completedElectives,
@@ -1679,12 +1684,26 @@ export function Lesson({ active, nav, route, state, setState }) {
   const [shake, setShake] = useState(0);
   // 휴강 확인 창을 띄웠는지.
   const [skipping, setSkipping] = useState(false);
+  // 완료·휴강이 거절됐을 때 알려줄 이유(창으로 보여준다).
+  const [blocked, setBlocked] = useState("");
   const timer = useRef(0);
   const scroller = useRef(null);
   const heading = useRef(null);
   const moved = useRef(false);
   useGuard(ok, nav, active);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  // 앱을 연 직후의 교육과정 갱신(refreshEnrolled)으로 이 자리의 수업이나 체험이 바뀌면, 이 화면의 수업으로는 더 이상 완료할 수 없다.
+  // 쓰던 기록은 예전 수업 이름으로 archive에 남기고, 안내 창을 띄워 홈으로 돌려보낸다(바뀐 수업을 홈에서 다시 시작한다).
+  const latest = ok ? all(state).find((item) => item.id === v.d.id) : null;
+  const stale = ok && slotChanged(v.d, latest, v.index);
+  const draftNow = useRef(draft);
+  draftNow.current = draft;
+  useEffect(() => {
+    if (!stale) return;
+    window.clearTimeout(timer.current);
+    setSkipping(false);
+    setState((s) => archiveStaleSlot(s, v.d.id, v.index, v.d.lessons[v.index], draftNow.current, v.d.games?.[v.index] ?? null));
+  }, [stale, v, setState]);
   // 수업을 열었으면 시작한 것으로 기록한다(홈 버튼이 "이어하기"가 된다).
   useEffect(() => {
     if (key) setState((s) => markStarted(s, key));
@@ -1712,6 +1731,8 @@ export function Lesson({ active, nav, route, state, setState }) {
   const skip = () => {
     window.clearTimeout(timer.current);
     setSkipping(false);
+    // 지금 차례가 아니라 휴강이 거절되면 아무 일 없이 넘어가지 않고 이유를 알려준다.
+    if (skipLesson(state, d.id, index) === state) return setBlocked("지금 차례인 수업만 휴강할 수 있어요. 홈에서 다시 열어주세요.");
     setState((s) => skipLesson(draft ? { ...s, drafts: { ...s.drafts, [key]: draft } } : s, d.id, index));
     if (isFinal) nav.replace("grades", undefined, "fade");
     else nav.reset(["home"]);
@@ -1734,6 +1755,38 @@ export function Lesson({ active, nav, route, state, setState }) {
       건너뛴 과제는 성적표에 ‘미이수’로 남아요. 나중에 다시 들을 수 있어요.
     </Dialog>
   );
+  const goHome = () => nav.reset(["home"]);
+  const newLesson = latest?.lessons?.[index];
+  const staleDialog = stale && (
+    <Dialog
+      title="수업 내용이 새로 바뀌었어요"
+      onClose={goHome}
+      actions={
+        <button className="button" onClick={goHome}>
+          홈으로 가기
+        </button>
+      }
+    >
+      {newLesson && newLesson !== subject
+        ? `최신 교육과정에 맞춰 ${label} 수업이 ‘${newLesson}’ 수업으로 바뀌었어요.`
+        : `최신 교육과정에 맞춰 ‘${subject}’ 수업의 체험이 바뀌었어요.`}{" "}
+      홈에서 바뀐 수업을 다시 시작해주세요.{draft.trim() ? " 쓰던 기록은 마이페이지 리포트의 ‘이전 체험 기록’에 남겨 두었어요." : ""}
+    </Dialog>
+  );
+  const blockedDialog = !!blocked && (
+    <Dialog
+      title="완료하지 못했어요"
+      onClose={() => setBlocked("")}
+      actions={
+        <button className="button" onClick={goHome}>
+          홈으로 가기
+        </button>
+      }
+    >
+      {blocked}
+    </Dialog>
+  );
+  const overlay = staleDialog || blockedDialog || skipDialog;
   const skipButton = (className, style) =>
     retake ? null : (
       <button onClick={() => setSkipping(true)} className={`pressable text-[13px] text-gray underline underline-offset-[3px] ${className}`} style={style}>
@@ -1743,7 +1796,7 @@ export function Lesson({ active, nav, route, state, setState }) {
 
   if (isFinal && final.kind === "artwork")
     return (
-      <Screen overlay={skipDialog}>
+      <Screen overlay={overlay}>
         <Header title={d.name} count={`${index + 1}/${total}`} onBack={nav.back} />
         {skipButton("absolute right-[20px] top-[84px] z-20 h-[28px]")}
         <Rub
@@ -1751,7 +1804,10 @@ export function Lesson({ active, nav, route, state, setState }) {
           year={year}
           onQuit={nav.back}
           onDone={() => {
+            // 졸업작품은 마친 것으로 남기고, 수업 완료가 거절되면(지금 차례가 아님 등) 이유를 알려준다.
+            const reason = lessonBlock({ ...state, artworks: { ...state.artworks, [d.id]: true } }, d.id, index);
             setState((s) => completeLesson({ ...s, artworks: { ...s.artworks, [d.id]: true } }, d.id, index, ""));
+            if (reason) return setBlocked(reason);
             nav.replace("grades", undefined, "fade");
           }}
         />
@@ -1792,6 +1848,9 @@ export function Lesson({ active, nav, route, state, setState }) {
   };
   const finish = () => {
     if (!tried) return warn(mode === "plan" ? "계획서의 세 칸을 모두 채워주세요." : "먼저 직접 해보기를 끝까지 해보세요.");
+    // 완료가 거절되면(최신 데이터의 체험을 하지 않음, 지금 차례가 아님 등) 아무 일 없이 홈으로 가지 않고 이유를 보여준다.
+    const reason = lessonBlock(state, d.id, index);
+    if (reason) return warn(reason);
     // 느낀 점은 적지 않아도 된다. 비어 있으면 기록 없이 완료한다(건너뛰기).
     window.clearTimeout(timer.current);
     setState((s) => completeLesson(s, d.id, index, draft));
@@ -2021,7 +2080,7 @@ export function Lesson({ active, nav, route, state, setState }) {
   return (
     <Screen
       foot={700}
-      overlay={skipDialog}
+      overlay={overlay}
       footer={
         <>
           {/* 이전 단계(첫 단계에서는 없음)와 휴강. 주 버튼과 구분되게 글씨 버튼으로 둔다. */}
@@ -2097,7 +2156,18 @@ export function Elective({ active, nav, route, state, setState }) {
   useGuard(ok, nav, active, latestJourney(state) ? "home" : "splash");
   useEffect(() => () => window.clearTimeout(timer.current), []);
   // 관찰 과제는 화면을 여는 것만으로는 해본 것이 아니고, 직접 해보기 단계에 들어갔을 때 해본 것으로 기록한다.
-  const basicTried = ok && quiz.status === "basic" && reached >= 1 && !saved?.tried;
+  // 앱을 연 직후의 교육과정 갱신으로 이 과목이 선택 체험 목록에서 빠지면 더 이상 기록할 수 없다(saveElective가 거절한다).
+  // 마치지 않은 과목의 쓰던 기록은 리포트의 이전 체험 기록(archive)에 남기고, 안내 창을 띄워 홈으로 돌려보낸다.
+  const latest = ok ? all(state).find((item) => item.id === v.d.id) : null;
+  const gone = ok && !electiveSubjects(latest).includes(subject);
+  const draftNow = useRef(draft);
+  draftNow.current = draft;
+  useEffect(() => {
+    if (!gone) return;
+    window.clearTimeout(timer.current);
+    setState((s) => (electiveOf(s, v.d.id, subject)?.done ? s : addArchive(s, v.d.id, `${subject} · 선택 체험 기록`, draftNow.current)));
+  }, [gone, v, subject, setState]);
+  const basicTried = ok && !gone && quiz.status === "basic" && reached >= 1 && !saved?.tried;
   useEffect(() => {
     if (basicTried) setState((s) => saveElective(s, v.d.id, subject, { tried: true }));
   }, [basicTried, v, subject, setState]);
@@ -2133,10 +2203,29 @@ export function Elective({ active, nav, route, state, setState }) {
   };
   const finish = () => {
     if (!tried) return warn("먼저 직접 해보기를 끝까지 해보세요.");
+    // 저장이 거절되면(목록에서 빠진 과목, 직접 해보기를 하지 않음) 아무 일 없이 돌아가지 않고 이유를 보여준다.
+    const next = saveElective(state, d.id, subject, { note: draft, done: true });
+    if (next === state) return warn("이 과목은 지금 선택 체험으로 열 수 없어요. 홈에서 다시 골라주세요.");
+    if (!next.electives[electiveKey(d.id, subject)]?.done) return warn("먼저 직접 해보기를 끝까지 해보세요.");
     window.clearTimeout(timer.current);
     setState((s) => saveElective(s, d.id, subject, { note: draft, done: true }));
     nav.back();
   };
+  const goHome = () => nav.reset(["home"]);
+  const goneDialog = gone && (
+    <Dialog
+      title="과목 정보가 새로 바뀌었어요"
+      onClose={goHome}
+      actions={
+        <button className="button" onClick={goHome}>
+          홈으로 가기
+        </button>
+      }
+    >
+      {`최신 교육과정에서 ‘${subject}’ 과목이 선택 체험 목록에서 빠졌어요. 홈에서 다른 과목을 골라주세요.`}
+      {draft.trim() && !saved?.done ? " 쓰던 기록은 마이페이지 리포트의 ‘이전 체험 기록’에 남겨 두었어요." : ""}
+    </Dialog>
+  );
   const written = !!draft.trim();
 
   let body;
@@ -2250,6 +2339,7 @@ export function Elective({ active, nav, route, state, setState }) {
   return (
     <Screen
       foot={700}
+      overlay={goneDialog}
       footer={
         <>
           <div className="absolute inset-x-[20px] top-[708px] flex h-[36px] items-center">

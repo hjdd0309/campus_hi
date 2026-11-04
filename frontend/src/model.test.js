@@ -42,6 +42,10 @@ import {
   departmentFrom,
   refreshDepartment,
   refreshEnrolled,
+  lessonBlock,
+  slotChanged,
+  archiveStaleSlot,
+  addArchive,
 } from "./model.js";
 
 const TOTAL = departments[0].lessons.length;
@@ -1178,4 +1182,82 @@ test("입학한 학과만 앱 실행당 한 번 다시 받고, 받지 못하면 
   assert.deepEqual(asked, ["기계공학과"]);
   assert.ok(state.catalog.find((d) => d.id === stale.id).yearly);
   assert.deepEqual(state.journeys[stale.id], { completed: 2, paused: false });
+});
+
+// 앱을 연 직후의 갱신과 열려 있는 수업이 어긋나는 경우(2026-11-04).
+const nurse = () => createDepartment("간호학과", "가나대학교", ["기본간호학", "성인간호학", "아동간호학"], "의학", null, "4년", "", { 기본간호학: "blank" });
+
+test("갱신으로 자리의 체험이 바뀐 뒤에는 옛 체험으로 완료되지 않고, 이유를 알려주며 옛 기록은 archive로 간다", () => {
+  const d = nurse();
+  const key = `${d.id}-0`;
+  const oldGame = d.games[0];
+  assert.equal(oldGame, "blank");
+  const base = { ...structuredClone(initialState), catalog: [d], journeys: { [d.id]: { completed: 0, paused: false } }, drafts: { [key]: "쓰던 기록" } };
+  // 갱신: 같은 자리의 체험이 바뀐다(수업 이름이 바뀌는 경우도 같다).
+  const fresh = { ...d, games: ["ox", ...d.games.slice(1)] };
+  const renamed = { ...d, lessons: ["바뀐 수업", ...d.lessons.slice(1)] };
+  assert.equal(slotChanged(d, fresh, 0), true);
+  assert.equal(slotChanged(d, renamed, 0), true);
+  assert.equal(slotChanged(d, d, 0), false);
+  assert.equal(slotChanged(d, undefined, 0), true);
+  let s = refreshDepartment(base, fresh);
+  // 갱신 뒤에 열려 있던 옛 화면이 옛 체험을 끝냈다.
+  s = { ...s, plays: { ...s.plays, [key]: { game: oldGame, summary: "빈칸 3개" } } };
+  // 완료는 거절되고(상태 그대로), 화면이 보여줄 이유가 있다.
+  assert.equal(completeLesson(s, d.id, 0, "기록"), s);
+  assert.equal(lessonBlock(s, d.id, 0), "먼저 직접 해보기를 끝까지 해보세요.");
+  // 옛 화면을 닫으며 쓰던 기록을 예전 수업 이름으로 남기고, 옛 체험 기록은 지운다(새 체험에 붙지 않게).
+  const closed = archiveStaleSlot(s, d.id, 0, d.lessons[0], "쓰던 기록 더 씀", oldGame);
+  assert.equal(closed.plays[key], undefined);
+  assert.deepEqual(closed.archive.at(-1), { id: d.id, title: d.lessons[0], note: "쓰던 기록 더 씀" });
+  assert.deepEqual(closed.journeys, base.journeys);
+  // 같은 기록을 다시 남기지 않는다.
+  assert.equal(archiveStaleSlot(closed, d.id, 0, d.lessons[0], "쓰던 기록 더 씀", oldGame), closed);
+  // 새 체험을 해보면 완료된다.
+  const replayed = { ...closed, plays: { ...closed.plays, [key]: { game: "ox", summary: "" } } };
+  assert.equal(lessonBlock(replayed, d.id, 0), "");
+  assert.equal(completeLesson(replayed, d.id, 0, "").journeys[d.id].completed, 1);
+});
+
+test("갱신으로 이름은 같고 체험만 바뀐 자리는 기록을 두고 옛 체험 기록(plays)만 지운다", () => {
+  const d = nurse();
+  const key = `${d.id}-0`;
+  const base = {
+    ...structuredClone(initialState),
+    catalog: [d],
+    journeys: { [d.id]: { completed: 1, paused: false } },
+    notes: { [key]: "남긴 기록" },
+    plays: { [key]: { game: "blank", summary: "" }, [`${d.id}-1`]: { game: "x", summary: "" } },
+  };
+  const s = refreshDepartment(base, { ...d, games: ["ox", ...d.games.slice(1)] });
+  assert.equal(s.notes[key], "남긴 기록");
+  assert.equal(s.plays[key], undefined);
+  assert.deepEqual(s.plays[`${d.id}-1`], base.plays[`${d.id}-1`]);
+  assert.deepEqual(s.archive, []);
+});
+
+test("자리가 그대로면 갱신 중에도 열려 있던 수업이 정상 완료된다", () => {
+  const d = nurse();
+  const key = `${d.id}-0`;
+  const base = { ...structuredClone(initialState), catalog: [d], journeys: { [d.id]: { completed: 0, paused: false } } };
+  // 갱신: 학년 자료만 새로 생기고 학년 자리는 그대로다.
+  const fresh = { ...d, yearly: { subjects: { 기본간호학: 1 }, names: {}, extra: {}, source_url: "", curriculum_year: null, checked_at: "" } };
+  assert.equal(slotChanged(d, fresh, 0), false);
+  let s = refreshDepartment(base, fresh);
+  assert.notEqual(s, base);
+  s = { ...s, plays: { [key]: { game: d.games[0], summary: "빈칸 3개" } } };
+  assert.equal(lessonBlock(s, d.id, 0), "");
+  const done = completeLesson(s, d.id, 0, "기록");
+  assert.equal(done.journeys[d.id].completed, 1);
+  assert.equal(done.notes[key], "기록");
+  // 지금 차례가 아닌 자리는 이유를 알려준다.
+  assert.match(lessonBlock(done, d.id, 0), /지금 차례/);
+});
+
+test("이전 체험 기록은 빈 기록과 같은 기록을 넣지 않는다", () => {
+  const s = { ...structuredClone(initialState), archive: [] };
+  assert.equal(addArchive(s, "a", "과목", "  "), s);
+  const one = addArchive(s, "a", "과목 · 선택 체험 기록", "기록");
+  assert.deepEqual(one.archive, [{ id: "a", title: "과목 · 선택 체험 기록", note: "기록" }]);
+  assert.equal(addArchive(one, "a", "과목 · 선택 체험 기록", "기록"), one);
 });

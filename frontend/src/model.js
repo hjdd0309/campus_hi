@@ -648,27 +648,56 @@ export function recommend(keywords, answers) {
   const scores = recommendationScores(keywords, answers);
   return [...fields].sort((a, b) => scores[b.id] - scores[a.id]);
 }
-export function completeLesson(state, id, index, note) {
-  const journey = state.journeys[id];
-  const department = [...departments, ...(state.catalog || [])].find(
-    (d) => d.id === id,
-  );
+// 수업을 지금 완료할 수 없는 이유(사용자에게 보여줄 문장). 완료할 수 있으면 빈 문자열이다.
+// completeLesson은 이유가 있으면 상태를 바꾸지 않으므로, 화면은 이 함수로 이유를 알려준다(아무 일 없이 넘어가지 않게).
+export function lessonBlock(state, id, index) {
+  const journey = state.journeys?.[id];
+  const department = [...departments, ...(state.catalog || [])].find((d) => d.id === id);
   const total = department?.lessons.length || 0;
   // 마지막 학년은 졸업 과제(작품 또는 계획서)를 마쳐야 완료된다.
-  if (department && index === total - 1 && !finalReady(state, department))
-    return state;
-  // 미니게임이 있는 수업은 게임을 해본 뒤에만 완료할 수 있다.
+  if (department && index === total - 1 && !finalReady(state, department)) return "졸업 과제를 먼저 끝까지 해주세요.";
+  // 미니게임이 있는 수업은 게임을 해본 뒤에만 완료할 수 있다. 최신 학과 데이터의 체험과 같은 체험이어야 한다.
   const game = state.catalog?.some((d) => d.id === id) ? department.games?.[index] : undefined;
-  if (game && state.plays?.[`${id}-${index}`]?.game !== game) return state;
+  if (game && state.plays?.[`${id}-${index}`]?.game !== game) return "먼저 직접 해보기를 끝까지 해보세요.";
   // 지금 차례인 자리이거나, 휴강해서 미이수로 남긴 자리(다시 듣기)만 완료할 수 있다.
+  if (!journey || journey.paused || index >= total || (journey.completed !== index && !isSkipped(journey, index)))
+    return "지금 차례인 수업이 아니라 완료할 수 없어요. 홈에서 다시 열어주세요.";
+  return "";
+}
+// 갱신 전후 학과에서 그 학년 자리의 수업(이름)이나 체험(game)이 바뀌었는지. 갱신된 학과가 없어도 바뀐 것으로 본다.
+export const slotChanged = (before, after, index) =>
+  !after || before?.lessons?.[index] !== after.lessons?.[index] || (before?.games?.[index] ?? null) !== (after.games?.[index] ?? null);
+// 열려 있던 수업의 자리가 갱신으로 바뀌었을 때, 그 화면에서 쓰던 기록(text)을 예전 수업 이름(title)으로 archive에 남긴다.
+// 갱신 뒤에 옛 화면이 저장한 그 자리의 쓰던 기록·해본 체험(옛 game)은 새 수업 것이 아니므로 지운다. 같은 기록은 두 번 넣지 않는다.
+export function archiveStaleSlot(state, id, index, title, text, oldGame) {
+  const key = `${id}-${index}`;
+  const note = typeof text === "string" ? text.slice(0, 3000) : "";
+  const entry = { id, title: String(title || "").slice(0, 60), note };
+  const archive = state.archive || [];
+  const known = archive.some((item) => item.id === entry.id && item.title === entry.title && item.note === entry.note);
+  const { [key]: draft, ...drafts } = state.drafts || {};
+  const { [key]: play, ...plays } = state.plays || {};
+  const dropDraft = draft !== undefined && draft === text;
+  const dropPlay = !!play && (play.game ?? null) === (oldGame ?? null);
+  if ((!note.trim() || known) && !dropDraft && !dropPlay) return state;
+  return {
+    ...state,
+    archive: note.trim() && !known ? [...archive, entry] : archive,
+    drafts: dropDraft ? drafts : state.drafts,
+    plays: dropPlay ? plays : state.plays,
+  };
+}
+// 리포트의 이전 체험 기록(archive)에 하나를 남긴다. 빈 기록과 이미 있는 같은 기록은 넣지 않는다.
+export function addArchive(state, id, title, note) {
+  const entry = { id, title: String(title || "").slice(0, 60), note: typeof note === "string" ? note.slice(0, 3000) : "" };
+  const archive = state.archive || [];
+  if (!entry.note.trim() || archive.some((item) => item.id === entry.id && item.title === entry.title && item.note === entry.note)) return state;
+  return { ...state, archive: [...archive, entry] };
+}
+export function completeLesson(state, id, index, note) {
+  if (lessonBlock(state, id, index)) return state;
+  const journey = state.journeys[id];
   const retake = isSkipped(journey, index);
-  if (
-    !journey ||
-    journey.paused ||
-    (journey.completed !== index && !retake) ||
-    index >= total
-  )
-    return state;
   // 느낀 점은 적지 않아도 완료할 수 있다(건너뛰기). 적었으면 기록으로 남긴다.
   const { [`${id}-${index}`]: finished, ...drafts } = state.drafts || {};
   return {
@@ -711,13 +740,22 @@ export function refreshDepartment(state, fresh) {
   const old = (state.catalog || []).find((item) => item.id === fresh?.id);
   if (!old || JSON.stringify(old) === JSON.stringify(fresh)) return state;
   const changed = [];
-  for (let i = 0; i < Math.max(old.lessons.length, fresh.lessons.length); i++) if (old.lessons[i] !== fresh.lessons[i]) changed.push(i);
+  // 수업 이름은 같고 체험(game)만 바뀐 자리: 기록은 같은 과목이라 그대로 두고, 옛 체험으로 해본 기록(plays)만 지운다
+  // (옛 체험 기록이 남으면 새 체험을 하지 않아도 기록 단계부터 열린다).
+  const gameOnly = [];
+  for (let i = 0; i < Math.max(old.lessons.length, fresh.lessons.length); i++)
+    if (old.lessons[i] !== fresh.lessons[i]) changed.push(i);
+    else if (slotChanged(old, fresh, i)) gameOnly.push(i);
   const next = { ...state, catalog: state.catalog.map((item) => (item.id === fresh.id ? fresh : item)) };
+  if (gameOnly.some((i) => state.plays?.[`${fresh.id}-${i}`])) {
+    next.plays = { ...state.plays };
+    for (const i of gameOnly) delete next.plays[`${fresh.id}-${i}`];
+  }
   if (!changed.length) return next;
   const archive = [...(state.archive || [])];
   const notes = { ...state.notes };
   const drafts = { ...state.drafts };
-  const plays = { ...state.plays };
+  const plays = { ...next.plays };
   const results = { ...state.results };
   const started = { ...state.started };
   for (const i of changed) {
