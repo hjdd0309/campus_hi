@@ -106,6 +106,7 @@
 - `frontend/` : React + Vite + Tailwind CSS 화면. 디자인과 모션은 처음 만든 Figma Make 시안을 따릅니다(화면 `src/screens.jsx`, 공용 부품 `src/ui.jsx`, 화면 전환 `src/App.jsx`, 색·모션 `src/index.css`).
 - `backend/` : FastAPI 서버와 학과 데이터(`data/courses.csv.gz`, 출처는 `backend/SOURCE.md`)
 - `scripts/dev.mjs` : 개발 환경 준비와 실행
+- `pipelines/course_activity/` : 과목 활동 정보 수집의 입력(강의계획서)과 결과(아래 "과목 활동 정보 수집")
 
 ## 개발
 
@@ -121,7 +122,7 @@ npm run build    # 프런트 프로덕션 빌드
 
 ```
 backend/.venv/Scripts/python -m pip install -r backend/requirements-test.txt -r backend/requirements-pipeline.txt
-backend/.venv/Scripts/python -m unittest backend.test_api backend.test_pipeline backend.test_lesson_games
+backend/.venv/Scripts/python -m unittest backend.test_api backend.test_pipeline backend.test_lesson_games backend.test_subject_levels backend.test_course_activity
 ```
 
 ## 운영 배포
@@ -179,6 +180,23 @@ backend/.venv/Scripts/python -m backend.pipeline import backend/data/year_import
 단과대 전체 교육과정처럼 한 PDF에 여러 학과가 들어 있고 100쪽이 넘으면, `collect`가 학과 이름이 나오는 쪽(과 그 다음 쪽)만 골라 보냅니다(`pypdf`, `requirements-pipeline.txt`).
 
 수집 결과는 서버를 다시 띄우거나 다시 배포해야 반영됩니다.
+
+## 과목 활동 정보 수집
+
+학과 게임을 설계할 때 쓰는 자료입니다. 안 들어본 과목도 "학생이 수업에서 실제로 하는 활동"을 알 수 있게, 과목마다 활동을 근거(URL·근거 문장)와 함께 모아 8개 활동 유형(코드 작성·디버깅, 계산·증명, 실험·측정·보고서, 설계·제도, 데이터 분석, 창작·제작, 사례 분석·토론·발표, 실기·임상)으로 나눕니다. 서비스 화면에는 나가지 않고, 팀원이 검토한 뒤 게임 설계 입력으로 씁니다. 도구는 `backend/course_activity.py`이고 `ANTHROPIC_API_KEY`가 필요합니다(`--dry-run`과 `report`는 필요 없음).
+
+```
+backend/.venv/Scripts/python -m backend.course_activity run --school 경희대학교 --course 컴퓨터공학과 --dry-run             # 대상 과목과 예상 호출 수·비용만
+backend/.venv/Scripts/python -m backend.course_activity run --school 경희대학교 --course 컴퓨터공학과 --max-courses 3 --budget-usd 2
+backend/.venv/Scripts/python -m backend.course_activity report --school 경희대학교 --course 컴퓨터공학과                   # 호출 없이 리포트만 다시
+```
+
+`--course`는 학과 이름의 일부만 적어도 그 이름이 들어간 학과가 하나뿐이면 찾습니다. 과목명은 표기만 다른 것(자료구조/자료구조론/데이터구조, 끝의 번호)을 묶어 묶음마다 한 번씩 처리합니다. 순서는 1차 분류(검색 없이 강의계획서·과목명으로) → 2차 검색(1차 신뢰도가 낮음·중간인 묶음만, `claude-opus-5-5` + 웹 검색) → 검증 → 리포트입니다. 검증에서는 근거 URL·근거 문장이 없거나, 그 검색에서 실제로 나온 주소가 아니거나, 근거 문장이 그 페이지에 그대로 있지 않으면 버리고, 남은 항목은 다른 모델(`claude-sonnet-5-5`)이 근거와 주장이 맞는지 대조합니다. 신뢰도는 서로 다른 학교 2곳 이상의 결과물(강의계획서 제외)이 같은 활동 유형을 보여줄 때만 "높음", 결과물이 하나라도 있으면 "중간", 강의계획서뿐이면 "낮음"입니다. 강의계획서가 없으면 1차 분류는 늘 "낮음"이라 모든 묶음이 검색 단계로 갑니다.
+
+- 강의계획서: 포털 로그인이 필요해 자동으로 모으지 않습니다. 팀원이 `pipelines/course_activity/inputs/syllabi/학교_학과/`(학과 이름의 공백은 `_`)에 과목명으로 된 txt·pdf(예: `자료구조.txt`)를 넣으면 씁니다. 이 폴더는 저장소에 올리지 않습니다(`.gitignore`).
+- 결과: `pipelines/course_activity/outputs/학교_학과/`의 `courses_normalized.json`(묶음), `stage1_classification.jsonl`, `stage2_search.jsonl`(검색 결과와 실제로 나온 주소, 페이지 글은 저장 안 함), `verify.jsonl`(검증 결과와 버린 항목·이유), `final.jsonl`(검증 통과), `review.csv`(팀원 검토용, 마지막 두 칸 `팀원_판정`·`팀원_메모`는 비워 둠), `summary.md`(유형 분포, 출처 종류 비율, 근거 부족 과목, 호출 수와 비용).
+- 다시 돌리면 끝난 묶음은 건너뛰고 오류 난 묶음만 다시 합니다. `--budget-usd`는 다음 호출의 예상 비용을 더해 넘으면 그 앞에서 멈춥니다(예상치는 파일 위쪽 `ESTIMATE`).
+- 에브리타임·카페·SNS 같은 로그인 사이트와 영상 사이트는 검색·열람에서 막고(`BLOCKED`), 학생 코드·글은 원문을 저장하지 않습니다(요약, URL, 300자 이하 근거 문장만).
 
 ## 수업 연습 문제
 

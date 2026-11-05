@@ -13,3 +13,5 @@ __pycache__/
 *.pyc
 backend/.cache/
 .env*
+# 팀원이 포털에서 받아 넣는 강의계획서(로그인 필요 자료라 저장소에 올리지 않음)
+pipelines/course_activity/inputs/syllabi/
