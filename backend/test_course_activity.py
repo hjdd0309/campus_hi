@@ -18,6 +18,13 @@ PAGES = {
     "https://blog.example.com/y": ["전혀 다른 내용만 있는 페이지입니다."],
 }
 FETCHED = {"https://blog.example.com/x": f"<글> {QUOTE_B.replace(' ', '  ')} 끝", "https://blog.example.com/y": "직접 받아도 다른 내용만 있습니다."}
+DOC_URL = "https://ce.example.ac.kr/curriculum.pdf"
+DOC_TEXT = (
+    "교육과정 편성표\n순번 교과목명 학수번호 학점\n1 자료구조 CSE101 3\n2 알고리즘 CSE102 3\n" + "표 " * 80
+    + "\n교과목 해설\n∙ 자료구조 (Data Structures)\n리스트, 스택, 큐, 트리를 배우고 과제 1: 이진 탐색 트리를 구현한다. 기말고사로 평가한다.\n"
+    + "∙ 알고리즘 (Algorithms)\n정렬과 탐색 알고리즘을 분석한다.\n" + "끝 " * 50
+)
+FETCHED[DOC_URL] = DOC_TEXT
 SCHOOLS = {"https://github.com/a/ds": "가대학교", "https://blog.example.com/x": "나대학교"}
 
 
@@ -48,8 +55,9 @@ SEARCH_RESULT = {
 
 
 class Fake:
-    def __init__(self, stage1_level="낮음", search_error=None, judge_reject=()):
+    def __init__(self, stage1_level="낮음", search_error=None, judge_reject=(), docs=()):
         self.calls = []
+        self.docs = list(docs)
         self.stage1_level = stage1_level
         self.search_error = search_error
         self.judge_reject = set(judge_reject)
@@ -57,9 +65,13 @@ class Fake:
     def classify(self, prompt):
         self.calls.append("stage1")
         evidence = []
-        if "[파일: 자료구조.txt]" in prompt:
-            evidence = [{"내용": "트리 구현 과제", "유형": ["코드 작성·디버깅"], "파일": "자료구조.txt", "근거_문장": "과제 1: 이진 탐색 트리를 구현한다."}]
+        if f"[문서: {DOC_URL}" in prompt:
+            evidence = [{"내용": "트리 구현 과제", "유형": ["코드 작성·디버깅"], "문서_URL": DOC_URL, "근거_문장": "과제 1: 이진 탐색 트리를 구현한다."}]
         return {"활동_유형": ["코드 작성·디버깅", "없는 유형"], "신뢰도": self.stage1_level, "판단_근거": "과목명", "근거": evidence}, usage()
+
+    def find_syllabus(self, prompt):
+        self.calls.append("stage0")
+        return {"찾음": bool(self.docs), "문서": [dict(doc) for doc in self.docs]}, usage(), None
 
     def search(self, prompt):
         self.calls.append("stage2")
@@ -81,13 +93,12 @@ class CourseActivityTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
         self.out = Path(self.folder.name) / "out"
-        self.syllabi = Path(self.folder.name) / "syllabi"
 
     def tearDown(self):
         self.folder.cleanup()
 
     def run_pipeline(self, client, **options):
-        return ca.run(SCHOOL, COURSE, client=client, out_dir=self.out, syllabus_dir=self.syllabi, fetcher=FETCHED.get, today="2026-11-05", log=lambda line: None, **options)
+        return ca.run(SCHOOL, COURSE, client=client, out_dir=self.out, fetcher=FETCHED.get, today="2026-11-05", log=lambda line: None, **options)
 
     def test_group_key_merges_notation_variants_only(self):
         self.assertEqual({ca.group_key(name) for name in ("자료구조", "자료구조론", "데이터구조", "자료 구조", "자료구조(Data Structures)")}, {"자료구조"})
@@ -124,6 +135,7 @@ class CourseActivityTests(unittest.TestCase):
         self.assertEqual(ca.parse_json(text)["과목명"], "나")
         with self.assertRaises(ValueError):
             ca.parse_json("JSON이 없는 답")
+        self.assertEqual(ca.parse_json('{"문서": [], "찾음": false}', "문서")["찾음"], False)
 
     def test_evidence_collects_search_fetch_and_citation_pages(self):
         blocks = [
@@ -172,7 +184,7 @@ class CourseActivityTests(unittest.TestCase):
     def test_run_writes_verified_results_and_reports(self):
         client = Fake()
         self.run_pipeline(client, max_courses=2)
-        self.assertEqual(client.calls, ["stage1", "stage2", "verify"] * 2)
+        self.assertEqual(client.calls, ["stage0", "stage1", "stage2", "verify"] * 2)
         finals = [json.loads(line) for line in (self.out / "final.jsonl").read_text(encoding="utf-8").splitlines()]
         self.assertEqual(len(finals), 2)
         first = finals[0]
@@ -198,13 +210,14 @@ class CourseActivityTests(unittest.TestCase):
         summary = (self.out / "summary.md").read_text(encoding="utf-8")
         self.assertIn("| 코드 작성·디버깅 | 2 |", summary)
         self.assertIn("검색에서 나오지 않은 주소: 2개", summary)
-        self.assertIn("| 합계 | | 6 |", summary)
-        self.assertIn("$0.05", summary)
+        self.assertIn("| 합계 | | 8 |", summary)
+        self.assertIn("| 합계 | | 8 | | | | $0.07 |", summary)
+        self.assertIn("가상/증강현실이론및실습: 찾지 못함", summary)
 
         # 다시 돌리면 처리한 묶음은 건너뛴다.
         again = Fake()
         self.run_pipeline(again, max_courses=2)
-        self.assertEqual(again.calls, ["stage1", "stage2", "verify"] * 2)
+        self.assertEqual(again.calls, ["stage0", "stage1", "stage2", "verify"] * 2)
         self.assertEqual(len((self.out / "final.jsonl").read_text(encoding="utf-8").splitlines()), 4)
 
     def test_rejected_claims_and_no_evidence_keep_low_confidence(self):
@@ -220,24 +233,25 @@ class CourseActivityTests(unittest.TestCase):
 
     def test_dry_run_makes_no_calls(self):
         lines = []
-        ca.run(SCHOOL, COURSE, client=None, dry_run=True, out_dir=self.out, syllabus_dir=self.syllabi, log=lines.append)
+        ca.run(SCHOOL, COURSE, client=None, dry_run=True, out_dir=self.out, log=lines.append)
         self.assertFalse(self.out.exists())
         text = "\n".join(lines)
         self.assertIn("교과목 77개 · 묶음 74개", text)
+        self.assertIn("강의계획서 탐색 74회", text)
         self.assertIn("2차 검색 74회", text)
         self.assertIn("호출하지 않았습니다", text)
 
     def test_budget_stops_before_a_call_would_exceed_it(self):
         client = Fake()
-        self.run_pipeline(client, budget_usd=0.05)
-        # 1차 분류(예상 $0.03)는 되지만, 검색(예상 $0.45)을 더하면 넘으므로 그 앞에서 멈춘다.
-        self.assertEqual(client.calls, ["stage1"])
+        self.run_pipeline(client, budget_usd=0.3)
+        # 강의계획서 탐색(예상 $0.25)과 1차 분류(예상 $0.03)는 되지만, 검색(예상 $0.45)을 더하면 넘으므로 그 앞에서 멈춘다.
+        self.assertEqual(client.calls, ["stage0", "stage1"])
         self.assertTrue((self.out / "stage1_classification.jsonl").exists())
         self.assertTrue((self.out / "summary.md").exists())
 
     def test_failures_are_recorded_and_retried(self):
         self.run_pipeline(Fake(search_error=RuntimeError("검색 실패")), max_courses=1)
-        state = ca.Run(SCHOOL, COURSE, self.out, self.syllabi)
+        state = ca.Run(SCHOOL, COURSE, self.out)
         self.assertIn("검색 실패", state.stage2[state.order[0]]["error"])
         self.assertNotIn(state.order[0], state.verify)
         retry = Fake()
@@ -250,23 +264,58 @@ class CourseActivityTests(unittest.TestCase):
         with self.assertRaises(AuthenticationError):
             self.run_pipeline(Fake(search_error=AuthenticationError("키 없음")), max_courses=1)
 
-    def test_syllabus_can_skip_search_but_alone_stays_low(self):
-        self.syllabi.mkdir()
-        (self.syllabi / "자료구조.txt").write_text("평가: 과제 1: 이진 탐색 트리를 구현한다. 기말고사.", encoding="utf-8")
-        (self.syllabi / "없는과목.txt").write_text("내용", encoding="utf-8")
-        client = Fake(stage1_level="높음")
-        state = ca.Run(SCHOOL, COURSE, self.out, self.syllabi)
-        self.assertEqual(state.unmatched_files, ["없는과목.txt"])
+    def test_found_syllabus_can_skip_search_but_alone_stays_low(self):
+        doc = {"문서_URL": DOC_URL, "문서_종류": "교과목해설", "추출_텍스트_요약": "트리 구현 과제가 있다."}
+        client = Fake(stage1_level="높음", docs=[doc])
+        state = ca.Run(SCHOOL, COURSE, self.out)
         key = ca.group_key("자료구조")
         state.process(client, key, ca.Budget(), "2026-11-05", FETCHED.get, log=lambda line: None)
-        self.assertEqual(client.calls, ["stage1", "verify"])
+        self.assertEqual(client.calls, ["stage0", "stage1", "verify"])
+        record = state.stage0[key]
+        self.assertEqual((record["찾음"], record["학교"], record["학과"], record["문서"][0]["문서_URL"]), (True, SCHOOL, COURSE, DOC_URL))
+        # 표의 칸이 아니라 해설 문단 둘레를 발췌한다.
+        self.assertIn("이진 탐색 트리를 구현한다", record["문서"][0]["원문_발췌"])
         final = state.verify[key]["final"]
-        self.assertEqual((final["신뢰도"], final["실제_활동"][0]["출처_종류"], final["실제_활동"][0]["근거_URL"]), ("낮음", "강의계획서", "강의계획서:자료구조.txt"))
-        # 강의계획서가 없는 과목은 모델이 높음이라 해도 낮음으로 두고 검색한다.
+        self.assertEqual((final["신뢰도"], final["실제_활동"][0]["출처_종류"], final["실제_활동"][0]["근거_URL"]), ("낮음", "강의계획서", DOC_URL))
+        # 강의계획서를 못 찾은 과목은 모델이 높음이라 해도 낮음으로 두고 검색한다.
         other = Fake(stage1_level="높음")
         state.process(other, ca.group_key("알고리즘"), ca.Budget(), "2026-11-05", FETCHED.get, log=lambda line: None)
+        self.assertFalse(state.stage0[ca.group_key("알고리즘")]["찾음"])
         self.assertEqual(state.stage1[ca.group_key("알고리즘")]["result"]["신뢰도"], "낮음")
-        self.assertEqual(other.calls, ["stage1", "stage2", "verify"])
+        self.assertEqual(other.calls, ["stage0", "stage1", "stage2", "verify"])
+        state.save()
+        self.assertTrue((self.out / "stage0_syllabus.jsonl").exists())
+
+    def test_course_excerpt_uses_whole_short_documents_and_description_in_long_ones(self):
+        self.assertEqual(ca.tidy("강좌명 | 자료구조 | 자료구조 | 교강사명\n\n  평가   방법 "), "강좌명 | 자료구조 | 교강사명\n평가 방법")
+        short = "2024학년도 강의계획서\n강좌명 | 자료구조 | 자료구조\n" + "주별 내용 " * 100
+        self.assertEqual(ca.course_excerpt(short, ["자료구조"]), ca.tidy(short))
+        self.assertIsNone(ca.course_excerpt(short, ["알고리즘"]))
+        long = "1 자료구조 CSE101 3\n" + "표 칸\n" * 3000 + "∙ 자료구조 (Data Structures)\n리스트와 트리를 배우고 이진 탐색 트리를 직접 구현하는 과제를 한다.\n" + "끝\n" * 3000
+        excerpt = ca.course_excerpt(long, ["자료구조"])
+        self.assertIn("이진 탐색 트리를 직접 구현", excerpt)
+        self.assertLess(len(excerpt), ca.SYLLABUS_BEFORE + ca.SYLLABUS_AFTER + 10)
+        # 로그인 없이 강의계획서를 보여 주는 수강신청 사이트는 막지 않는다.
+        self.assertFalse(ca.login_page("https://sugang.khu.ac.kr/core?attribute=lectPlan&loginYn=N"))
+        self.assertTrue(ca.login_page("https://e-campus.khu.ac.kr/course/1"))
+
+    def test_check_documents_keeps_only_open_pages_naming_the_course(self):
+        group = {"names": ["자료구조"], "name": "자료구조"}
+        fetched = {DOC_URL: DOC_TEXT, "https://dept.example.ac.kr/other": "다른 과목만 있는 문서 " * 30, "https://dept.example.ac.kr/short": "로그인이 필요합니다"}
+        docs = [
+            {"문서_URL": DOC_URL, "문서_종류": "교과목해설", "추출_텍스트_요약": "요약"},
+            {"문서_URL": DOC_URL + "#again", "문서_종류": "교과목해설", "추출_텍스트_요약": "같은 문서"},
+            {"문서_URL": "https://portal.example.ac.kr/syllabus?id=1", "문서_종류": "강의계획서", "추출_텍스트_요약": ""},
+            {"문서_URL": "https://dept.example.ac.kr/other", "문서_종류": "교과목해설", "추출_텍스트_요약": ""},
+            {"문서_URL": "https://dept.example.ac.kr/short", "문서_종류": "강의계획서", "추출_텍스트_요약": ""},
+            {"문서_URL": "https://dept.example.ac.kr/gone", "문서_종류": "없는종류", "추출_텍스트_요약": ""},
+        ]
+        kept, dropped = ca.check_documents({"문서": docs}, group, fetched.get)
+        self.assertEqual([doc["문서_URL"] for doc in kept], [DOC_URL])
+        self.assertEqual([drop["이유"] for drop in dropped], ["같은 문서", "로그인 필요 페이지", "문서에 과목명이 없음", "내용 없음(로그인·스크립트 페이지일 수 있음)", "문서를 열 수 없음"])
+        # 직접 받지 못해도 검색 도구가 받은 본문이 있으면 쓴다.
+        kept, _ = ca.check_documents({"문서": [docs[-1]]}, group, lambda url: None, {"https://dept.example.ac.kr/gone": [DOC_TEXT]})
+        self.assertEqual(kept[0]["문서_종류"], "교과목해설")
 
     def test_usage_counts_searches_and_unknown_models(self):
         self.assertEqual(ca.usage_of("claude-opus-5-5", 1_000_000, 100_000, searches=5)["cost_usd"], 4.0 + 2.0 + 0.05)
@@ -287,6 +336,8 @@ class CourseActivityTests(unittest.TestCase):
         def verdicts(prompt):
             return Fake().judge(prompt)[0]
 
+        self.run_pipeline(client, max_courses=1)
+        answer("stage0", {"찾음": False, "문서": []})
         self.run_pipeline(client, max_courses=1)
         answer("stage1", {"활동_유형": ["코드 작성·디버깅"], "신뢰도": "낮음", "판단_근거": "과목명", "근거": []})
         self.run_pipeline(client, max_courses=1)

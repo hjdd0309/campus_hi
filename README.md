@@ -106,7 +106,7 @@
 - `frontend/` : React + Vite + Tailwind CSS 화면. 디자인과 모션은 처음 만든 Figma Make 시안을 따릅니다(화면 `src/screens.jsx`, 공용 부품 `src/ui.jsx`, 화면 전환 `src/App.jsx`, 색·모션 `src/index.css`).
 - `backend/` : FastAPI 서버와 학과 데이터(`data/courses.csv.gz`, 출처는 `backend/SOURCE.md`)
 - `scripts/dev.mjs` : 개발 환경 준비와 실행
-- `pipelines/course_activity/` : 과목 활동 정보 수집의 입력(강의계획서)과 결과(아래 "과목 활동 정보 수집")
+- `pipelines/course_activity/` : 과목 활동 정보 수집의 결과(아래 "과목 활동 정보 수집")
 
 ## 개발
 
@@ -191,11 +191,11 @@ backend/.venv/Scripts/python -m backend.course_activity run --school 경희대�
 backend/.venv/Scripts/python -m backend.course_activity report --school 경희대학교 --course 컴퓨터공학과                   # 호출 없이 리포트만 다시
 ```
 
-`--course`는 학과 이름의 일부만 적어도 그 이름이 들어간 학과가 하나뿐이면 찾습니다. 과목명은 표기만 다른 것(자료구조/자료구조론/데이터구조, 끝의 번호)을 묶어 묶음마다 한 번씩 처리합니다. 순서는 1차 분류(검색 없이 강의계획서·과목명으로) → 2차 검색(1차 신뢰도가 낮음·중간인 묶음만, `claude-opus-5-5` + 웹 검색) → 검증 → 리포트입니다. 검증에서는 근거 URL·근거 문장이 없거나, 그 검색에서 실제로 나온 주소가 아니거나, 근거 문장이 그 페이지에 그대로 있지 않으면 버리고, 남은 항목은 다른 모델(`claude-sonnet-5-5`)이 근거와 주장이 맞는지 대조합니다. 신뢰도는 서로 다른 학교 2곳 이상의 결과물(강의계획서 제외)이 같은 활동 유형을 보여줄 때만 "높음", 결과물이 하나라도 있으면 "중간", 강의계획서뿐이면 "낮음"입니다. 강의계획서가 없으면 1차 분류는 늘 "낮음"이라 모든 묶음이 검색 단계로 갑니다.
+`--course`는 학과 이름의 일부만 적어도 그 이름이 들어간 학과가 하나뿐이면 찾습니다. 과목명은 표기만 다른 것(자료구조/자료구조론/데이터구조, 끝의 번호)을 묶어 묶음마다 한 번씩 처리합니다. 순서는 강의계획서 탐색(웹 검색) → 1차 분류(검색 없이 찾은 문서·과목명으로) → 2차 검색(1차 신뢰도가 낮음·중간인 묶음만, `claude-opus-5-5` + 웹 검색) → 검증 → 리포트입니다. 검증에서는 근거 URL·근거 문장이 없거나, 그 검색에서 실제로 나온 주소가 아니거나, 근거 문장이 그 페이지에 그대로 있지 않으면 버리고, 남은 항목은 다른 모델(`claude-sonnet-5-5`)이 근거와 주장이 맞는지 대조합니다. 신뢰도는 서로 다른 학교 2곳 이상의 결과물(강의계획서 제외)이 같은 활동 유형을 보여줄 때만 "높음", 결과물이 하나라도 있으면 "중간", 강의계획서뿐이면 "낮음"입니다. 강의계획서를 못 찾으면 1차 분류는 늘 "낮음"이라 그 묶음은 검색 단계로 갑니다.
 
-- 강의계획서: 포털 로그인이 필요해 자동으로 모으지 않습니다. 팀원이 `pipelines/course_activity/inputs/syllabi/학교_학과/`(학과 이름의 공백은 `_`)에 과목명으로 된 txt·pdf(예: `자료구조.txt`)를 넣으면 씁니다. 이 폴더는 저장소에 올리지 않습니다(`.gitignore`).
-- 결과: `pipelines/course_activity/outputs/학교_학과/`의 `courses_normalized.json`(묶음), `stage1_classification.jsonl`, `stage2_search.jsonl`(검색 결과와 실제로 나온 주소, 페이지 글은 저장 안 함), `verify.jsonl`(검증 결과와 버린 항목·이유), `final.jsonl`(검증 통과), `review.csv`(팀원 검토용, 마지막 두 칸 `팀원_판정`·`팀원_메모`는 비워 둠), `summary.md`(유형 분포, 출처 종류 비율, 근거 부족 과목, 호출 수와 비용).
-- API 키 없이 Claude Code로 돌릴 때는 `--manual`을 붙입니다. 답이 없는 단계마다 `backend/.cache/course_activity/학교_학과/requests/단계.jsonl`에 요청(프롬프트)을 남기고 멈추므로, Claude Code가 요청을 읽고 같은 폴더의 `stage1.jsonl`·`stage2.jsonl`·`verify.jsonl`에 `{"key", "prompt_id", "answer"}`로 답을 쓴 뒤 같은 명령을 다시 돌립니다(1차 분류 → 검색 → 검증, 네 번). 검색은 Claude Code가 직접 하므로 어떤 페이지가 나왔는지 기록이 없어, 모든 출처를 직접 받아 근거 문장을 대조합니다. 검증 답은 검색을 하지 않은 별도 서브에이전트(Sonnet)가 그 요청 파일만 읽고 씁니다. 비용은 $0으로 기록됩니다.
+- 강의계획서: 사람이 파일을 넣지 않고, 묶음마다 웹 검색으로 그 학교의 공개 강의계획서 조회 페이지, 학과 교육과정 PDF·교과목 해설, 교수 강의 페이지를 찾습니다. 포털·수강신청·LMS처럼 로그인이 필요한 페이지는 건너뜁니다(`LOGIN_HOSTS`). 찾은 문서는 프로그램이 직접 받아 과목명이 들어 있는지 확인하고, 과목 둘레 원문을 발췌해 `stage0_syllabus.jsonl`(과목명, 학교, 학과, 찾음, 문서마다 `문서_URL`·`문서_종류`·`추출_텍스트_요약`·`원문_발췌`, 버린 문서와 이유)에 남깁니다. 못 찾으면 `찾음: false`로 두고 과목명만으로 다음 단계를 합니다.
+- 결과: `pipelines/course_activity/outputs/학교_학과/`의 `courses_normalized.json`(묶음), `stage0_syllabus.jsonl`, `stage1_classification.jsonl`, `stage2_search.jsonl`(검색 결과와 실제로 나온 주소, 페이지 글은 저장 안 함), `verify.jsonl`(검증 결과와 버린 항목·이유), `final.jsonl`(검증 통과), `review.csv`(팀원 검토용, 마지막 두 칸 `팀원_판정`·`팀원_메모`는 비워 둠), `summary.md`(유형 분포, 출처 종류 비율, 과목별 강의계획서 탐색 결과, 근거 부족 과목, 호출 수와 비용).
+- API 키 없이 Claude Code로 돌릴 때는 `--manual`을 붙입니다. 답이 없는 단계마다 `backend/.cache/course_activity/학교_학과/requests/단계.jsonl`에 요청(프롬프트)을 남기고 멈추므로, Claude Code가 요청을 읽고 같은 폴더의 `stage0.jsonl`·`stage1.jsonl`·`stage2.jsonl`·`verify.jsonl`에 `{"key", "prompt_id", "answer"}`로 답을 쓴 뒤 같은 명령을 다시 돌립니다(강의계획서 탐색 → 1차 분류 → 검색 → 검증, 다섯 번). 검색은 Claude Code가 직접 하므로 어떤 페이지가 나왔는지 기록이 없어, 모든 출처를 직접 받아 근거 문장을 대조합니다. 검증 답은 검색을 하지 않은 별도 서브에이전트(Sonnet)가 그 요청 파일만 읽고 씁니다. 비용은 $0으로 기록됩니다.
 - 다시 돌리면 끝난 묶음은 건너뛰고 오류 난 묶음만 다시 합니다. `--budget-usd`는 다음 호출의 예상 비용을 더해 넘으면 그 앞에서 멈춥니다(예상치는 파일 위쪽 `ESTIMATE`).
 - 에브리타임·카페·SNS 같은 로그인 사이트와 영상 사이트는 검색·열람에서 막고(`BLOCKED`), 학생 코드·글은 원문을 저장하지 않습니다(요약, URL, 300자 이하 근거 문장만).
 

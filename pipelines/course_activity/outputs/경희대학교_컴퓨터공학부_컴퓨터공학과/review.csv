@@ -1,7 +1,7 @@
 ﻿과목명,학년,활동_유형,대표_과제,시험_형태,신뢰도,근거_URL들,출처_종류,팀원_판정(맞음/틀림/부분),팀원_메모
-가상/증강현실이론및실습,,"코드 작성·디버깅, 창작·제작",근거 없음,근거 없음,낮음,https://ce.khu.ac.kr/resources/user/download/ce/2024%20%EC%BB%B4%ED%93%A8%ED%84%B0%EA%B3%B5%ED%95%99%EA%B3%BC%20%EA%B5%90%EC%9C%A1%EA%B3%BC%EC%A0%95.pdf,강의계획서,,
-AIoT소프트웨어,4,코드 작성·디버깅,근거 없음,근거 없음,낮음,https://ce.khu.ac.kr/resources/user/download/ce/2024%20%EC%BB%B4%ED%93%A8%ED%84%B0%EA%B3%B5%ED%95%99%EA%B3%BC%20%EA%B5%90%EC%9C%A1%EA%B3%BC%EC%A0%95.pdf,강의계획서,,
-물리학및실험1,,"실험·측정·보고서, 사례 분석·토론·발표","매주 역학 실험 측정 후 결과보고서 작성, 학기 중 조별 결과 발표",근거 없음,중간,https://physics.khu.ac.kr/physics/user/contents/view.do?menuNo=3000028,교수페이지,,
+가상/증강현실이론및실습,,"코드 작성·디버깅, 실험·측정·보고서, 창작·제작, 사례 분석·토론·발표",근거 없음,근거 없음,낮음,https://sugang.khu.ac.kr/core?attribute=lectPlan&p_year=2025&p_term=20&p_teach=065428&p_code=SWCON31300&p_subjt=SWCON313&lang=ko&loginYn=N&schedule_cd=hakbu,강의계획서,,
+AIoT소프트웨어,4,코드 작성·디버깅,근거 없음,근거 없음,낮음,https://sugang.khu.ac.kr/core?attribute=lectPlan&p_year=2024&p_term=10&p_teach=020897&p_code=CSE44000&p_subjt=CSE440&lang=ko&loginYn=N&schedule_cd=hakbu,강의계획서,,
+물리학및실험1,,"계산·증명, 실험·측정·보고서, 사례 분석·토론·발표",근거 없음,근거 없음,중간,https://sugang.khu.ac.kr/core?attribute=lectPlan&p_year=2023&p_term=10&p_teach=039297&p_code=APHY100217&p_subjt=APHY1002&lang=ko&loginYn=N&schedule_cd=hakbu | https://physics.khu.ac.kr/physics/user/contents/view.do?menuNo=3000028,"강의계획서, 교수페이지",,
 정보보호,4,(미처리),,,,,,,
 AIoT디지털시스템,4,(미처리),,,,,,,
 컴파일러,3,(미처리),,,,,,,
