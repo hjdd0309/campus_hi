@@ -159,6 +159,16 @@ class CourseActivityTests(unittest.TestCase):
         self.assertEqual(ca.confidence([passed("가대학교"), passed("")]), "중간")
         self.assertEqual(ca.confidence([passed("가대학교", source="강의계획서"), passed("나대학교", source="강의계획서")]), "낮음")
 
+    def test_representative_task_needs_real_task_evidence(self):
+        group = {"key": "가", "name": "가", "names": ["가"]}
+        stage1 = {"result": {"활동_유형": []}}
+        stage2 = {"result": {**ca.sanitize_search(SEARCH_RESULT), "대표_과제": "Unity 텀 프로젝트", "시험_형태": "필기"}}
+        syllabus_only = [{"유형": ["창작·제작"], "학교": "가대학교", "출처_종류": "강의계획서"}]
+        final = ca.finalize(group, stage1, stage2, syllabus_only)
+        self.assertEqual((final["대표_과제"], final["시험_형태"]), ("근거 없음", "근거 없음"))
+        final = ca.finalize(group, stage1, stage2, [*syllabus_only, {"유형": ["창작·제작"], "학교": "", "출처_종류": "교수페이지"}, {"유형": ["계산·증명"], "학교": "", "출처_종류": "시험"}])
+        self.assertEqual((final["대표_과제"], final["시험_형태"]), ("Unity 텀 프로젝트", "필기"))
+
     def test_run_writes_verified_results_and_reports(self):
         client = Fake()
         self.run_pipeline(client, max_courses=2)
@@ -262,6 +272,36 @@ class CourseActivityTests(unittest.TestCase):
         self.assertEqual(ca.usage_of("claude-opus-5-5", 1_000_000, 100_000, searches=5)["cost_usd"], 4.0 + 2.0 + 0.05)
         unknown = ca.usage_of("claude-opus-4-8", 1_000_000, 0)
         self.assertEqual((unknown["cost_usd"], unknown["price_assumed"]), (4.0, True))
+
+    def test_manual_mode_waits_for_answers_and_checks_every_source(self):
+        work = Path(self.folder.name) / "work"
+        client = ca.FileClient(work)
+
+        def answer(stage, value):
+            requests = ca.load_jsonl(work / "requests" / f"{stage}.jsonl")
+            self.assertEqual(len(requests), 1)
+            request = next(iter(requests.values()))
+            value = value(request["prompt"]) if callable(value) else value
+            (work / f"{stage}.jsonl").write_text(json.dumps({"key": request["key"], "prompt_id": request["prompt_id"], "answer": value}, ensure_ascii=False) + "\n", encoding="utf-8")
+
+        def verdicts(prompt):
+            return Fake().judge(prompt)[0]
+
+        self.run_pipeline(client, max_courses=1)
+        answer("stage1", {"활동_유형": ["코드 작성·디버깅"], "신뢰도": "낮음", "판단_근거": "과목명", "근거": []})
+        self.run_pipeline(client, max_courses=1)
+        answer("stage2", SEARCH_RESULT)
+        self.run_pipeline(client, max_courses=1)
+        answer("verify", verdicts)
+        state = self.run_pipeline(client, max_courses=1)
+        entry = state.verify[state.order[0]]
+        # 나온 페이지 기록이 없으니 "검색에서 나오지 않은 주소"로 거르지 않고 직접 받아 대조한다(made.up은 받을 수 없음).
+        reasons = sorted(drop["이유"] for drop in entry["dropped"])
+        self.assertEqual(reasons, ["근거 문장을 출처에서 찾지 못함", "근거 없음", "막은 사이트", "출처를 열 수 없음", "출처를 열 수 없음"])
+        # github 페이지는 FETCHED에 없어 받을 수 없으므로, 직접 받은 blog 하나만 남는다.
+        self.assertEqual([item["근거_URL"] for item in entry["final"]["실제_활동"]], ["https://blog.example.com/x"])
+        self.assertEqual(entry["final"]["신뢰도"], "중간")
+        self.assertIn("Claude Code", (self.out / "summary.md").read_text(encoding="utf-8"))
 
     def test_claude_search_continues_paused_turns_and_sums_usage(self):
         def response(stop, content, searches):

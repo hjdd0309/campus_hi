@@ -6,6 +6,7 @@
     python -m backend.course_activity run --school 경희대학교 --course 컴퓨터공학과 --dry-run
     python -m backend.course_activity run --school 경희대학교 --course 컴퓨터공학과 --max-courses 3 --budget-usd 2
     python -m backend.course_activity report --school 경희대학교 --course 컴퓨터공학과   # 호출 없이 리포트만 다시
+    python -m backend.course_activity run --school 경희대학교 --course 컴퓨터공학과 --manual --max-courses 3  # API 대신 Claude Code가 답을 씀(FileClient)
 
 단계(과목명이 같은 묶음마다 한 번씩):
 1. 대상 선택: 학교·학과의 교과목(`courses.csv.gz`).
@@ -550,7 +551,8 @@ def candidates_of(stage1, stage2):
 
 
 def check_items(items, pages, syllabi, fetcher=fetch_page):
-    """형식·출처 대조. (대조할 항목과 둘레 글 목록, 버린 항목과 이유 목록)을 돌려준다."""
+    """형식·출처 대조. (대조할 항목과 둘레 글 목록, 버린 항목과 이유 목록)을 돌려준다.
+    pages가 None이면(Claude Code가 직접 검색해 어떤 페이지가 나왔는지 기록이 없을 때) 모든 출처를 직접 받아 대조한다."""
     files = dict(syllabi)
     kept, dropped = [], []
     fetched = {}
@@ -576,10 +578,10 @@ def check_items(items, pages, syllabi, fetcher=fetch_page):
             key = canonical_url(url)
             if key is None:
                 reason = "주소 형식 오류"
-            elif key not in pages:
+            elif pages is not None and key not in pages:
                 reason = "검색에서 나오지 않은 주소"
             else:
-                excerpt = next((found for text in pages[key] for found in [locate(quote, text)] if found), None)
+                excerpt = next((found for text in (pages or {}).get(key, []) for found in [locate(quote, text)] if found), None)
                 if excerpt is None:
                     if key not in fetched:
                         fetched[key] = fetcher(url)
@@ -621,10 +623,11 @@ def finalize(group, stage1, stage2, passed):
     kinds = {item["출처_종류"] for item in passed}
     task = result.get("대표_과제", "")
     exam = result.get("시험_형태", "")
-    # 대표 과제·시험 형태는 그것을 뒷받침하는 출처 종류가 검증을 통과했을 때만 남긴다.
-    if not kinds & {"과제명세", "학생결과물", "교수페이지", "강의계획서"}:
+    # 대표 과제·시험 형태는 실제 과제(과제 명세·학생 결과물·교수 페이지)나 시험 출처가 검증을 통과했을 때만 남긴다.
+    # 교과목 해설·강의계획서만 통과했으면 조사자가 적은 대표 과제가 그 문서에 없는 내용일 수 있어 남기지 않는다.
+    if not kinds & {"과제명세", "학생결과물", "교수페이지"}:
         task = "근거 없음"
-    if "시험" not in kinds and "강의계획서" not in kinds:
+    if "시험" not in kinds:
         exam = "근거 없음"
     return {
         "key": group["key"], "과목명": group["name"], "과목명_묶음": group["names"],
@@ -676,6 +679,58 @@ class Budget:
 
 class Stop(Exception):
     pass
+
+
+class Pending(Exception):
+    """Claude Code 방식에서 아직 답이 없는 단계. 요청을 파일로 남기고 다음 묶음으로 넘어간다."""
+
+
+MANUAL_ROOT = Path(__file__).parent / ".cache" / "course_activity"
+MANUAL_MODELS = {
+    "stage1": "claude-opus-5-5 (Claude Code)",
+    "stage2": "claude-opus-5-5 (Claude Code)",
+    "verify": "claude-sonnet-5-5 (Claude Code 서브에이전트)",
+}
+
+
+class FileClient:
+    """API 키 없이 Claude Code가 단계마다 직접 답을 쓰는 방식.
+
+    답이 없으면 `requests/단계.jsonl`에 {"key", "과목명", "prompt_id", "prompt"}를 남기고 Pending을 낸다.
+    답은 `단계.jsonl`에 {"key", "prompt_id", "answer"}로 쓴다(stage1·stage2는 프롬프트의 JSON 형식, verify는
+    {"results": [...]}). prompt_id가 지금 요청과 다르면(입력이 바뀜) 그 답은 쓰지 않고 다시 요청한다.
+    검색은 어떤 페이지가 나왔는지 기록이 없으므로 모든 출처를 직접 받아 근거 문장을 대조한다.
+    검증 답은 검색·분류를 쓰지 않은 별도 서브에이전트가 쓴다. 비용은 API를 쓰지 않으므로 0으로 기록한다."""
+
+    def __init__(self, folder, models=None):
+        self.folder = Path(folder)
+        self.models = models or MANUAL_MODELS
+        self.key = None
+
+    def begin(self, key):
+        self.key = key
+
+    def _answer(self, stage, prompt, name):
+        prompt_id = digest(prompt)
+        answer = load_jsonl(self.folder / f"{stage}.jsonl").get(self.key)
+        if answer and answer.get("prompt_id") == prompt_id:
+            usage = {"model": self.models[stage], "input_tokens": 0, "output_tokens": 0, "web_search_requests": 0, "web_fetch_requests": 0, "cost_usd": 0.0, "price_assumed": False, "manual": True}
+            return answer["answer"], usage
+        path = self.folder / "requests" / f"{stage}.jsonl"
+        requests = load_jsonl(path)
+        requests[self.key] = {"key": self.key, "과목명": name, "prompt_id": prompt_id, "prompt": prompt}
+        save_jsonl(path, requests, [])
+        raise Pending(f"{stage} 답 대기: {path}")
+
+    def classify(self, prompt):
+        return self._answer("stage1", prompt, re.search(r"과목명: (.*)", prompt).group(1))
+
+    def search(self, prompt):
+        answer, usage = self._answer("stage2", prompt, re.search(r"과목명: (.*)", prompt).group(1))
+        return answer, usage, None
+
+    def judge(self, prompt):
+        return self._answer("verify", prompt, re.search(r'"(.*?)" 과목', prompt).group(1))
 
 
 # 묶음마다 다시 해도 같은 이유로 실패하는 오류. 그 자리에서 실행을 멈춘다(인증 정보 없음은 SDK가 TypeError로 알림).
@@ -745,7 +800,9 @@ class Run:
     def process(self, client, key, budget, today, fetcher=fetch_page, log=print):
         group = self.groups[key]
         syllabi = self.syllabi.get(key, [])
-        pages = {}
+        fresh = None
+        if hasattr(client, "begin"):
+            client.begin(key)
         if not self.stage1_ok(key):
             if not budget.allows("stage1"):
                 raise Stop()
@@ -754,6 +811,8 @@ class Run:
                 result, usage = run_stage1(client, stage1_prompt(self.school, self.course, group, others, self.years, syllabi), syllabi)
                 budget.add("stage1", usage)
                 self.stage1[key] = {"key": key, "과목명": group["name"], "result": result, "syllabi": [name for name, _ in syllabi], "usage": usage, "checked_at": today}
+            except Pending:
+                raise
             except Exception as error:
                 self.fail(self.stage1, key, group, error, today, log)
                 return
@@ -761,16 +820,24 @@ class Run:
             if not budget.allows("stage2"):
                 raise Stop()
             try:
-                result, usage, pages = client.search(search_prompt(self.course, group, syllabi))
+                result, usage, fresh = client.search(search_prompt(self.course, group, syllabi))
                 budget.add("stage2", usage)
-                self.stage2[key] = {"key": key, "과목명": group["name"], "result": sanitize_search(result), "pages": sorted(pages), "usage": usage, "checked_at": today}
+                self.stage2[key] = {"key": key, "과목명": group["name"], "result": sanitize_search(result), "pages": sorted(fresh) if fresh is not None else None, "usage": usage, "checked_at": today}
+            except Pending:
+                raise
             except Exception as error:
                 self.fail(self.stage2, key, group, error, today, log)
                 return
         stage1 = self.stage1[key]
         stage2 = self.stage2.get(key) if self.needs_search(key) else None
         # 이번 실행에서 검색하지 않았으면(캐시) 페이지 글이 없으니, 실제로 나왔던 주소만 두고 글은 다시 받는다.
-        pages = pages or {url: [] for url in (stage2 or {}).get("pages", [])}
+        # 나온 페이지 기록이 없는 검색(Claude Code가 직접 함)은 None으로 두어 모든 출처를 직접 받아 대조한다.
+        if fresh is not None:
+            pages = fresh
+        elif stage2 is not None and stage2.get("pages") is None:
+            pages = None
+        else:
+            pages = {url: [] for url in (stage2 or {}).get("pages") or []}
         kept, dropped = check_items(candidates_of(stage1, stage2), pages, syllabi, fetcher)
         passed, usage = [], None
         if kept:
@@ -779,6 +846,8 @@ class Run:
             try:
                 verdicts, usage = client.judge(judge_prompt(group["name"], self.course, kept))
                 budget.add("verify", usage)
+            except Pending:
+                raise
             except Exception as error:
                 self.fail(self.verify, key, group, error, today, log)
                 return
@@ -804,6 +873,14 @@ class Run:
         final = self.verify[key]["final"]
         log(f"  {group['name']}: 통과 {len(passed)} · 버림 {len(dropped)} · 신뢰도 {final['신뢰도'] if final else '낮음(근거 없음)'}")
 
+    def final(self, key):
+        """검증을 통과한 항목으로 최종 결과를 다시 만든다(규칙이 바뀌어도 리포트가 지금 규칙을 따르게)."""
+        entry = self.verify.get(key) or {}
+        if entry.get("error") or not entry.get("final") or key not in self.stage1:
+            return None
+        stage2 = self.stage2.get(key) if self.needs_search(key) else None
+        return finalize(self.groups[key], self.stage1[key], stage2, entry["final"]["실제_활동"])
+
     def fail(self, records, key, group, error, today, log=print):
         if type(error).__name__ in FATAL:
             raise error
@@ -828,6 +905,8 @@ def run(school, course, client=None, dry_run=False, max_courses=None, budget_usd
         log(f"[{number}/{len(pending)}] {state.groups[key]['name']}")
         try:
             state.process(client, key, budget, today, fetcher, log)
+        except Pending as waiting:
+            log(f"  {waiting}")
         except Stop:
             log(f"예산(${budget_usd:.2f})에 닿아 멈춥니다. 지금까지 ${budget.spent:.2f}를 썼습니다.")
             stopped = True
@@ -872,7 +951,7 @@ def review_rows(state):
     rows = []
     for key in state.order:
         group = state.groups[key]
-        final = (state.verify.get(key) or {}).get("final")
+        final = state.final(key)
         stage1 = (state.stage1.get(key) or {}).get("result")
         for name in group["names"]:
             if final:
@@ -892,7 +971,7 @@ def review_rows(state):
 
 def write_reports(state):
     state.out.mkdir(parents=True, exist_ok=True)
-    finals = [entry["final"] for key in state.order for entry in [state.verify.get(key) or {}] if entry.get("final")]
+    finals = [final for key in state.order for final in [state.final(key)] if final]
     state.path("final.jsonl").write_text("".join(json.dumps(final, ensure_ascii=False) + "\n" for final in finals), encoding="utf-8")
     with state.path("review.csv").open("w", encoding="utf-8-sig", newline="") as file:
         writer = csv.writer(file)
@@ -903,7 +982,7 @@ def write_reports(state):
 
 def summary(state):
     keys = state.order
-    finals = {key: state.verify[key]["final"] for key in keys if (state.verify.get(key) or {}).get("final")}
+    finals = {key: final for key in keys for final in [state.final(key)] if final}
     processed = [key for key in keys if key in state.verify and not state.verify[key].get("error")]
     lines = [f"# 과목 활동 수집 요약: {state.school} {state.course}", ""]
     lines.append(f"- 교과목 {sum(len(group['names']) for group in state.groups.values())}개, 묶음 {len(keys)}개, 강의계획서 {sum(len(files) for files in state.syllabi.values())}개")
@@ -965,7 +1044,8 @@ def summary(state):
             f"{sum(usage['input_tokens'] for usage in usages):,} | {sum(usage['output_tokens'] for usage in usages):,} | ${cost:.2f} |"
         )
     lines.append(f"| 합계 | | {total_calls} | | | | ${total_cost:.2f} |")
-    lines += ["", "실패한 호출의 비용은 집계되지 않습니다. 웹 검색은 1회 $0.01로 셉니다." + (" 단가를 모르는 모델이 응답한 호출은 가장 비싼 단가로 셌습니다." if assumed else ""), ""]
+    manual = any(record.get("usage", {}).get("manual") for records in (state.stage1, state.stage2, state.verify) for record in records.values() if record.get("usage"))
+    lines += ["", "실패한 호출의 비용은 집계되지 않습니다. 웹 검색은 1회 $0.01로 셉니다." + (" 단가를 모르는 모델이 응답한 호출은 가장 비싼 단가로 셌습니다." if assumed else "") + (" 모델 이름에 (Claude Code)가 붙은 단계는 API를 쓰지 않고 Claude Code 안에서 처리해 비용을 $0으로 셌습니다(웹 검색 횟수도 기록되지 않음)." if manual else ""), ""]
     return "\n".join(lines)
 
 
@@ -980,6 +1060,7 @@ def main(argv=None):
             command.add_argument("--dry-run", action="store_true", help="호출 없이 대상 과목과 예상 호출 수만 출력")
             command.add_argument("--max-courses", type=int, help="이번에 처리할 묶음 수")
             command.add_argument("--budget-usd", type=float, help="이번 실행에서 쓸 최대 비용(달러). 닿으면 멈춤")
+            command.add_argument("--manual", action="store_true", help="API 대신 Claude Code가 단계마다 답을 씀(backend/.cache/course_activity/학교_학과/)")
     args = parser.parse_args(argv)
     try:
         school, course = find_program(args.school, args.course)
@@ -998,7 +1079,8 @@ def main(argv=None):
         print("--budget-usd는 0보다 커야 합니다.")
         return 1
     try:
-        run(school, course, dry_run=args.dry_run, max_courses=args.max_courses, budget_usd=args.budget_usd)
+        client = FileClient(MANUAL_ROOT / folder_name(school, course)) if args.manual and not args.dry_run else None
+        run(school, course, client=client, dry_run=args.dry_run, max_courses=args.max_courses, budget_usd=args.budget_usd)
     except Exception as error:
         if type(error).__name__ not in FATAL:
             raise
