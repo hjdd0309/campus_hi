@@ -1,0 +1,76 @@
+2026학년도 2학기 강의계획서
+출력
+기본정보
+강좌명 | 논리회로 | 교강사명 | 유재수(전자정보대학 전자공학부)
+학수번호 | EE20903 | 사무실/연구실 | 전전 518호
+이수구분 | 전공필수 | 연락처 | 로그인하세요
+개설학과 | 전자정보대학 전자공학부 전자공학과 | 연락처 | 로그인하세요
+학점 | 3 | 이메일 | 로그인하세요
+강의시간강의실 | 유재수 월12:00-13:15 B01, 유재수 수12:00-13:15 B01 | 홈페이지 | [개인용] [수업용]
+영어강좌여부 | | 면담시간 | 수업후 10분
+성적기록방법 | 등급 | 등급 | 등급
+선수과목
+조회된 데이터가 존재하지 않습니다.
+수업개요 및 목표
+수업개요 | Increasing the ability to design of digital circuits through understanding characteristics and operation of functional logic device using Boolean algebra and learing design and analysis of combinational and sequential circuits.
+수업목표 | Understanding of fundamental concepts used in the design of digial system Leanrning the basic tools for the design of digital circuits Design of digital electronic circuits
+수업운영방식
+| 대면수업 | 실시간온라인수업 | 비실시간 온라인수업(콘텐츠 업로드 방식) | 하이브리드수업(일부 수강생은 대면으로,일부 수강생은 온라인으로 진행) | 블랜디드수업(시험 등 평가활동을 제외하고,30-50%가 원격수업으로 진행)
+| 수업운영방식 | | | | |
+추가설명 | 수업운영방식 | 대면강의 | 대면강의 | 대면강의 | 대면강의
+수업유형 및 방법
+| 이론강의 | 실험/실습 | 실기 | ABEEK설계 | 현장학습 | 캡스톤디자인 | 기타
+수업유형 | 100% | 0% | 0% | 0% | 0% | 0% | 0%
+수업유형 | 수업유형추가설명 | 이론 강의 | 이론 강의 | 이론 강의 | 이론 강의 | 이론 강의 | 이론 강의
+| 토의/토론 | 특강/세미나 | 팀별발표 | 개별발표 | 시청각 | 온라인강의 | e-campus활용 | PBL/CBL
+수업방법 | | | | | ○ | | ○ |
+수업방법 | 이론강의 | 실험/실습 | 실기 | 유인물 | 견학/현장강의 | QUEST 수업 | 기타 |
+수업방법 | ○ | | | ○ | | | |
+수업진행추가설명 | 이론 강의 | 이론 강의 | 이론 강의 | 이론 강의 | 이론 강의 | 이론 강의 | 이론 강의 | 이론 강의
+교재 및 참고자료
+교재구분 | 교재구분 | 서명 | 저자명 | 출판사 | 출판년도 | ISBN | 비고
+교재 및 참고자료 | 1 | Digital Design | M. Morris Mano | Prentice Hall | 2002 | 0130621218 |
+교재 및 참고자료 | 2 | | | | | |
+교재 및 참고자료 | 3 | | | | | |
+교재 및 참고자료 | 4 | Digital Systems: Principles and Applications (7th edition) | Ronald J. Tocci and Neal S. Widmer | Prentice Hall | 1997 | 0137005105 |
+교재 및 참고자료 | 5 | | | | | |
+교재 및 참고자료 | 6 | | | | | |
+교재 및 참고자료 | 7 | | | | | |
+교재 및 참고자료 | 8 | | | | | |
+교재 및 참고자료 | 9 | | | | | |
+교재 및 참고자료 | 10 | | | | | |
+추가문헌 및 자료 | 추가문헌 및 자료 | | | | | |
+평가방법
+평가항목 | 평가비율(%) | 추 가 설 명
+중간고사 | 35% |
+기말고사 | 35% |
+과제보고서 | 20% |
+발표 | 0% |
+출석 | 10% |
+기타 | 0% |
+주별강의내용
+차시 | 날짜 | 강의주제 및 내용 | 비고(주차별 수업방법,과제 등)
+1주 | 9/1 ~ 9/7 | Intronduction, Binary numbers, Complements (Chapter 1) |
+2주 | 9/8 ~ 9/14 | Binary codes, Binary storage and registers, Binary logic (Chapter 1) |
+3주 | 9/15 ~ 9/21 | Axiomatic ㅇefinition of Boolean algebra, Boolean functions (Chapter 2) |
+4주 | 9/22 ~ 9/28 | Canonical and standard forms, Digital logic gate, Integrated circuits (Chapter 2) |
+5주 | 9/29 ~ 10/5 | Map method, Five-variable map, Product of sums simplification (Chapter 3) |
+6주 | 10/6 ~ 10/12 | NAND and NOR implementation, Hardware description language (HDL) (Chapter 3) |
+7주 | 10/13 ~ 10/19 | Combinational circuits, Analysis/design procedure (Chapter 4) |
+8주 | 10/20 ~ 10/26 | Binary Adder-substractor, Binary multiplier (Chapter 4) mid-term exam |
+9주 | 10/27 ~ 11/2 | Magnitude comparator, Decoders, Encoders, Multiplexers (Chapter 4) |
+10주 | 11/3 ~ 11/9 | Sequential circuits, Latches, Flip-flops (Chapter 5) |
+11주 | 11/10 ~ 11/16 | Analysis of clocked sequential circuits, State redution and assignment (Chapter 5) |
+12주 | 11/17 ~ 11/23 | Resisters, Ripple counters, Synchronous counters (Chapter 6) |
+13주 | 11/24 ~ 11/30 | Other counters, HDL for resistors and counters (Chapter 6) |
+14주 | 12/1 ~ 12/7 | Random acess memory, Memory deconding, Error detection and correction (Chapter 7) |
+15주 | 12/8 ~ 12/14 | Read-only memory, Programmable logic array, Programmable array logic, Sequential programmable devices (Chapter 7) Final exam |
+16주 | 12/15 ~ 12/21 | |
+기타 | | |
+과제 | | |
+수업안내사항 | | |
+장애학생지원내용
+강의수강관련 | 시각장애: 디지털교재, 확대교재, 강의 녹취, 대필도우미 허용 지체장애: 대필도우미 및 수업보조 도우미 허용 청각장애: 대필 및 문자통역 도우미 활동 허용, 강의 녹취허용 건강장애: 질병 등으로 인한 결석에 대한 출석 인정, 대필 도우미 허용 학습장애: 대필도우미 허용 지적장애/자폐성장애: 대필도우미 및 수업멘토 허용
+과제 및 평가관련 | 과제 제출 및 응답 방식의 조정, 평가시간 연장, 평가 문항 제시 및 응답 방식의 조정, 별도 고사실 제공, 개별화 과제 제출 및 대체 평가 실시 과제 및 평가관련 :*장애유형, 정도에 따라 지원 내용이 다를 수 있음
+비고 | 본 과목을 수강하는 장애학생은 수업에 필요한 별도의 지원이 필요한 경우, 담당교강사 및 장애학생지원센터 (서울 02-961-2104~5, 국제 031-201-3460~1)로 필요한 사항을 요청하기 바랍니다.
+COPYRIGHT © KYUNG HEE UNIVERSITY. ALL RIGHT RESERVED.

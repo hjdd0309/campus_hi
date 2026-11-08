@@ -1,0 +1,78 @@
+2026학년도 2학기 강의계획서
+출력
+기본정보
+강좌명 | 인공지능프로그래밍 | 교강사명 | 김수현(소프트웨어융합대학 컴퓨터공학부)
+학수번호 | AI100200 | 사무실/연구실 | 우정원 7027호
+이수구분 | 전공필수 | 연락처 | 로그인하세요
+개설학과 | 소프트웨어융합대학 컴퓨터공학부 인공지능학과 | 연락처 | 로그인하세요
+학점 | 3 | 이메일 | 로그인하세요
+강의시간강의실 | 김수현 화13:00-14:50 B06, 김수현 목13:00-14:50 B06 | 홈페이지 | [개인용] https://kdst.re.kr[수업용] https://e-campus.khu.ac.kr/
+영어강좌여부 | | 면담시간 | Thu 15:00-16:00 (사전 이메일 협의)
+성적기록방법 | 등급 | 등급 | 등급
+선수과목
+선수과목 | 필수선수과목 | 적용학번 | Abeek적용여부 | 선수교과목그룹 | 선수교과목 | 적용성적 | 필수이수과목수
+선수과목 | 필수선수과목 | 2010 ~ | N | 01 | 웹/파이선프로그래밍(SWCON104) | | 1
+선수과목 | 추천선수과목 | | | | | |
+수업개요 및 목표
+수업개요 | **AI Programming** 1. Introduction: Artificial Intelligence, Google Colab Basics, Simple Classification (Chapter 1) 2. Data Processing (Chapter 2) 3. Regression and Regularization (Chapter 3) 3. Classification Algorithms (Chapter 4) 5. Tree Algorithms (Chapter 5) 6. Unsupervised Learning (Chapter 6) 7. Multi-Layer Perceptron (Chapter 7) 8. Convolutional Neural Networks (Chapter 8) 9. Recurrent Neural Networks (Chapter 9) 10. Transformers (Chapter 10)
+수업목표 | **We will learn:** 1. Machine learning basics 2. How to program your AI algorithms based on Google Colab 3. Basic deep neural networks 4. CNN and RNN variants
+수업운영방식
+| 대면수업 | 실시간온라인수업 | 비실시간 온라인수업(콘텐츠 업로드 방식) | 하이브리드수업(일부 수강생은 대면으로,일부 수강생은 온라인으로 진행) | 블랜디드수업(시험 등 평가활동을 제외하고,30-50%가 원격수업으로 진행)
+| 수업운영방식 | | | | |
+추가설명 | 수업운영방식 | 대면 수업을 기본으로 운영하되, 보강은 비대면 실시간/비실시간 가능 | 대면 수업을 기본으로 운영하되, 보강은 비대면 실시간/비실시간 가능 | 대면 수업을 기본으로 운영하되, 보강은 비대면 실시간/비실시간 가능 | 대면 수업을 기본으로 운영하되, 보강은 비대면 실시간/비실시간 가능
+수업유형 및 방법
+| 이론강의 | 실험/실습 | 실기 | ABEEK설계 | 현장학습 | 캡스톤디자인 | 기타
+수업유형 | 50% | 50% | 0% | 0% | 0% | | 0%
+수업유형 | 수업유형추가설명 | | | | | |
+| 토의/토론 | 특강/세미나 | 팀별발표 | 개별발표 | 시청각 | 온라인강의 | e-campus활용 | PBL/CBL
+수업방법 | | | | | | | ○ |
+수업방법 | 이론강의 | 실험/실습 | 실기 | 유인물 | 견학/현장강의 | QUEST 수업 | 기타 |
+수업방법 | ○ | ○ | | | | | |
+수업진행추가설명 | 매 시간 수업에 약 1시간 이론, 나머지 실습 강의로 구성됨. 실습은 오픈소스인 NumPy, scikit-learn, PyTorch를 활용하여 진행함 NumPy: 기본적인 행렬/텐서를 다루는데 활용 scikit-learn: 다양한 기계학습 알고리즘을 사용해 보는 용도로 활용 PyTorch: 딥러닝 모델을 만드는데 활용 | 매 시간 수업에 약 1시간 이론, 나머지 실습 강의로 구성됨. 실습은 오픈소스인 NumPy, scikit-learn, PyTorch를 활용하여 진행함 NumPy: 기본적인 행렬/텐서를 다루는데 활용 scikit-learn: 다양한 기계학습 알고리즘을 사용해 보는 용도로 활용 PyTorch: 딥러닝 모델을 만드는데 활용 | 매 시간 수업에 약 1시간 이론, 나머지 실습 강의로 구성됨. 실습은 오픈소스인 NumPy, scikit-learn, PyTorch를 활용하여 진행함 NumPy: 기본적인 행렬/텐서를 다루는데 활용 scikit-learn: 다양한 기계학습 알고리즘을 사용해 보는 용도로 활용 PyTorch: 딥러닝 모델을 만드는데 활용 | 매 시간 수업에 약 1시간 이론, 나머지 실습 강의로 구성됨. 실습은 오픈소스인 NumPy, scikit-learn, PyTorch를 활용하여 진행함 NumPy: 기본적인 행렬/텐서를 다루는데 활용 scikit-learn: 다양한 기계학습 알고리즘을 사용해 보는 용도로 활용 PyTorch: 딥러닝 모델을 만드는데 활용 | 매 시간 수업에 약 1시간 이론, 나머지 실습 강의로 구성됨. 실습은 오픈소스인 NumPy, scikit-learn, PyTorch를 활용하여 진행함 NumPy: 기본적인 행렬/텐서를 다루는데 활용 scikit-learn: 다양한 기계학습 알고리즘을 사용해 보는 용도로 활용 PyTorch: 딥러닝 모델을 만드는데 활용 | 매 시간 수업에 약 1시간 이론, 나머지 실습 강의로 구성됨. 실습은 오픈소스인 NumPy, scikit-learn, PyTorch를 활용하여 진행함 NumPy: 기본적인 행렬/텐서를 다루는데 활용 scikit-learn: 다양한 기계학습 알고리즘을 사용해 보는 용도로 활용 PyTorch: 딥러닝 모델을 만드는데 활용 | 매 시간 수업에 약 1시간 이론, 나머지 실습 강의로 구성됨. 실습은 오픈소스인 NumPy, scikit-learn, PyTorch를 활용하여 진행함 NumPy: 기본적인 행렬/텐서를 다루는데 활용 scikit-learn: 다양한 기계학습 알고리즘을 사용해 보는 용도로 활용 PyTorch: 딥러닝 모델을 만드는데 활용 | 매 시간 수업에 약 1시간 이론, 나머지 실습 강의로 구성됨. 실습은 오픈소스인 NumPy, scikit-learn, PyTorch를 활용하여 진행함 NumPy: 기본적인 행렬/텐서를 다루는데 활용 scikit-learn: 다양한 기계학습 알고리즘을 사용해 보는 용도로 활용 PyTorch: 딥러닝 모델을 만드는데 활용
+교재 및 참고자료
+교재구분 | 교재구분 | 서명 | 저자명 | 출판사 | 출판년도 | ISBN | 비고
+교재 및 참고자료 | 1 | 혼자 공부하는 머신러닝+딥러닝 | 박해선 | 한빛미디어 | 2025 | 9791169213608 | 20년 말고 25년에 나온 개정판
+교재 및 참고자료 | 2 | | | | | |
+교재 및 참고자료 | 3 | | | | | |
+교재 및 참고자료 | 4 | | | | | |
+교재 및 참고자료 | 5 | | | | | |
+교재 및 참고자료 | 6 | | | | | |
+교재 및 참고자료 | 7 | | | | | |
+교재 및 참고자료 | 8 | | | | | |
+교재 및 참고자료 | 9 | | | | | |
+교재 및 참고자료 | 10 | | | | | |
+추가문헌 및 자료 | 추가문헌 및 자료 | | | | | |
+평가방법
+평가항목 | 평가비율(%) | 추 가 설 명
+중간고사 | 30% |
+기말고사 | 30% |
+과제보고서 | 5% |
+발표 | 15% |
+출석 | 20% |
+기타 | 0% |
+주별강의내용
+차시 | 날짜 | 강의주제 및 내용 | 비고(주차별 수업방법,과제 등)
+1주 | 9/1 ~ 9/7 | Introduction: Artificial Intelligence, Google Colab Basics, Simple Classification (Chapter 1) |
+2주 | 9/8 ~ 9/14 | Data Preprocessing (Chapter 2) |
+3주 | 9/15 ~ 9/21 | Regression and Regularization (Chapter 3) |
+4주 | 9/22 ~ 9/28 | Classification Algorithms (Chapter 4) |
+5주 | 9/29 ~ 10/5 | Tree Algorithms (Chapter 5) |
+6주 | 10/6 ~ 10/12 | Tree Algorithms (Chapter 5) & Unsupervised Learning (Chapter 6) |
+7주 | 10/13 ~ 10/19 | Unsupervised Learning (Chapter 6) |
+8주 | 10/20 ~ 10/26 | Midterm Exam |
+9주 | 10/27 ~ 11/2 | Multi-Layer Perceptron (Chapter 7) |
+10주 | 11/3 ~ 11/9 | Multi-Layer Perceptron (Chapter 7) & Convolutional Neural Networks (Chapter 8) |
+11주 | 11/10 ~ 11/16 | Convolutional Neural Networks (Chapter 8) |
+12주 | 11/17 ~ 11/23 | Recurrent Neural Networks (Chapter 9) |
+13주 | 11/24 ~ 11/30 | Recurrent Neural Networks (Chapter 9) & Transformers (Chapter 10) |
+14주 | 12/1 ~ 12/7 | Final Project Presentation |
+15주 | 12/8 ~ 12/14 | Transformers (Chapter 10) |
+16주 | 12/15 ~ 12/21 | Final Exam |
+기타 | | |
+과제 | | |
+수업안내사항 | Taking the Introduction class in the first week is recommended. | Taking the Introduction class in the first week is recommended. | Taking the Introduction class in the first week is recommended.
+장애학생지원내용
+강의수강관련 | 시각장애: 디지털교재, 확대교재, 강의 녹취, 대필도우미 허용 지체장애: 대필도우미 및 수업보조 도우미 허용 청각장애: 대필 및 문자통역 도우미 활동 허용, 강의 녹취허용 건강장애: 질병 등으로 인한 결석에 대한 출석 인정, 대필 도우미 허용 학습장애: 대필도우미 허용 지적장애/자폐성장애: 대필도우미 및 수업멘토 허용
+과제 및 평가관련 | 과제 제출 및 응답 방식의 조정, 평가시간 연장, 평가 문항 제시 및 응답 방식의 조정, 별도 고사실 제공, 개별화 과제 제출 및 대체 평가 실시 과제 및 평가관련 :*장애유형, 정도에 따라 지원 내용이 다를 수 있음
+비고 | 본 과목을 수강하는 장애학생은 수업에 필요한 별도의 지원이 필요한 경우, 담당교강사 및 장애학생지원센터 (서울 02-961-2104~5, 국제 031-201-3460~1)로 필요한 사항을 요청하기 바랍니다.
+COPYRIGHT © KYUNG HEE UNIVERSITY. ALL RIGHT RESERVED.

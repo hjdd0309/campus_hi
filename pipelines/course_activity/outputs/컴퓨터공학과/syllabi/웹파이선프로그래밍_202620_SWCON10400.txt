@@ -1,0 +1,76 @@
+2026학년도 2학기 강의계획서
+출력
+기본정보
+강좌명 | 웹/파이선프로그래밍 | 교강사명 | 박상근(소프트웨어융합대학 소프트웨어융합학과)
+학수번호 | SWCON10400 | 사무실/연구실 | 전자정보대학 314호
+이수구분 | 전공필수 | 연락처 | 로그인하세요
+개설학과 | 소프트웨어융합대학 소프트웨어융합학과 소프트웨어융합학 | 연락처 | 로그인하세요
+학점 | 3 | 이메일 | 로그인하세요
+강의시간강의실 | 박상근 월13:00-14:50 전205, 박상근 수13:00-14:50 전205 | 홈페이지 | [개인용] https://uxc.khu.ac.kr/[수업용] e-campus.khu.ac.kr
+영어강좌여부 | 영어(부분)강좌 | 면담시간 | Office Hour : 화/목 12:00 - 13:00. 사전 예약 이메일: sk.park@khu.ac.kr
+성적기록방법 | 등급 | 등급 | 등급
+선수과목
+조회된 데이터가 존재하지 않습니다.
+수업개요 및 목표
+수업개요 | 파이썬은 웹 개발, 데이터 분석, 인공 지능 등 컴퓨터로 가능한 대부분의 영역에서 널리 쓰이고 있는 프로그래밍 언어입니다. 이 수업에서는 파이썬에 대한 기본 지식을 배우게 됩니다. 파이썬 학습을 통해 프로그래밍적 사고 능력을 기를 수 있으며, 나아가서 프로그래밍을 활용해 다양한 문제를 해결할 수 있습니다. 파이썬의 기본에 대해 먼저 학습 한 후, HTML, CSS, JavaScript 등의 웹 기본 지식을 학습하고 파이썬과 결합한 간단한 웹서비스 개발을 실습합니다. 이를 통해, 본인이 해결하고자 하는 문제를 해결하거나, 머릿속으로만 그리던 서비스를 실제로 구현하기 위한 첫 걸음을 내딛을 수 있습니다. 프로그래밍을 처음 접하는 학생들의 눈높이에 맞춰 수업을 진행하지만, 이미 파이썬에 대한 기본 지식이 있는 학생들도 파이썬에 대한 깊이를 더 느낄 수 있는 커리큘럼이 준비되어 있습니다. (단, 철저한 복습은 필수!)
+수업목표 | 1. 파이썬 개발 환경 구축 2. 파이썬 프로그래밍 언어의 기본 학습 3. 웹의 동작 원리 및 HTML, CSS, JavaScript 기본 학습 4. 데이터 분석 텀프로젝트 수행을 통한 실전 문제 해결 5. 자기소개 웹사이트 제작
+수업운영방식
+| 대면수업 | 실시간온라인수업 | 비실시간 온라인수업(콘텐츠 업로드 방식) | 하이브리드수업(일부 수강생은 대면으로,일부 수강생은 온라인으로 진행) | 블랜디드수업(시험 등 평가활동을 제외하고,30-50%가 원격수업으로 진행)
+| 수업운영방식 | | | | |
+추가설명 | 수업운영방식 | 별도 안내가 없을 시 대면 수업이 기본. | 별도 안내가 없을 시 대면 수업이 기본. | 별도 안내가 없을 시 대면 수업이 기본. | 별도 안내가 없을 시 대면 수업이 기본.
+수업유형 및 방법
+| 이론강의 | 실험/실습 | 실기 | ABEEK설계 | 현장학습 | 캡스톤디자인 | 기타
+수업유형 | 75% | 20% | 0% | 0% | 0% | 0% | 5%
+수업유형 | 수업유형추가설명 | 1. 강의계획서 숙지: 교재/일정 관련 2. 질의응답 방법: 2-1) Slido Q&A게시판에 질문 2-2) 수업 도중이라도 조교에게 가서 자유롭게 질문 가능 2-3) 질의응답 홈페이지(http://mobilelab.khu.ac.kr/wordpress/webpythonbbs/)에서, 본인이 궁금한 질문 관련 사항을 검색 후 질문 | 1. 강의계획서 숙지: 교재/일정 관련 2. 질의응답 방법: 2-1) Slido Q&A게시판에 질문 2-2) 수업 도중이라도 조교에게 가서 자유롭게 질문 가능 2-3) 질의응답 홈페이지(http://mobilelab.khu.ac.kr/wordpress/webpythonbbs/)에서, 본인이 궁금한 질문 관련 사항을 검색 후 질문 | 1. 강의계획서 숙지: 교재/일정 관련 2. 질의응답 방법: 2-1) Slido Q&A게시판에 질문 2-2) 수업 도중이라도 조교에게 가서 자유롭게 질문 가능 2-3) 질의응답 홈페이지(http://mobilelab.khu.ac.kr/wordpress/webpythonbbs/)에서, 본인이 궁금한 질문 관련 사항을 검색 후 질문 | 1. 강의계획서 숙지: 교재/일정 관련 2. 질의응답 방법: 2-1) Slido Q&A게시판에 질문 2-2) 수업 도중이라도 조교에게 가서 자유롭게 질문 가능 2-3) 질의응답 홈페이지(http://mobilelab.khu.ac.kr/wordpress/webpythonbbs/)에서, 본인이 궁금한 질문 관련 사항을 검색 후 질문 | 1. 강의계획서 숙지: 교재/일정 관련 2. 질의응답 방법: 2-1) Slido Q&A게시판에 질문 2-2) 수업 도중이라도 조교에게 가서 자유롭게 질문 가능 2-3) 질의응답 홈페이지(http://mobilelab.khu.ac.kr/wordpress/webpythonbbs/)에서, 본인이 궁금한 질문 관련 사항을 검색 후 질문 | 1. 강의계획서 숙지: 교재/일정 관련 2. 질의응답 방법: 2-1) Slido Q&A게시판에 질문 2-2) 수업 도중이라도 조교에게 가서 자유롭게 질문 가능 2-3) 질의응답 홈페이지(http://mobilelab.khu.ac.kr/wordpress/webpythonbbs/)에서, 본인이 궁금한 질문 관련 사항을 검색 후 질문
+| 토의/토론 | 특강/세미나 | 팀별발표 | 개별발표 | 시청각 | 온라인강의 | e-campus활용 | PBL/CBL
+수업방법 | | | | | | | ○ | ○
+수업방법 | 이론강의 | 실험/실습 | 실기 | 유인물 | 견학/현장강의 | QUEST 수업 | 기타 |
+수업방법 | ○ | ○ | | | | ○ | ○ |
+수업진행추가설명 | 본 강의에서는 온라인 퀴즈 및 Q&A 학습 도구인 Slido (https://www.slido.com)를 활용해서 수업 시간에 배운 내용을 온라인 퀴즈로 복습합니다. 학생 여러분은 여러분의 노트북 또는 스마트폰으로 https://www.slido.com에 접속하고, 제가 불러주는 입장 코드를 입력하면 본 퀴즈에 참여할 수 있습니다. 점수에 반영되는 퀴즈는 아니니 편하게 본인의 닉네임을 설정하고 접속해서 퀴즈에 참여하기 바랍니다. 수업 도중 궁금한 점에 대해서는 Slido의 Q&A게시판에 질문주시면 수시로 확인하면서 해당 질문에 답변드립니다. | 본 강의에서는 온라인 퀴즈 및 Q&A 학습 도구인 Slido (https://www.slido.com)를 활용해서 수업 시간에 배운 내용을 온라인 퀴즈로 복습합니다. 학생 여러분은 여러분의 노트북 또는 스마트폰으로 https://www.slido.com에 접속하고, 제가 불러주는 입장 코드를 입력하면 본 퀴즈에 참여할 수 있습니다. 점수에 반영되는 퀴즈는 아니니 편하게 본인의 닉네임을 설정하고 접속해서 퀴즈에 참여하기 바랍니다. 수업 도중 궁금한 점에 대해서는 Slido의 Q&A게시판에 질문주시면 수시로 확인하면서 해당 질문에 답변드립니다. | 본 강의에서는 온라인 퀴즈 및 Q&A 학습 도구인 Slido (https://www.slido.com)를 활용해서 수업 시간에 배운 내용을 온라인 퀴즈로 복습합니다. 학생 여러분은 여러분의 노트북 또는 스마트폰으로 https://www.slido.com에 접속하고, 제가 불러주는 입장 코드를 입력하면 본 퀴즈에 참여할 수 있습니다. 점수에 반영되는 퀴즈는 아니니 편하게 본인의 닉네임을 설정하고 접속해서 퀴즈에 참여하기 바랍니다. 수업 도중 궁금한 점에 대해서는 Slido의 Q&A게시판에 질문주시면 수시로 확인하면서 해당 질문에 답변드립니다. | 본 강의에서는 온라인 퀴즈 및 Q&A 학습 도구인 Slido (https://www.slido.com)를 활용해서 수업 시간에 배운 내용을 온라인 퀴즈로 복습합니다. 학생 여러분은 여러분의 노트북 또는 스마트폰으로 https://www.slido.com에 접속하고, 제가 불러주는 입장 코드를 입력하면 본 퀴즈에 참여할 수 있습니다. 점수에 반영되는 퀴즈는 아니니 편하게 본인의 닉네임을 설정하고 접속해서 퀴즈에 참여하기 바랍니다. 수업 도중 궁금한 점에 대해서는 Slido의 Q&A게시판에 질문주시면 수시로 확인하면서 해당 질문에 답변드립니다. | 본 강의에서는 온라인 퀴즈 및 Q&A 학습 도구인 Slido (https://www.slido.com)를 활용해서 수업 시간에 배운 내용을 온라인 퀴즈로 복습합니다. 학생 여러분은 여러분의 노트북 또는 스마트폰으로 https://www.slido.com에 접속하고, 제가 불러주는 입장 코드를 입력하면 본 퀴즈에 참여할 수 있습니다. 점수에 반영되는 퀴즈는 아니니 편하게 본인의 닉네임을 설정하고 접속해서 퀴즈에 참여하기 바랍니다. 수업 도중 궁금한 점에 대해서는 Slido의 Q&A게시판에 질문주시면 수시로 확인하면서 해당 질문에 답변드립니다. | 본 강의에서는 온라인 퀴즈 및 Q&A 학습 도구인 Slido (https://www.slido.com)를 활용해서 수업 시간에 배운 내용을 온라인 퀴즈로 복습합니다. 학생 여러분은 여러분의 노트북 또는 스마트폰으로 https://www.slido.com에 접속하고, 제가 불러주는 입장 코드를 입력하면 본 퀴즈에 참여할 수 있습니다. 점수에 반영되는 퀴즈는 아니니 편하게 본인의 닉네임을 설정하고 접속해서 퀴즈에 참여하기 바랍니다. 수업 도중 궁금한 점에 대해서는 Slido의 Q&A게시판에 질문주시면 수시로 확인하면서 해당 질문에 답변드립니다. | 본 강의에서는 온라인 퀴즈 및 Q&A 학습 도구인 Slido (https://www.slido.com)를 활용해서 수업 시간에 배운 내용을 온라인 퀴즈로 복습합니다. 학생 여러분은 여러분의 노트북 또는 스마트폰으로 https://www.slido.com에 접속하고, 제가 불러주는 입장 코드를 입력하면 본 퀴즈에 참여할 수 있습니다. 점수에 반영되는 퀴즈는 아니니 편하게 본인의 닉네임을 설정하고 접속해서 퀴즈에 참여하기 바랍니다. 수업 도중 궁금한 점에 대해서는 Slido의 Q&A게시판에 질문주시면 수시로 확인하면서 해당 질문에 답변드립니다. | 본 강의에서는 온라인 퀴즈 및 Q&A 학습 도구인 Slido (https://www.slido.com)를 활용해서 수업 시간에 배운 내용을 온라인 퀴즈로 복습합니다. 학생 여러분은 여러분의 노트북 또는 스마트폰으로 https://www.slido.com에 접속하고, 제가 불러주는 입장 코드를 입력하면 본 퀴즈에 참여할 수 있습니다. 점수에 반영되는 퀴즈는 아니니 편하게 본인의 닉네임을 설정하고 접속해서 퀴즈에 참여하기 바랍니다. 수업 도중 궁금한 점에 대해서는 Slido의 Q&A게시판에 질문주시면 수시로 확인하면서 해당 질문에 답변드립니다.
+교재 및 참고자료
+교재구분 | 교재구분 | 서명 | 저자명 | 출판사 | 출판년도 | ISBN | 비고
+교재 및 참고자료 | 1 | 주교재: 박상근 교수 자체 제작 PPT (e-Campus에서 다운로드) | 박상근 | 박상근 | | |
+교재 및 참고자료 | 2 | [참고도서] Do it! 점프 투 파이썬 (https://wikidocs.net/book/1 에 무료 공개) | 박응용 | 이지스퍼블리싱 | 2019 | 9791163030911 |
+교재 및 참고자료 | 3 | [참고도서] 왕초보를 위한 Python: 쉽게 풀어 쓴 기초 문법과 실습(https://wikidocs.net/book/2 에 무료 공개) | 전뇌해커 | | | |
+교재 및 참고자료 | 4 | | | | | |
+교재 및 참고자료 | 5 | | | | | |
+교재 및 참고자료 | 6 | | | | | |
+교재 및 참고자료 | 7 | | | | | |
+교재 및 참고자료 | 8 | | | | | |
+교재 및 참고자료 | 9 | | | | | |
+교재 및 참고자료 | 10 | | | | | |
+추가문헌 및 자료 | 추가문헌 및 자료 | ㅇ 주교재: https://e-campus.khu.ac.kr/ 에서 PPT 다운로드 ㅇ 기타 참고자료: - Free Python Material (Korean) - Jump to Python: https://wikidocs.net/book/1 - Free Python Material (Korean) - 왕초보를 위한 Python: 쉽게 풀어 쓴 기초 문법과 실습: https://wikidocs.net/book/2 - Free Python Material (English) - Think Python (2nd Edition): http://greenteapress.com/wp/think-python-2e/ - HTML Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/HTML - HTML Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/HTML - CSS Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/CSS - CSS Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/CSS - JavaScript Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/JavaScript - JavaScript Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/JavaScript | ㅇ 주교재: https://e-campus.khu.ac.kr/ 에서 PPT 다운로드 ㅇ 기타 참고자료: - Free Python Material (Korean) - Jump to Python: https://wikidocs.net/book/1 - Free Python Material (Korean) - 왕초보를 위한 Python: 쉽게 풀어 쓴 기초 문법과 실습: https://wikidocs.net/book/2 - Free Python Material (English) - Think Python (2nd Edition): http://greenteapress.com/wp/think-python-2e/ - HTML Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/HTML - HTML Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/HTML - CSS Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/CSS - CSS Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/CSS - JavaScript Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/JavaScript - JavaScript Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/JavaScript | ㅇ 주교재: https://e-campus.khu.ac.kr/ 에서 PPT 다운로드 ㅇ 기타 참고자료: - Free Python Material (Korean) - Jump to Python: https://wikidocs.net/book/1 - Free Python Material (Korean) - 왕초보를 위한 Python: 쉽게 풀어 쓴 기초 문법과 실습: https://wikidocs.net/book/2 - Free Python Material (English) - Think Python (2nd Edition): http://greenteapress.com/wp/think-python-2e/ - HTML Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/HTML - HTML Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/HTML - CSS Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/CSS - CSS Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/CSS - JavaScript Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/JavaScript - JavaScript Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/JavaScript | ㅇ 주교재: https://e-campus.khu.ac.kr/ 에서 PPT 다운로드 ㅇ 기타 참고자료: - Free Python Material (Korean) - Jump to Python: https://wikidocs.net/book/1 - Free Python Material (Korean) - 왕초보를 위한 Python: 쉽게 풀어 쓴 기초 문법과 실습: https://wikidocs.net/book/2 - Free Python Material (English) - Think Python (2nd Edition): http://greenteapress.com/wp/think-python-2e/ - HTML Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/HTML - HTML Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/HTML - CSS Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/CSS - CSS Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/CSS - JavaScript Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/JavaScript - JavaScript Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/JavaScript | ㅇ 주교재: https://e-campus.khu.ac.kr/ 에서 PPT 다운로드 ㅇ 기타 참고자료: - Free Python Material (Korean) - Jump to Python: https://wikidocs.net/book/1 - Free Python Material (Korean) - 왕초보를 위한 Python: 쉽게 풀어 쓴 기초 문법과 실습: https://wikidocs.net/book/2 - Free Python Material (English) - Think Python (2nd Edition): http://greenteapress.com/wp/think-python-2e/ - HTML Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/HTML - HTML Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/HTML - CSS Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/CSS - CSS Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/CSS - JavaScript Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/JavaScript - JavaScript Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/JavaScript | ㅇ 주교재: https://e-campus.khu.ac.kr/ 에서 PPT 다운로드 ㅇ 기타 참고자료: - Free Python Material (Korean) - Jump to Python: https://wikidocs.net/book/1 - Free Python Material (Korean) - 왕초보를 위한 Python: 쉽게 풀어 쓴 기초 문법과 실습: https://wikidocs.net/book/2 - Free Python Material (English) - Think Python (2nd Edition): http://greenteapress.com/wp/think-python-2e/ - HTML Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/HTML - HTML Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/HTML - CSS Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/CSS - CSS Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/CSS - JavaScript Mozila Official Document (English): https://developer.mozilla.org/en-US/docs/Web/JavaScript - JavaScript Mozila Official Document (Korean): https://developer.mozilla.org/ko/docs/Web/JavaScript
+평가방법
+평가항목 | 평가비율(%) | 추 가 설 명
+중간고사 | 20% |
+기말고사 | 60% |
+과제보고서 | 15% |
+발표 | 0% |
+출석 | 0% | - 결석시 100점 만점에서 1점씩 계속 차감, (지각/조퇴는 0.5점씩 차감)- 교칙에 의거, 수업의 1/3 이상 결석시 자동 F
+기타 | 5% | “본 과목은 교수-학생 상호작용 활성화 수업지원 프로그램에 참여하는 교과목임:e-Campus 상에 학습일지 제출 및 e-Campus를 통한 튜터의 피드백 제공”
+주별강의내용
+차시 | 날짜 | 강의주제 및 내용 | 비고(주차별 수업방법,과제 등)
+1주 | 9/1 ~ 9/7 | Orientation Setting up Python development evironment |
+2주 | 9/8 ~ 9/14 | Variables Data Types (Numeric, String) |
+3주 | 9/15 ~ 9/21 | Data Types (List, Tuple, Set, Dictionary) |
+4주 | 9/22 ~ 9/28 | Boolean Conditional Statement |
+5주 | 9/29 ~ 10/5 | Loop |
+6주 | 10/6 ~ 10/12 | Function |
+7주 | 10/13 ~ 10/19 | Function Module |
+8주 | 10/20 ~ 10/26 | Mid-term Exam |
+9주 | 10/27 ~ 11/2 | File Class 1 |
+10주 | 11/3 ~ 11/9 | Class 2 |
+11주 | 11/10 ~ 11/16 | Exception Data analysis using Python (Pandas and Matplotlib) |
+12주 | 11/17 ~ 11/23 | Introduction to Web HTML |
+13주 | 11/24 ~ 11/30 | CSS |
+14주 | 12/1 ~ 12/7 | JavaScript |
+15주 | 12/8 ~ 12/14 | Final Exam |
+16주 | 12/15 ~ 12/21 | . |
+기타 | - 결석시 100점 만점에서 1점씩 계속 차감, (지각/조퇴는 2번 모이면 결석 1회로 계산함) - 교칙에 의거, 수업의 1/3 이상 결석시 자동 F. - 교칙에 의거, 수업에 "실제" 참석 일수 1/2 미만이면 자동 F. | - 결석시 100점 만점에서 1점씩 계속 차감, (지각/조퇴는 2번 모이면 결석 1회로 계산함) - 교칙에 의거, 수업의 1/3 이상 결석시 자동 F. - 교칙에 의거, 수업에 "실제" 참석 일수 1/2 미만이면 자동 F. | - 결석시 100점 만점에서 1점씩 계속 차감, (지각/조퇴는 2번 모이면 결석 1회로 계산함) - 교칙에 의거, 수업의 1/3 이상 결석시 자동 F. - 교칙에 의거, 수업에 "실제" 참석 일수 1/2 미만이면 자동 F.
+과제 | - 데이터 분석 텀프로젝트 수행 - 자기소개 웹사이트 제작 텀프로젝트 수행 | - 데이터 분석 텀프로젝트 수행 - 자기소개 웹사이트 제작 텀프로젝트 수행 | - 데이터 분석 텀프로젝트 수행 - 자기소개 웹사이트 제작 텀프로젝트 수행
+수업안내사항 | - 수업 일정은 사정에 따라 변동될 수 있습니다. - 시험을 위해 각자 노트북을 준비해와야 합니다. | - 수업 일정은 사정에 따라 변동될 수 있습니다. - 시험을 위해 각자 노트북을 준비해와야 합니다. | - 수업 일정은 사정에 따라 변동될 수 있습니다. - 시험을 위해 각자 노트북을 준비해와야 합니다.
+장애학생지원내용
+강의수강관련 | 시각장애: 디지털교재, 확대교재, 강의 녹취, 대필도우미 허용 지체장애: 대필도우미 및 수업보조 도우미 허용 청각장애: 대필 및 문자통역 도우미 활동 허용, 강의 녹취허용 건강장애: 질병 등으로 인한 결석에 대한 출석 인정, 대필 도우미 허용 학습장애: 대필도우미 허용 지적장애/자폐성장애: 대필도우미 및 수업멘토 허용
+과제 및 평가관련 | 과제 제출 및 응답 방식의 조정, 평가시간 연장, 평가 문항 제시 및 응답 방식의 조정, 별도 고사실 제공, 개별화 과제 제출 및 대체 평가 실시 과제 및 평가관련 :*장애유형, 정도에 따라 지원 내용이 다를 수 있음
+비고 | 본 과목을 수강하는 장애학생은 수업에 필요한 별도의 지원이 필요한 경우, 담당교강사 및 장애학생지원센터 (서울 02-961-2104~5, 국제 031-201-3460~1)로 필요한 사항을 요청하기 바랍니다.
+COPYRIGHT © KYUNG HEE UNIVERSITY. ALL RIGHT RESERVED.

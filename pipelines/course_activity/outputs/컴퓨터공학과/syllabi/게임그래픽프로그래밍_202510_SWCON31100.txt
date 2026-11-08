@@ -1,0 +1,77 @@
+2025학년도 1학기 강의계획서
+출력
+기본정보
+강좌명 | 게임그래픽프로그래밍 | 교강사명 | 이대호(소프트웨어융합대학 소프트웨어융합학과)
+학수번호 | SWCON31100 | 사무실/연구실 |
+이수구분 | 전공선택 | 연락처 | 로그인하세요
+개설학과 | 소프트웨어융합대학 소프트웨어융합학과 소프트웨어융합학 | 연락처 | 로그인하세요
+학점 | 3 | 이메일 | 로그인하세요
+강의시간강의실 | 이대호 월12:00-13:50 B06, 이대호 수12:00-13:50 B06 | 홈페이지 | [개인용] [수업용]
+영어강좌여부 | | 면담시간 |
+성적기록방법 | 등급 | 등급 | 등급
+선수과목
+조회된 데이터가 존재하지 않습니다.
+수업개요 및 목표
+수업개요 | 게임 제작에 있어서 가장 기본이 되는 3차원 컴퓨터 그래픽스의 기초 및 중요 요소를 다루고 DirectX 에 대해서 실습 (C/C++기반) 을 통해 실습을 진행
+수업목표 | 1. 그래픽 좌표계, 공간, 벡터, 행렬등 수학기반의 이론들을 학습하고 실습에 적용 2. C/C++를 이용한 DirectX 사용 (rendering pipeline, shader, texture, illumination, etc.) 3. Computer Graphics Advanced 이론들
+수업운영방식
+| 대면수업 | 비대면 수업(e-campus) | 비대면 수업(e-campus) | 비대면 수업(e-campus) | 대면 + 비대면 병행(대면 + e-campus) | 대면 + 비대면 병행(대면 + e-campus) | 대면 + 비대면 병행(대면 + e-campus)
+| 대면수업 | 실시간비대면 수업(zoom) | 비실시간비대면 수업(contents) | 실시간+비실시간비대면 수업(zoom+contents) | 대면 + 실시간비대면 수업(대면+zoom) | 대면 + 비실시간비대면 수업(대면+contents) | 대면+실시간+비실시간비대면 수업(대면+zoom+contents)
+수업운영방식 | ○ | | | | | |
+수업운영방식 | 추가설명 | 기본적으로 모든 이론 및 실습을 대면 수업으로 진행 (공휴일은 온라인으로 진행할 수 있음) | 기본적으로 모든 이론 및 실습을 대면 수업으로 진행 (공휴일은 온라인으로 진행할 수 있음) | 기본적으로 모든 이론 및 실습을 대면 수업으로 진행 (공휴일은 온라인으로 진행할 수 있음) | 기본적으로 모든 이론 및 실습을 대면 수업으로 진행 (공휴일은 온라인으로 진행할 수 있음) | 기본적으로 모든 이론 및 실습을 대면 수업으로 진행 (공휴일은 온라인으로 진행할 수 있음) | 기본적으로 모든 이론 및 실습을 대면 수업으로 진행 (공휴일은 온라인으로 진행할 수 있음)
+수업유형 및 방법
+| 이론강의 | 실험/실습 | 실기 | ABEEK설계 | 현장학습 | 캡스톤디자인 | 기타
+수업유형 | 50% | 50% | 0% | 0% | 0% | 0% | 0%
+수업유형 | 수업유형추가설명 | 1. 이론 및 실습 2. 실습에는 아래의 오픈 소스를 이용함 - https://github.com/d3dcoder/d3d12book - https://github.com/yottaawesome/intro-to-dx12 3. 참고로 사용하는 오픈 소스 - https://github.com/jpvanoosten/LearningDirectX12/tree/v0.0.4 - https://github.com/NizeLee/KhuGle/tree/main/04.%20KhuGle(3D%20Rendering) | 1. 이론 및 실습 2. 실습에는 아래의 오픈 소스를 이용함 - https://github.com/d3dcoder/d3d12book - https://github.com/yottaawesome/intro-to-dx12 3. 참고로 사용하는 오픈 소스 - https://github.com/jpvanoosten/LearningDirectX12/tree/v0.0.4 - https://github.com/NizeLee/KhuGle/tree/main/04.%20KhuGle(3D%20Rendering) | 1. 이론 및 실습 2. 실습에는 아래의 오픈 소스를 이용함 - https://github.com/d3dcoder/d3d12book - https://github.com/yottaawesome/intro-to-dx12 3. 참고로 사용하는 오픈 소스 - https://github.com/jpvanoosten/LearningDirectX12/tree/v0.0.4 - https://github.com/NizeLee/KhuGle/tree/main/04.%20KhuGle(3D%20Rendering) | 1. 이론 및 실습 2. 실습에는 아래의 오픈 소스를 이용함 - https://github.com/d3dcoder/d3d12book - https://github.com/yottaawesome/intro-to-dx12 3. 참고로 사용하는 오픈 소스 - https://github.com/jpvanoosten/LearningDirectX12/tree/v0.0.4 - https://github.com/NizeLee/KhuGle/tree/main/04.%20KhuGle(3D%20Rendering) | 1. 이론 및 실습 2. 실습에는 아래의 오픈 소스를 이용함 - https://github.com/d3dcoder/d3d12book - https://github.com/yottaawesome/intro-to-dx12 3. 참고로 사용하는 오픈 소스 - https://github.com/jpvanoosten/LearningDirectX12/tree/v0.0.4 - https://github.com/NizeLee/KhuGle/tree/main/04.%20KhuGle(3D%20Rendering) | 1. 이론 및 실습 2. 실습에는 아래의 오픈 소스를 이용함 - https://github.com/d3dcoder/d3d12book - https://github.com/yottaawesome/intro-to-dx12 3. 참고로 사용하는 오픈 소스 - https://github.com/jpvanoosten/LearningDirectX12/tree/v0.0.4 - https://github.com/NizeLee/KhuGle/tree/main/04.%20KhuGle(3D%20Rendering)
+| 토의/토론 | 특강/세미나 | 팀별발표 | 개별발표 | 시청각 | 온라인강의 | e-campus활용 | PBL/CBL
+수업방법 | | | | | | | ○ |
+수업방법 | 이론강의 | 실험/실습 | 실기 | 유인물 | 견학/현장강의 | QUEST 수업 | 기타 |
+수업방법 | ○ | ○ | | | | | |
+수업진행추가설명 | | | | | | | |
+교재 및 참고자료
+교재구분 | 교재구분 | 서명 | 저자명 | 출판사 | 출판년도 | ISBN | 비고
+교재 및 참고자료 | 1 | Introduction to 3D Game Programming with DirectX® 12 | F. D. Luna | Mercury Learning | | |
+교재 및 참고자료 | 2 | 강의노트 | 이대호 | | | |
+교재 및 참고자료 | 3 | | | | | |
+교재 및 참고자료 | 4 | | | | | |
+교재 및 참고자료 | 5 | | | | | |
+교재 및 참고자료 | 6 | | | | | |
+교재 및 참고자료 | 7 | | | | | |
+교재 및 참고자료 | 8 | | | | | |
+교재 및 참고자료 | 9 | | | | | |
+교재 및 참고자료 | 10 | | | | | |
+추가문헌 및 자료 | 추가문헌 및 자료 | | | | | |
+평가방법
+평가항목 | 평가비율(%) | 추 가 설 명
+중간고사 | 30% |
+기말고사 | 30% |
+과제보고서 | 30% |
+발표 | 0% |
+출석 | 10% |
+기타 | 0% |
+주별강의내용
+차시 | 날짜 | 강의주제 및 내용 | 비고(주차별 수업방법,과제 등)
+1주 | 3/4 ~ 3/10 | Introduction |
+2주 | 3/11 ~ 3/17 | Vector, matrix and transformation |
+3주 | 3/18 ~ 3/24 | Vector, matrix and transformation |
+4주 | 3/25 ~ 3/31 | Direct3D Initialization |
+5주 | 4/1 ~ 4/7 | The rendering pipeline |
+6주 | 4/8 ~ 4/14 | Drawing in Direct3D I |
+7주 | 4/15 ~ 4/21 | Drawing in Direct 3D II |
+8주 | 4/22 ~ 4/28 | Drawing in Direct 3D II/중간고사 |
+9주 | 4/29 ~ 5/5 | Lighting |
+10주 | 5/6 ~ 5/12 | Texturing |
+11주 | 5/13 ~ 5/19 | Blending |
+12주 | 5/20 ~ 5/26 | Stenciling |
+13주 | 5/27 ~ 6/2 | The geometry shader/The compute shader |
+14주 | 6/3 ~ 6/9 | The tessellation stages/Quaternions |
+15주 | 6/10 ~ 6/16 | Character animation/기말고사 |
+16주 | 6/17 ~ 6/23 | |
+기타 | | |
+과제 | | |
+수업안내사항 | | |
+장애학생지원내용
+강의수강관련 | 시각장애: 디지털교재, 확대교재, 강의 녹취, 대필도우미 허용 지체장애: 대필도우미 및 수업보조 도우미 허용 청각장애: 대필 및 문자통역 도우미 활동 허용, 강의 녹취허용 건강장애: 질병 등으로 인한 결석에 대한 출석 인정, 대필 도우미 허용 학습장애: 대필도우미 허용 지적장애/자폐성장애: 대필도우미 및 수업멘토 허용
+과제 및 평가관련 | 과제 제출 및 응답 방식의 조정, 평가시간 연장, 평가 문항 제시 및 응답 방식의 조정, 별도 고사실 제공, 개별화 과제 제출 및 대체 평가 실시 과제 및 평가관련 :*장애유형, 정도에 따라 지원 내용이 다를 수 있음
+비고 | 본 과목을 수강하는 장애학생은 수업에 필요한 별도의 지원이 필요한 경우, 담당교강사 및 장애학생지원센터 (서울 02-961-2104~5, 국제 031-201-3460~1)로 필요한 사항을 요청하기 바랍니다.
+COPYRIGHT © KYUNG HEE UNIVERSITY. ALL RIGHT RESERVED.

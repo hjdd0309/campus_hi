@@ -1,0 +1,79 @@
+2026학년도 2학기 강의계획서
+출력
+기본정보
+강좌명 | 고급딥러닝 | 교강사명 | 최성하(소프트웨어융합대학 컴퓨터공학부)
+학수번호 | AI300100 | 사무실/연구실 | 우정원 (Woojeongwon) 6029
+이수구분 | 전공필수 | 연락처 | 로그인하세요
+개설학과 | 소프트웨어융합대학 컴퓨터공학부 인공지능학과 | 연락처 | 로그인하세요
+학점 | 3 | 이메일 | 로그인하세요
+강의시간강의실 | 최성하 화16:30-17:45 전103, 최성하 목16:30-17:45 전103 | 홈페이지 | [개인용] https://www.sunghachoi.com[수업용] https://emil.khu.ac.kr/teaching/advanced-deep-learning
+영어강좌여부 | 영어(부분)강좌 | 면담시간 | By email appointment
+성적기록방법 | 등급 | 등급 | 등급
+선수과목
+선수과목 | 필수선수과목 | 적용학번 | Abeek적용여부 | 선수교과목그룹 | 선수교과목 | 적용성적 | 필수이수과목수
+선수과목 | 필수선수과목 | 2010 ~ | N | 01 | 딥러닝(CSE331) | | 1
+선수과목 | 필수선수과목 | 2010 ~ | N | 01 | 머신러닝(CSE331) | | 1
+선수과목 | 추천선수과목 | AI and Ethics (AI3002) Web/Python Programming (SWCON104) | AI and Ethics (AI3002) Web/Python Programming (SWCON104) | AI and Ethics (AI3002) Web/Python Programming (SWCON104) | AI and Ethics (AI3002) Web/Python Programming (SWCON104) | AI and Ethics (AI3002) Web/Python Programming (SWCON104) | AI and Ethics (AI3002) Web/Python Programming (SWCON104)
+수업개요 및 목표
+수업개요 | This course introduces the core architectures, training methods, tuning strategies, and evaluation techniques of modern AI models, with a focus on Attention, Transformers, and Large Language Models (LLMs). It also covers recent extensions of LLMs, including reasoning, Multimodal Large Language Models (MLLMs), Agentic AI, and Retrieval-Augmented Generation (RAG). Students will gain basic hands-on experience through assignments using PyTorch and Hugging Face. --- Lectures will be delivered in Korean, while lecture slides will be provided in English. Exam questions will be provided only in English. Students may write exam answers in either Korean or English. 강의는 한국어로 진행되며, 강의 슬라이드는 영어로 제공됩니다. 시험문제는 영어로만 제공됩니다. 시험 답안은 한국어 또는 영어로 작성할 수 있습니다.
+수업목표 | By the end of this course, students will understand the core principles of Attention, Transformers, and LLMs, and gain a conceptual understanding of how modern AI models are developed, adapted, and evaluated. They will also learn key concepts in reasoning, multimodal AI, Agentic AI, and RAG, while building basic practical familiarity through PyTorch and Hugging Face-based assignments.
+수업운영방식
+| 대면수업 | 실시간온라인수업 | 비실시간 온라인수업(콘텐츠 업로드 방식) | 하이브리드수업(일부 수강생은 대면으로,일부 수강생은 온라인으로 진행) | 블랜디드수업(시험 등 평가활동을 제외하고,30-50%가 원격수업으로 진행)
+| 수업운영방식 | | | | |
+추가설명 | 수업운영방식 | Lecture-based in-person course with programming assignments | Lecture-based in-person course with programming assignments | Lecture-based in-person course with programming assignments | Lecture-based in-person course with programming assignments
+수업유형 및 방법
+| 이론강의 | 실험/실습 | 실기 | ABEEK설계 | 현장학습 | 캡스톤디자인 | 기타
+수업유형 | 90% | 10% | 0% | 0% | 0% | 0% | 0%
+수업유형 | 수업유형추가설명 | Lecture-based in-person course with programming assignments | Lecture-based in-person course with programming assignments | Lecture-based in-person course with programming assignments | Lecture-based in-person course with programming assignments | Lecture-based in-person course with programming assignments | Lecture-based in-person course with programming assignments
+| 토의/토론 | 특강/세미나 | 팀별발표 | 개별발표 | 시청각 | 온라인강의 | e-campus활용 | PBL/CBL
+수업방법 | | ○ | | | | | |
+수업방법 | 이론강의 | 실험/실습 | 실기 | 유인물 | 견학/현장강의 | QUEST 수업 | 기타 |
+수업방법 | ○ | | | | | | |
+수업진행추가설명 | This course is primarily lecture-based, with possible invited talks by AI professionals from industry. 이 수업은 주로 강의 중심으로 진행되며, 산업계에서 활동하는 AI 전문가들의 초청 강연이 포함될 수 있습니다. | This course is primarily lecture-based, with possible invited talks by AI professionals from industry. 이 수업은 주로 강의 중심으로 진행되며, 산업계에서 활동하는 AI 전문가들의 초청 강연이 포함될 수 있습니다. | This course is primarily lecture-based, with possible invited talks by AI professionals from industry. 이 수업은 주로 강의 중심으로 진행되며, 산업계에서 활동하는 AI 전문가들의 초청 강연이 포함될 수 있습니다. | This course is primarily lecture-based, with possible invited talks by AI professionals from industry. 이 수업은 주로 강의 중심으로 진행되며, 산업계에서 활동하는 AI 전문가들의 초청 강연이 포함될 수 있습니다. | This course is primarily lecture-based, with possible invited talks by AI professionals from industry. 이 수업은 주로 강의 중심으로 진행되며, 산업계에서 활동하는 AI 전문가들의 초청 강연이 포함될 수 있습니다. | This course is primarily lecture-based, with possible invited talks by AI professionals from industry. 이 수업은 주로 강의 중심으로 진행되며, 산업계에서 활동하는 AI 전문가들의 초청 강연이 포함될 수 있습니다. | This course is primarily lecture-based, with possible invited talks by AI professionals from industry. 이 수업은 주로 강의 중심으로 진행되며, 산업계에서 활동하는 AI 전문가들의 초청 강연이 포함될 수 있습니다. | This course is primarily lecture-based, with possible invited talks by AI professionals from industry. 이 수업은 주로 강의 중심으로 진행되며, 산업계에서 활동하는 AI 전문가들의 초청 강연이 포함될 수 있습니다.
+교재 및 참고자료
+교재구분 | 교재구분 | 서명 | 저자명 | 출판사 | 출판년도 | ISBN | 비고
+교재 및 참고자료 | 1 | | | | | |
+교재 및 참고자료 | 2 | | | | | |
+교재 및 참고자료 | 3 | | | | | |
+교재 및 참고자료 | 4 | | | | | |
+교재 및 참고자료 | 5 | | | | | |
+교재 및 참고자료 | 6 | | | | | |
+교재 및 참고자료 | 7 | | | | | |
+교재 및 참고자료 | 8 | | | | | |
+교재 및 참고자료 | 9 | | | | | |
+교재 및 참고자료 | 10 | | | | | |
+추가문헌 및 자료 | 추가문헌 및 자료 | No required textbook. The course will primarily use lecture slides and selected reference materials, which may include: - CS224N: Natural Language Processing with Deep Learning (https://web.stanford.edu/class/archive/cs/cs224n/cs224n.1246) - CS231N: Deep Learning for Computer Vision (https://cs231n.stanford.edu/2025) - CME295: Transformers & Large Language Models (https://cme295.stanford.edu/) | No required textbook. The course will primarily use lecture slides and selected reference materials, which may include: - CS224N: Natural Language Processing with Deep Learning (https://web.stanford.edu/class/archive/cs/cs224n/cs224n.1246) - CS231N: Deep Learning for Computer Vision (https://cs231n.stanford.edu/2025) - CME295: Transformers & Large Language Models (https://cme295.stanford.edu/) | No required textbook. The course will primarily use lecture slides and selected reference materials, which may include: - CS224N: Natural Language Processing with Deep Learning (https://web.stanford.edu/class/archive/cs/cs224n/cs224n.1246) - CS231N: Deep Learning for Computer Vision (https://cs231n.stanford.edu/2025) - CME295: Transformers & Large Language Models (https://cme295.stanford.edu/) | No required textbook. The course will primarily use lecture slides and selected reference materials, which may include: - CS224N: Natural Language Processing with Deep Learning (https://web.stanford.edu/class/archive/cs/cs224n/cs224n.1246) - CS231N: Deep Learning for Computer Vision (https://cs231n.stanford.edu/2025) - CME295: Transformers & Large Language Models (https://cme295.stanford.edu/) | No required textbook. The course will primarily use lecture slides and selected reference materials, which may include: - CS224N: Natural Language Processing with Deep Learning (https://web.stanford.edu/class/archive/cs/cs224n/cs224n.1246) - CS231N: Deep Learning for Computer Vision (https://cs231n.stanford.edu/2025) - CME295: Transformers & Large Language Models (https://cme295.stanford.edu/) | No required textbook. The course will primarily use lecture slides and selected reference materials, which may include: - CS224N: Natural Language Processing with Deep Learning (https://web.stanford.edu/class/archive/cs/cs224n/cs224n.1246) - CS231N: Deep Learning for Computer Vision (https://cs231n.stanford.edu/2025) - CME295: Transformers & Large Language Models (https://cme295.stanford.edu/)
+평가방법
+평가항목 | 평가비율(%) | 추 가 설 명
+중간고사 | 30% |
+기말고사 | 40% |
+과제보고서 | 20% | Hands-on assignments will use selected materials from Stanford CS224N and CS231N. Students are strongly encouraged to complete them independently, as related questions may appear on the exams. In addition, quizzes will be given throughout the course.In addition, if invited talks are held during the course, students’ reflections and questions may be reflected in the Assignment/Report score.실습 과제는 Stanford CS224N 및 CS231N의 선별된 자료를 활용하여 진행됩니다. 관련 문제가 시험에 출제될 수 있으므로, 학생들은 실습 과제를 스스로 수행할 것을 강력히 권장합니다. 또한, 수업 전반에 걸쳐 퀴즈가 진행됩니다.추가적으로, 수업 중 초청 강연이 진행될 경우 학생들이 제출한 소감 및 질문이 Assignment/Report 점수에 반영될 수 있습니다.
+발표 | 0% |
+출석 | 10% |
+기타 | 0% |
+주별강의내용
+차시 | 날짜 | 강의주제 및 내용 | 비고(주차별 수업방법,과제 등)
+1주 | 9/1 ~ 9/7 | Course Introduction |
+2주 | 9/8 ~ 9/14 | Attention and Transformers (Part A) |
+3주 | 9/15 ~ 9/21 | Attention and Transformers (Part B) |
+4주 | 9/22 ~ 9/28 | LLM Architecture |
+5주 | 9/29 ~ 10/5 | LLM Pre-Training |
+6주 | 10/6 ~ 10/12 | LLM Fine-Tuning - Supervised Fine-Tuning, Instruction Tuning, LoRA |
+7주 | 10/13 ~ 10/19 | LLM Alignment and Preference Optimization - RLHF, DPO, and GRPO |
+8주 | 10/20 ~ 10/26 | Midterm Exam |
+9주 | 10/27 ~ 11/2 | GPU Training |
+10주 | 11/3 ~ 11/9 | Reasoning |
+11주 | 11/10 ~ 11/16 | Reasoning and Test-Time Scaling |
+12주 | 11/17 ~ 11/23 | ViT to Multimodal LLMs (Part A) |
+13주 | 11/24 ~ 11/30 | ViT to Multimodal LLMs (Part B) Overview of Diffusion, DiT |
+14주 | 12/1 ~ 12/7 | Agentic AI and RAG |
+15주 | 12/8 ~ 12/14 | Invited Talk or Recent AI Trends |
+16주 | 12/15 ~ 12/21 | Final Exam |
+기타 | | |
+과제 | Hands-on assignments and quizzes will be given throughout the course and will account for 20% of the final grade. The assignments will use selected materials from Stanford CS224N and CS231N. Students are strongly encouraged to complete them independently, as related questions may appear on the exams. 실습 과제와 퀴즈는 수업 전반에 걸쳐 진행되며, 최종 성적의 20%를 차지합니다. 실습 과제는 Stanford CS224N 및 CS231N의 일부 자료를 활용하여 구성됩니다. 관련 문제가 시험에 출제될 수 있으므로, 학생들은 과제를 스스로 성실히 수행할 것을 강력히 권장합니다. | Hands-on assignments and quizzes will be given throughout the course and will account for 20% of the final grade. The assignments will use selected materials from Stanford CS224N and CS231N. Students are strongly encouraged to complete them independently, as related questions may appear on the exams. 실습 과제와 퀴즈는 수업 전반에 걸쳐 진행되며, 최종 성적의 20%를 차지합니다. 실습 과제는 Stanford CS224N 및 CS231N의 일부 자료를 활용하여 구성됩니다. 관련 문제가 시험에 출제될 수 있으므로, 학생들은 과제를 스스로 성실히 수행할 것을 강력히 권장합니다. | Hands-on assignments and quizzes will be given throughout the course and will account for 20% of the final grade. The assignments will use selected materials from Stanford CS224N and CS231N. Students are strongly encouraged to complete them independently, as related questions may appear on the exams. 실습 과제와 퀴즈는 수업 전반에 걸쳐 진행되며, 최종 성적의 20%를 차지합니다. 실습 과제는 Stanford CS224N 및 CS231N의 일부 자료를 활용하여 구성됩니다. 관련 문제가 시험에 출제될 수 있으므로, 학생들은 과제를 스스로 성실히 수행할 것을 강력히 권장합니다.
+수업안내사항 | Lectures will be delivered in Korean, while lecture slides will be provided in English. Exam questions will be provided only in English. Students may write exam answers in either Korean or English. 강의는 한국어로 진행되며, 강의 슬라이드는 영어로 제공됩니다. 시험문제는 영어로만 제공됩니다. 시험 답안은 한국어 또는 영어로 작성할 수 있습니다. | Lectures will be delivered in Korean, while lecture slides will be provided in English. Exam questions will be provided only in English. Students may write exam answers in either Korean or English. 강의는 한국어로 진행되며, 강의 슬라이드는 영어로 제공됩니다. 시험문제는 영어로만 제공됩니다. 시험 답안은 한국어 또는 영어로 작성할 수 있습니다. | Lectures will be delivered in Korean, while lecture slides will be provided in English. Exam questions will be provided only in English. Students may write exam answers in either Korean or English. 강의는 한국어로 진행되며, 강의 슬라이드는 영어로 제공됩니다. 시험문제는 영어로만 제공됩니다. 시험 답안은 한국어 또는 영어로 작성할 수 있습니다.
+장애학생지원내용
+강의수강관련 | 시각장애: 디지털교재, 확대교재, 강의 녹취, 대필도우미 허용 지체장애: 대필도우미 및 수업보조 도우미 허용 청각장애: 대필 및 문자통역 도우미 활동 허용, 강의 녹취허용 건강장애: 질병 등으로 인한 결석에 대한 출석 인정, 대필 도우미 허용 학습장애: 대필도우미 허용 지적장애/자폐성장애: 대필도우미 및 수업멘토 허용
+과제 및 평가관련 | 과제 제출 및 응답 방식의 조정, 평가시간 연장, 평가 문항 제시 및 응답 방식의 조정, 별도 고사실 제공, 개별화 과제 제출 및 대체 평가 실시 과제 및 평가관련 :*장애유형, 정도에 따라 지원 내용이 다를 수 있음
+비고 | 본 과목을 수강하는 장애학생은 수업에 필요한 별도의 지원이 필요한 경우, 담당교강사 및 장애학생지원센터 (서울 02-961-2104~5, 국제 031-201-3460~1)로 필요한 사항을 요청하기 바랍니다.
+COPYRIGHT © KYUNG HEE UNIVERSITY. ALL RIGHT RESERVED.

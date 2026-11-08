@@ -1,0 +1,76 @@
+2026학년도 2학기 강의계획서
+출력
+기본정보
+강좌명 | 풀스택서비스네트워킹 | 교강사명 | 이성원(소프트웨어융합대학 소프트웨어융합학과)
+학수번호 | SWCON49200 | 사무실/연구실 | 전자정보대학/소프트웨어융합대학 323호
+이수구분 | 전공선택 | 연락처 | 로그인하세요
+개설학과 | 소프트웨어융합대학 소프트웨어융합학과 소프트웨어융합학 | 연락처 | 로그인하세요
+학점 | 3 | 이메일 | 로그인하세요
+강의시간강의실 | 이성원 목17:00-19:45 B09 | 홈페이지 | [개인용] [질의응답] http://mobilelab.khu.ac.kr/wordpress/fssn/[수업용] [강의자료 & 과제제출] https://e-campus.khu.ac.kr/
+영어강좌여부 | 영어(부분)강좌 | 면담시간 | 필요한 경우, 이메일을 통한 사전 시간 예약 후, 오프라인 방식으로 진행함. 이메일은 평일 오전9시~오후5시 사이에 보내도록 함.
+성적기록방법 | 등급 | 등급 | 등급
+선수과목
+조회된 데이터가 존재하지 않습니다.
+수업개요 및 목표
+수업개요 | 현대 모바일기기 및 데이터센터 등에서 사용하고 있는 최신 네트워킹 기술들에 대해서 학습함
+수업목표 | - 전통적인 OSI 7계층 기반 인터넷과 Socket 통신 기술을 이해함 - WWW 서비스를 가능하게 한 HTTP/1.1과 이의 개선된 기술인 HTTP/2 및 HTTP/3를 이해함 - 분산 처리를 위한 메시지 큐 기술인 Zero Message Queue(ZMQ, ZeroMQ)를 이해함 - Client/Server 기반의 대용량 분산처리를 가능하게 하는 gRPC 기술을 이해함 - Peer-to-Peer (P2P) 기술의 하나인 WebRTC를 이해함
+수업운영방식
+| 대면수업 | 실시간온라인수업 | 비실시간 온라인수업(콘텐츠 업로드 방식) | 하이브리드수업(일부 수강생은 대면으로,일부 수강생은 온라인으로 진행) | 블랜디드수업(시험 등 평가활동을 제외하고,30-50%가 원격수업으로 진행)
+| 수업운영방식 | | | | |
+추가설명 | 수업운영방식 | 해당 사항 없음 | 해당 사항 없음 | 해당 사항 없음 | 해당 사항 없음
+수업유형 및 방법
+| 이론강의 | 실험/실습 | 실기 | ABEEK설계 | 현장학습 | 캡스톤디자인 | 기타
+수업유형 | 100% | 0% | 0% | 0% | 0% | 0% | 0%
+수업유형 | 수업유형추가설명 | 해당 사항 없음 | 해당 사항 없음 | 해당 사항 없음 | 해당 사항 없음 | 해당 사항 없음 | 해당 사항 없음
+| 토의/토론 | 특강/세미나 | 팀별발표 | 개별발표 | 시청각 | 온라인강의 | e-campus활용 | PBL/CBL
+수업방법 | | | | | | | ○ |
+수업방법 | 이론강의 | 실험/실습 | 실기 | 유인물 | 견학/현장강의 | QUEST 수업 | 기타 |
+수업방법 | ○ | | | | | | |
+수업진행추가설명 | [오픈소스SW 활용] 본 수업의 실습자료는 자체 개발 후 GitHub를 통해서 오픈소스로 공개함 (1) '경희의 오늘' 서버 & 앱의 오픈소스 소프트웨어를 기반으로, Microservice 서버의 구조/동작 및 앱을 이해하고, 프로젝트 개발시 활용함 - Client URL: https://github.com/drsungwon/khu-today-app - Server URL: https://github.com/drsungwon/khu-today-server (2) TCP GUI, HTTP/1.1, HTTP/2, HTTP3, QUIC 기반 Client/Server 코드를 오픈소스로 공개하여 활용함 - URL: http://mobilelab.khu.ac.kr/wordpress/fssn/?vid=64 [수업 게시판을 통해서 8종의 오픈소스 소프트웨어로 접근함] | [오픈소스SW 활용] 본 수업의 실습자료는 자체 개발 후 GitHub를 통해서 오픈소스로 공개함 (1) '경희의 오늘' 서버 & 앱의 오픈소스 소프트웨어를 기반으로, Microservice 서버의 구조/동작 및 앱을 이해하고, 프로젝트 개발시 활용함 - Client URL: https://github.com/drsungwon/khu-today-app - Server URL: https://github.com/drsungwon/khu-today-server (2) TCP GUI, HTTP/1.1, HTTP/2, HTTP3, QUIC 기반 Client/Server 코드를 오픈소스로 공개하여 활용함 - URL: http://mobilelab.khu.ac.kr/wordpress/fssn/?vid=64 [수업 게시판을 통해서 8종의 오픈소스 소프트웨어로 접근함] | [오픈소스SW 활용] 본 수업의 실습자료는 자체 개발 후 GitHub를 통해서 오픈소스로 공개함 (1) '경희의 오늘' 서버 & 앱의 오픈소스 소프트웨어를 기반으로, Microservice 서버의 구조/동작 및 앱을 이해하고, 프로젝트 개발시 활용함 - Client URL: https://github.com/drsungwon/khu-today-app - Server URL: https://github.com/drsungwon/khu-today-server (2) TCP GUI, HTTP/1.1, HTTP/2, HTTP3, QUIC 기반 Client/Server 코드를 오픈소스로 공개하여 활용함 - URL: http://mobilelab.khu.ac.kr/wordpress/fssn/?vid=64 [수업 게시판을 통해서 8종의 오픈소스 소프트웨어로 접근함] | [오픈소스SW 활용] 본 수업의 실습자료는 자체 개발 후 GitHub를 통해서 오픈소스로 공개함 (1) '경희의 오늘' 서버 & 앱의 오픈소스 소프트웨어를 기반으로, Microservice 서버의 구조/동작 및 앱을 이해하고, 프로젝트 개발시 활용함 - Client URL: https://github.com/drsungwon/khu-today-app - Server URL: https://github.com/drsungwon/khu-today-server (2) TCP GUI, HTTP/1.1, HTTP/2, HTTP3, QUIC 기반 Client/Server 코드를 오픈소스로 공개하여 활용함 - URL: http://mobilelab.khu.ac.kr/wordpress/fssn/?vid=64 [수업 게시판을 통해서 8종의 오픈소스 소프트웨어로 접근함] | [오픈소스SW 활용] 본 수업의 실습자료는 자체 개발 후 GitHub를 통해서 오픈소스로 공개함 (1) '경희의 오늘' 서버 & 앱의 오픈소스 소프트웨어를 기반으로, Microservice 서버의 구조/동작 및 앱을 이해하고, 프로젝트 개발시 활용함 - Client URL: https://github.com/drsungwon/khu-today-app - Server URL: https://github.com/drsungwon/khu-today-server (2) TCP GUI, HTTP/1.1, HTTP/2, HTTP3, QUIC 기반 Client/Server 코드를 오픈소스로 공개하여 활용함 - URL: http://mobilelab.khu.ac.kr/wordpress/fssn/?vid=64 [수업 게시판을 통해서 8종의 오픈소스 소프트웨어로 접근함] | [오픈소스SW 활용] 본 수업의 실습자료는 자체 개발 후 GitHub를 통해서 오픈소스로 공개함 (1) '경희의 오늘' 서버 & 앱의 오픈소스 소프트웨어를 기반으로, Microservice 서버의 구조/동작 및 앱을 이해하고, 프로젝트 개발시 활용함 - Client URL: https://github.com/drsungwon/khu-today-app - Server URL: https://github.com/drsungwon/khu-today-server (2) TCP GUI, HTTP/1.1, HTTP/2, HTTP3, QUIC 기반 Client/Server 코드를 오픈소스로 공개하여 활용함 - URL: http://mobilelab.khu.ac.kr/wordpress/fssn/?vid=64 [수업 게시판을 통해서 8종의 오픈소스 소프트웨어로 접근함] | [오픈소스SW 활용] 본 수업의 실습자료는 자체 개발 후 GitHub를 통해서 오픈소스로 공개함 (1) '경희의 오늘' 서버 & 앱의 오픈소스 소프트웨어를 기반으로, Microservice 서버의 구조/동작 및 앱을 이해하고, 프로젝트 개발시 활용함 - Client URL: https://github.com/drsungwon/khu-today-app - Server URL: https://github.com/drsungwon/khu-today-server (2) TCP GUI, HTTP/1.1, HTTP/2, HTTP3, QUIC 기반 Client/Server 코드를 오픈소스로 공개하여 활용함 - URL: http://mobilelab.khu.ac.kr/wordpress/fssn/?vid=64 [수업 게시판을 통해서 8종의 오픈소스 소프트웨어로 접근함] | [오픈소스SW 활용] 본 수업의 실습자료는 자체 개발 후 GitHub를 통해서 오픈소스로 공개함 (1) '경희의 오늘' 서버 & 앱의 오픈소스 소프트웨어를 기반으로, Microservice 서버의 구조/동작 및 앱을 이해하고, 프로젝트 개발시 활용함 - Client URL: https://github.com/drsungwon/khu-today-app - Server URL: https://github.com/drsungwon/khu-today-server (2) TCP GUI, HTTP/1.1, HTTP/2, HTTP3, QUIC 기반 Client/Server 코드를 오픈소스로 공개하여 활용함 - URL: http://mobilelab.khu.ac.kr/wordpress/fssn/?vid=64 [수업 게시판을 통해서 8종의 오픈소스 소프트웨어로 접근함]
+교재 및 참고자료
+교재구분 | 교재구분 | 서명 | 저자명 | 출판사 | 출판년도 | ISBN | 비고
+교재 및 참고자료 | 1 | 강의노트로 대체함 | | | | |
+교재 및 참고자료 | 2 | | | | | |
+교재 및 참고자료 | 3 | | | | | |
+교재 및 참고자료 | 4 | | | | | |
+교재 및 참고자료 | 5 | | | | | |
+교재 및 참고자료 | 6 | | | | | |
+교재 및 참고자료 | 7 | | | | | |
+교재 및 참고자료 | 8 | | | | | |
+교재 및 참고자료 | 9 | | | | | |
+교재 및 참고자료 | 10 | | | | | |
+추가문헌 및 자료 | 추가문헌 및 자료 | - 강의노트: e-campus 통한 배포 - 강의노트에서 chapter별로 권장 도서를 추천함 | - 강의노트: e-campus 통한 배포 - 강의노트에서 chapter별로 권장 도서를 추천함 | - 강의노트: e-campus 통한 배포 - 강의노트에서 chapter별로 권장 도서를 추천함 | - 강의노트: e-campus 통한 배포 - 강의노트에서 chapter별로 권장 도서를 추천함 | - 강의노트: e-campus 통한 배포 - 강의노트에서 chapter별로 권장 도서를 추천함 | - 강의노트: e-campus 통한 배포 - 강의노트에서 chapter별로 권장 도서를 추천함
+평가방법
+평가항목 | 평가비율(%) | 추 가 설 명
+중간고사 | 40% |
+기말고사 | 40% |
+과제보고서 | 20% |
+발표 | 0% |
+출석 | 0% |
+기타 | 0% |
+주별강의내용
+차시 | 날짜 | 강의주제 및 내용 | 비고(주차별 수업방법,과제 등)
+1주 | 9/1 ~ 9/7 | Orientation + { 과제 소개 예정 } + OSI Overall OSI L1/L2/L3 |
+2주 | 9/8 ~ 9/14 | (이캠퍼스) OSI L1/L2/L3 (이캠퍼스) OSI Transport Layer [Overall, UDP] |
+3주 | 9/15 ~ 9/21 | OSI Transport Layer [TCP] |
+4주 | 9/22 ~ 9/28 | (이캠퍼스) Socket |
+5주 | 9/29 ~ 10/5 | ZMQ (Zero Message Queue) |
+6주 | 10/6 ~ 10/12 | HTTP/1.1 |
+7주 | 10/13 ~ 10/19 | HTTP/1.1 |
+8주 | 10/20 ~ 10/26 | 중간고사 |
+9주 | 10/27 ~ 11/2 | gRPC |
+10주 | 11/3 ~ 11/9 | gRPC |
+11주 | 11/10 ~ 11/16 | HTTP/2 |
+12주 | 11/17 ~ 11/23 | HTTP/2 |
+13주 | 11/24 ~ 11/30 | WebRTC |
+14주 | 12/1 ~ 12/7 | HTTP/3 |
+15주 | 12/8 ~ 12/14 | 기말고사 |
+16주 | 12/15 ~ 12/21 | |
+기타 | - 수업의 1/3 이상 결석시 F 처리함. 지각은 0.5 회 결석으로 처리하며, 총점에서 결석은 1점, 지각은 0.5점 차감함 | - 수업의 1/3 이상 결석시 F 처리함. 지각은 0.5 회 결석으로 처리하며, 총점에서 결석은 1점, 지각은 0.5점 차감함 | - 수업의 1/3 이상 결석시 F 처리함. 지각은 0.5 회 결석으로 처리하며, 총점에서 결석은 1점, 지각은 0.5점 차감함
+과제 | (1) 수업의 실습 내용을 직접 실행하고, 실행 영상을 이캠퍼스에 업로드 함 (2) '이캠퍼스'의 "경희대학교 생성형 AI 교육 AiKHU" (1)입문/(2)활용/(3)심화 - 3강좌의 **이수증**을 과제로 제출함 - AiKHU 바로가기: "https://e-campus.khu.ac.kr/aikhu | (1) 수업의 실습 내용을 직접 실행하고, 실행 영상을 이캠퍼스에 업로드 함 (2) '이캠퍼스'의 "경희대학교 생성형 AI 교육 AiKHU" (1)입문/(2)활용/(3)심화 - 3강좌의 **이수증**을 과제로 제출함 - AiKHU 바로가기: "https://e-campus.khu.ac.kr/aikhu | (1) 수업의 실습 내용을 직접 실행하고, 실행 영상을 이캠퍼스에 업로드 함 (2) '이캠퍼스'의 "경희대학교 생성형 AI 교육 AiKHU" (1)입문/(2)활용/(3)심화 - 3강좌의 **이수증**을 과제로 제출함 - AiKHU 바로가기: "https://e-campus.khu.ac.kr/aikhu
+수업안내사항 | - 취업/졸업/장학금 등 수업외 명목으로 교강사에 학점 청탁 관련 이메일/문자/전화 등 요청을 하는 행위는 전면 금지함 - 상기 사항이 1 회 발생시는 교강사의 재량으로 상담 등을 실시할 수 있음. 2 회 발생시는 이유를 막론하고 정해진 행정 절차에 의거 처리함 | - 취업/졸업/장학금 등 수업외 명목으로 교강사에 학점 청탁 관련 이메일/문자/전화 등 요청을 하는 행위는 전면 금지함 - 상기 사항이 1 회 발생시는 교강사의 재량으로 상담 등을 실시할 수 있음. 2 회 발생시는 이유를 막론하고 정해진 행정 절차에 의거 처리함 | - 취업/졸업/장학금 등 수업외 명목으로 교강사에 학점 청탁 관련 이메일/문자/전화 등 요청을 하는 행위는 전면 금지함 - 상기 사항이 1 회 발생시는 교강사의 재량으로 상담 등을 실시할 수 있음. 2 회 발생시는 이유를 막론하고 정해진 행정 절차에 의거 처리함
+장애학생지원내용
+강의수강관련 | 시각장애: 디지털교재, 확대교재, 강의 녹취, 대필도우미 허용 지체장애: 대필도우미 및 수업보조 도우미 허용 청각장애: 대필 및 문자통역 도우미 활동 허용, 강의 녹취허용 건강장애: 질병 등으로 인한 결석에 대한 출석 인정, 대필 도우미 허용 학습장애: 대필도우미 허용 지적장애/자폐성장애: 대필도우미 및 수업멘토 허용
+과제 및 평가관련 | 과제 제출 및 응답 방식의 조정, 평가시간 연장, 평가 문항 제시 및 응답 방식의 조정, 별도 고사실 제공, 개별화 과제 제출 및 대체 평가 실시 과제 및 평가관련 :*장애유형, 정도에 따라 지원 내용이 다를 수 있음
+비고 | 본 과목을 수강하는 장애학생은 수업에 필요한 별도의 지원이 필요한 경우, 담당교강사 및 장애학생지원센터 (서울 02-961-2104~5, 국제 031-201-3460~1)로 필요한 사항을 요청하기 바랍니다.
+COPYRIGHT © KYUNG HEE UNIVERSITY. ALL RIGHT RESERVED.

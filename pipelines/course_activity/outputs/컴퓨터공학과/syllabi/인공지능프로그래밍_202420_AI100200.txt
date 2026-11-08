@@ -1,0 +1,79 @@
+2024학년도 2학기 강의계획서
+출력
+기본정보
+강좌명 | 인공지능프로그래밍 | 교강사명 | 박경문(소프트웨어융합대학 컴퓨터공학부)
+학수번호 | AI100200 | 사무실/연구실 | 전자정보대학 325-4
+이수구분 | 전공필수 | 연락처 | 로그인하세요
+개설학과 | 소프트웨어융합대학 컴퓨터공학부 인공지능학과 | 연락처 | 로그인하세요
+학점 | 3 | 이메일 | 로그인하세요
+강의시간강의실 | 박경문 화10:00-11:50 B01, 박경문 목10:00-11:50 B01 | 홈페이지 | [개인용] https://agi.khu.ac.kr[수업용] https://e-campus.khu.ac.kr/
+영어강좌여부 | | 면담시간 | 화 13:30-14:00, 목 13:30-14:00
+성적기록방법 | 등급 | 등급 | 등급
+선수과목
+선수과목 | 필수선수과목 | 적용학번 | Abeek적용여부 | 선수교과목그룹 | 선수교과목 | 적용성적 | 필수이수과목수
+선수과목 | 필수선수과목 | 2022 ~ | N | 01 | 웹/파이선프로그래밍(SWCON104) | | 1
+선수과목 | 추천선수과목 | | | | | |
+수업개요 및 목표
+수업개요 | AI Programming 1. Introduction: Artificial Intelligence, Google Colab Basics, Simple Classification (Chapter 1) 2. Data Processing (Chapter 2) 3. Regression and Regularization (Chapter 3) 4. Tree Search (Chapter 4) 5. Unsupervised Learning (Chapter 5) 6. Multi-Layer Perceptron (Chapter 6) 7. Convolutional Neural Networks (Chapter 7) 8. Recurrent Neural Networks (Chapter 8)
+수업목표 | We will learn: 1) machine learning basics, 2) how to program your AI algorithms based on Google Colab, 3) basic deep neural networks, and 4) CNN and RNN variants.
+수업운영방식
+| 대면수업 | 비대면 수업(e-campus) | 비대면 수업(e-campus) | 비대면 수업(e-campus) | 대면 + 비대면 병행(대면 + e-campus) | 대면 + 비대면 병행(대면 + e-campus) | 대면 + 비대면 병행(대면 + e-campus)
+| 대면수업 | 실시간비대면 수업(zoom) | 비실시간비대면 수업(contents) | 실시간+비실시간비대면 수업(zoom+contents) | 대면 + 실시간비대면 수업(대면+zoom) | 대면 + 비실시간비대면 수업(대면+contents) | 대면+실시간+비실시간비대면 수업(대면+zoom+contents)
+수업운영방식 | ○ | | | | | |
+수업운영방식 | 추가설명 | 매주 대면수업을 원칙으로 진행함. | 매주 대면수업을 원칙으로 진행함. | 매주 대면수업을 원칙으로 진행함. | 매주 대면수업을 원칙으로 진행함. | 매주 대면수업을 원칙으로 진행함. | 매주 대면수업을 원칙으로 진행함.
+수업유형 및 방법
+| 이론강의 | 실험/실습 | 실기 | ABEEK설계 | 현장학습 | 캡스톤디자인 | 기타
+수업유형 | 35% | 35% | 0% | 0% | 0% | 30% | 0%
+수업유형 | 수업유형추가설명 | | | | | |
+| 토의/토론 | 특강/세미나 | 팀별발표 | 개별발표 | 시청각 | 온라인강의 | e-campus활용 | PBL/CBL
+수업방법 | | | ○ | | | | ○ |
+수업방법 | 이론강의 | 실험/실습 | 실기 | 유인물 | 견학/현장강의 | QUEST 수업 | 기타 |
+수업방법 | ○ | ○ | | | | | |
+수업진행추가설명 | 매주 총 4시간 수업 중 2시간 이론, 2시간 실습 강의로 구성됨. | 매주 총 4시간 수업 중 2시간 이론, 2시간 실습 강의로 구성됨. | 매주 총 4시간 수업 중 2시간 이론, 2시간 실습 강의로 구성됨. | 매주 총 4시간 수업 중 2시간 이론, 2시간 실습 강의로 구성됨. | 매주 총 4시간 수업 중 2시간 이론, 2시간 실습 강의로 구성됨. | 매주 총 4시간 수업 중 2시간 이론, 2시간 실습 강의로 구성됨. | 매주 총 4시간 수업 중 2시간 이론, 2시간 실습 강의로 구성됨. | 매주 총 4시간 수업 중 2시간 이론, 2시간 실습 강의로 구성됨.
+교재 및 참고자료
+교재구분 | 교재구분 | 서명 | 저자명 | 출판사 | 출판년도 | ISBN | 비고
+교재 및 참고자료 | 1 | 혼자 공부하는 머신러닝 + 딥러닝 | 박해선 | 한빛미디어 | 2022 | |
+교재 및 참고자료 | 2 | | | | | |
+교재 및 참고자료 | 3 | | | | | |
+교재 및 참고자료 | 4 | | | | | |
+교재 및 참고자료 | 5 | | | | | |
+교재 및 참고자료 | 6 | | | | | |
+교재 및 참고자료 | 7 | | | | | |
+교재 및 참고자료 | 8 | | | | | |
+교재 및 참고자료 | 9 | | | | | |
+교재 및 참고자료 | 10 | | | | | |
+추가문헌 및 자료 | 추가문헌 및 자료 | | | | | |
+평가방법
+평가항목 | 평가비율(%) | 추 가 설 명
+중간고사 | 30% |
+기말고사 | 0% |
+과제보고서 | 20% |
+발표 | 40% |
+출석 | 10% |
+기타 | 0% |
+주별강의내용
+차시 | 날짜 | 강의주제 및 내용 | 비고(주차별 수업방법,과제 등)
+1주 | 9/2 ~ 9/8 | Introduction: Artificial Intelligence, Google Colab Basics, Simple Classification (Chapter 1) |
+2주 | 9/9 ~ 9/15 | Data Processing: Training & Test Datasets (Chapter 2-1) |
+3주 | 9/16 ~ 9/22 | Data Preprocessing (Chapter 2-2) |
+4주 | 9/23 ~ 9/29 | Regression and Regularization (Chapter 3-1) |
+5주 | 9/30 ~ 10/6 | Logistic Regression and Stochastic Gradient Descent (Chapter 3-2) |
+6주 | 10/7 ~ 10/13 | Tree Search and Cross Validation (Chapter 4-1) |
+7주 | 10/14 ~ 10/20 | Hyperparameter Search and Ensemble (Chapter 4-2) |
+8주 | 10/21 ~ 10/27 | Midterm Exam. |
+9주 | 10/28 ~ 11/3 | Unsupervised Learning (Chapter 5): K-Means Clustering |
+10주 | 11/4 ~ 11/10 | Multi-Layer Perceptron (Chapter 6) |
+11주 | 11/11 ~ 11/17 | Convolutional Neural Networks (Chapter 7-1) |
+12주 | 11/18 ~ 11/24 | Image Classification using CNN (Chapter 7-2) |
+13주 | 11/25 ~ 12/1 | Visualization of CNN Filters (Chapter 7-3) |
+14주 | 12/2 ~ 12/8 | Recurrent Neural Networks (Chapter 8-1) |
+15주 | 12/9 ~ 12/15 | RNN Variants: LSTM & GRU (Chapter 8-2) |
+16주 | 12/16 ~ 12/22 | Final Presentation. |
+기타 | | |
+과제 | | |
+수업안내사항 | 인공지능프로그래밍 수업 전반 및 운영에 관심 있는 학생은 필히 첫 주 Introduction 수강을 추천함. | 인공지능프로그래밍 수업 전반 및 운영에 관심 있는 학생은 필히 첫 주 Introduction 수강을 추천함. | 인공지능프로그래밍 수업 전반 및 운영에 관심 있는 학생은 필히 첫 주 Introduction 수강을 추천함.
+장애학생지원내용
+강의수강관련 | 시각장애: 디지털교재, 확대교재, 강의 녹취, 대필도우미 허용 지체장애: 대필도우미 및 수업보조 도우미 허용 청각장애: 대필 및 문자통역 도우미 활동 허용, 강의 녹취허용 건강장애: 질병 등으로 인한 결석에 대한 출석 인정, 대필 도우미 허용 학습장애: 대필도우미 허용 지적장애/자폐성장애: 대필도우미 및 수업멘토 허용
+과제 및 평가관련 | 과제 제출 및 응답 방식의 조정, 평가시간 연장, 평가 문항 제시 및 응답 방식의 조정, 별도 고사실 제공, 개별화 과제 제출 및 대체 평가 실시 과제 및 평가관련 :*장애유형, 정도에 따라 지원 내용이 다를 수 있음
+비고 | 본 과목을 수강하는 장애학생은 수업에 필요한 별도의 지원이 필요한 경우, 담당교강사 및 장애학생지원센터 (서울 02-961-2104~5, 국제 031-201-3460~1)로 필요한 사항을 요청하기 바랍니다.
+COPYRIGHT © KYUNG HEE UNIVERSITY. ALL RIGHT RESERVED.

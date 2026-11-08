@@ -1,0 +1,84 @@
+2026학년도 1학기 강의계획서
+출력
+기본정보
+강좌명 | 인공지능과게임프로그래밍 | 교강사명 | 조명아(소프트웨어융합대학 소프트웨어융합학과)
+학수번호 | SWCON49100 | 사무실/연구실 | 우정원 7032호
+이수구분 | 전공선택 | 연락처 | 로그인하세요
+개설학과 | 소프트웨어융합대학 소프트웨어융합학과 소프트웨어융합학 | 연락처 | 로그인하세요
+학점 | 3 | 이메일 | 로그인하세요
+강의시간강의실 | 조명아 화13:30-14:45 전103, 조명아 목13:30-14:45 전103 | 홈페이지 | [개인용] https://vslab.khu.ac.kr/[수업용] https://e-campus.khu.ac.kr/
+영어강좌여부 | 영어(부분)강좌 | 면담시간 | Please schedule an appointment via email.
+성적기록방법 | 등급 | 등급 | 등급
+선수과목
+선수과목 | 필수선수과목 | 적용학번 | Abeek적용여부 | 선수교과목그룹 | 선수교과목 | 적용성적 | 필수이수과목수
+선수과목 | 필수선수과목 | 2010 ~ | N | 01 | 객체지향프로그래밍(CSE103) | | 2
+선수과목 | 필수선수과목 | 2010 ~ | N | 01 | 객체지향프로그래밍(CSE207) | | 2
+선수과목 | 필수선수과목 | 2010 ~ | N | 01 | 선형대수(AMTH1004) | | 2
+선수과목 | 필수선수과목 | 2010 ~ | N | 01 | 선형대수학1(MATH2111) | | 2
+선수과목 | 필수선수과목 | 2010 ~ | N | 01 | 선형대수학1(MATH2111) | | 2
+선수과목 | 필수선수과목 | 2010 ~ | N | 01 | 응용선형대수특강(AMTH1010) | | 2
+선수과목 | 추천선수과목 | | | | | |
+수업개요 및 목표
+수업개요 | This course introduces and provides practical programming concepts for game components, data and signal analysis, and artificial intelligence using game programming. It explores fundamental theories of signal and image processing, analysis, machine learning, and game vision, focusing on their applications within diverse fields of artificial intelligence.
+수업목표 | This course aims to provide a comprehensive understanding of artificial intelligence and data analysis through both theoretical knowledge and practical programming in game development.
+수업운영방식
+| 대면수업 | 비대면 수업(e-campus) | 비대면 수업(e-campus) | 비대면 수업(e-campus) | 대면 + 비대면 병행(대면 + e-campus) | 대면 + 비대면 병행(대면 + e-campus) | 대면 + 비대면 병행(대면 + e-campus)
+| 대면수업 | 실시간비대면 수업(zoom) | 비실시간비대면 수업(contents) | 실시간+비실시간비대면 수업(zoom+contents) | 대면 + 실시간비대면 수업(대면+zoom) | 대면 + 비실시간비대면 수업(대면+contents) | 대면+실시간+비실시간비대면 수업(대면+zoom+contents)
+수업운영방식 | ○ | | | | | |
+수업운영방식 | 추가설명 | The course is primarily conducted in face-to-face sessions, occasionally supplemented with recorded lectures. It combines theoretical lectures with practical laptop-based exercises, providing a well-rounded learning experience. | The course is primarily conducted in face-to-face sessions, occasionally supplemented with recorded lectures. It combines theoretical lectures with practical laptop-based exercises, providing a well-rounded learning experience. | The course is primarily conducted in face-to-face sessions, occasionally supplemented with recorded lectures. It combines theoretical lectures with practical laptop-based exercises, providing a well-rounded learning experience. | The course is primarily conducted in face-to-face sessions, occasionally supplemented with recorded lectures. It combines theoretical lectures with practical laptop-based exercises, providing a well-rounded learning experience. | The course is primarily conducted in face-to-face sessions, occasionally supplemented with recorded lectures. It combines theoretical lectures with practical laptop-based exercises, providing a well-rounded learning experience. | The course is primarily conducted in face-to-face sessions, occasionally supplemented with recorded lectures. It combines theoretical lectures with practical laptop-based exercises, providing a well-rounded learning experience.
+수업유형 및 방법
+| 이론강의 | 실험/실습 | 실기 | ABEEK설계 | 현장학습 | 캡스톤디자인 | 기타
+수업유형 | 70% | 30% | 0% | 0% | 0% | 0% | 0%
+수업유형 | 수업유형추가설명 | | | | | |
+| 토의/토론 | 특강/세미나 | 팀별발표 | 개별발표 | 시청각 | 온라인강의 | e-campus활용 | PBL/CBL
+수업방법 | | | ○ | | | | ○ |
+수업방법 | 이론강의 | 실험/실습 | 실기 | 유인물 | 견학/현장강의 | QUEST 수업 | 기타 |
+수업방법 | ○ | ○ | | | | | |
+수업진행추가설명 | | | | | | | |
+교재 및 참고자료
+교재구분 | 교재구분 | 서명 | 저자명 | 출판사 | 출판년도 | ISBN | 비고
+교재 및 참고자료 | 1 | 파이토치와 유니티 ML-Agents로 배우는 강화학습 | 민규식 , 이현호 , 김영록 , 정유정 , 정규열 , 박유민 | 위키북스 | 2022 | 9791158393410 |
+교재 및 참고자료 | 2 | AI for Games | Ian Millington | 에이콘 | 2019 | 9781138483972 |
+교재 및 참고자료 | 3 | Deep Learning with PyTorch: A practical approach to building neural network models using PyTorch | Vishnu Subramanian | 에이콘 | 2019 | 9781788624336 |
+교재 및 참고자료 | 4 | | | | | |
+교재 및 참고자료 | 5 | | | | | |
+교재 및 참고자료 | 6 | | | | | |
+교재 및 참고자료 | 7 | | | | | |
+교재 및 참고자료 | 8 | | | | | |
+교재 및 참고자료 | 9 | | | | | |
+교재 및 참고자료 | 10 | | | | | |
+추가문헌 및 자료 | 추가문헌 및 자료 | | | | | |
+평가방법
+평가항목 | 평가비율(%) | 추 가 설 명
+중간고사 | 25% |
+기말고사 | 25% |
+과제보고서 | 20% |
+발표 | 20% |
+출석 | 10% |
+기타 | 0% |
+주별강의내용
+차시 | 날짜 | 강의주제 및 내용 | 비고(주차별 수업방법,과제 등)
+1주 | 3/3 ~ 3/9 | Course Introduction |
+2주 | 3/10 ~ 3/16 | Basics of Game Vision and AI |
+3주 | 3/17 ~ 3/23 | [Artificial Intelligence] Fundamentals of Deep Learning |
+4주 | 3/24 ~ 3/30 | [Artificial Intelligence] Various Architecture of AI Networks |
+5주 | 3/31 ~ 4/6 | [Artificial Intelligence] Training neural networks |
+6주 | 4/7 ~ 4/13 | [Game] Fundamentals of movements |
+7주 | 4/14 ~ 4/20 | [Game] Strategy- decision tree |
+8주 | 4/21 ~ 4/27 | Midterm |
+9주 | 4/28 ~ 5/4 | [Game] Path Finding |
+10주 | 5/5 ~ 5/11 | 5/5 No class (Children’s Day holiday) [Game] Path Finding |
+11주 | 5/12 ~ 5/18 | [Game] Reinforcement learning |
+12주 | 5/19 ~ 5/25 | [Game] Term project [Opensource SW Project] |
+13주 | 5/26 ~ 6/1 | [Game] Term project [Opensource SW Project] |
+14주 | 6/2 ~ 6/8 | Recent models and applications: Videos and 3D |
+15주 | 6/9 ~ 6/15 | Term project presentation |
+16주 | 6/16 ~ 6/22 | Final exam |
+기타 | | |
+과제 | | |
+수업안내사항 | Grading adheres to the school's guidelines. The number and schedule of assignments may vary from what is initially outlined in the course registration form. | Grading adheres to the school's guidelines. The number and schedule of assignments may vary from what is initially outlined in the course registration form. | Grading adheres to the school's guidelines. The number and schedule of assignments may vary from what is initially outlined in the course registration form.
+장애학생지원내용
+강의수강관련 | 시각장애: 디지털교재, 확대교재, 강의 녹취, 대필도우미 허용 지체장애: 대필도우미 및 수업보조 도우미 허용 청각장애: 대필 및 문자통역 도우미 활동 허용, 강의 녹취허용 건강장애: 질병 등으로 인한 결석에 대한 출석 인정, 대필 도우미 허용 학습장애: 대필도우미 허용 지적장애/자폐성장애: 대필도우미 및 수업멘토 허용
+과제 및 평가관련 | 과제 제출 및 응답 방식의 조정, 평가시간 연장, 평가 문항 제시 및 응답 방식의 조정, 별도 고사실 제공, 개별화 과제 제출 및 대체 평가 실시 과제 및 평가관련 :*장애유형, 정도에 따라 지원 내용이 다를 수 있음
+비고 | 본 과목을 수강하는 장애학생은 수업에 필요한 별도의 지원이 필요한 경우, 담당교강사 및 장애학생지원센터 (서울 02-961-2104~5, 국제 031-201-3460~1)로 필요한 사항을 요청하기 바랍니다.
+COPYRIGHT © KYUNG HEE UNIVERSITY. ALL RIGHT RESERVED.

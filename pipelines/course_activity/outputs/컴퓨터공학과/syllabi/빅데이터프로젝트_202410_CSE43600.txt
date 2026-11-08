@@ -1,0 +1,78 @@
+2024학년도 1학기 강의계획서
+출력
+기본정보
+강좌명 | 빅데이터프로젝트 | 교강사명 | 이해준(소프트웨어융합대학 컴퓨터공학부)
+학수번호 | CSE43600 | 사무실/연구실 |
+이수구분 | 전공선택 | 연락처 | 로그인하세요
+개설학과 | 소프트웨어융합대학 컴퓨터공학부 컴퓨터공학과 | 연락처 | 로그인하세요
+학점 | 3(설계:0) | 이메일 | 로그인하세요
+강의시간강의실 | 이해준 금09:00-11:45 B01 | 홈페이지 | [개인용] philip.lee@khu.ac.kr[수업용]
+영어강좌여부 | | 면담시간 |
+성적기록방법 | 등급 | 등급 | 등급
+선수과목
+조회된 데이터가 존재하지 않습니다.
+수업개요 및 목표
+수업개요 | Traditionally, we have been working with structured data mainly from RDMS, but in this century, a ton of different type logs are coming from various fields, e.g., finance, hospital, crime, weather, etc. In order to handle the abundant logs, data engineers or scientists should understand a big picture of a Big Data solution. There are a few of steps in the Big Data solution: Data Acquisition, Data Storage, Data Analysis and Data Visualization.
+수업목표 | To gain an understanding of the above steps, students will learn a way of designing the Big Data solution and of managing various related frameworks. This course would be for the third or fourth year students.
+수업운영방식
+| 대면수업 | 비대면 수업(e-campus) | 비대면 수업(e-campus) | 비대면 수업(e-campus) | 대면 + 비대면 병행(대면 + e-campus) | 대면 + 비대면 병행(대면 + e-campus) | 대면 + 비대면 병행(대면 + e-campus)
+| 대면수업 | 실시간비대면 수업(zoom) | 비실시간비대면 수업(contents) | 실시간+비실시간비대면 수업(zoom+contents) | 대면 + 실시간비대면 수업(대면+zoom) | 대면 + 비실시간비대면 수업(대면+contents) | 대면+실시간+비실시간비대면 수업(대면+zoom+contents)
+수업운영방식 | ○ | | | | | |
+수업운영방식 | 추가설명 | 대면 수업으로 진행합니다. | 대면 수업으로 진행합니다. | 대면 수업으로 진행합니다. | 대면 수업으로 진행합니다. | 대면 수업으로 진행합니다. | 대면 수업으로 진행합니다.
+수업유형 및 방법
+| 이론강의 | 실험/실습 | 실기 | ABEEK설계 | 현장학습 | 캡스톤디자인 | 기타
+수업유형 | 30% | 70% | 0% | 0% | 0% | 0% | 0%
+수업유형 | 수업유형추가설명 | | | | | |
+| 토의/토론 | 특강/세미나 | 팀별발표 | 개별발표 | 시청각 | 온라인강의 | e-campus활용 | PBL/CBL
+수업방법 | ○ | | ○ | ○ | | | ○ |
+수업방법 | 이론강의 | 실험/실습 | 실기 | 유인물 | 견학/현장강의 | QUEST 수업 | 기타 |
+수업방법 | ○ | ○ | | | | | |
+수업진행추가설명 | 강의자료는 아래 첨부파일 확인해주세요. | 강의자료는 아래 첨부파일 확인해주세요. | 강의자료는 아래 첨부파일 확인해주세요. | 강의자료는 아래 첨부파일 확인해주세요. | 강의자료는 아래 첨부파일 확인해주세요. | 강의자료는 아래 첨부파일 확인해주세요. | 강의자료는 아래 첨부파일 확인해주세요. | 강의자료는 아래 첨부파일 확인해주세요.
+교재 및 참고자료
+교재구분 | 교재구분 | 서명 | 저자명 | 출판사 | 출판년도 | ISBN | 비고
+교재 및 참고자료 | 1 | | | | | |
+교재 및 참고자료 | 2 | | | | | |
+교재 및 참고자료 | 3 | | | | | |
+교재 및 참고자료 | 4 | | | | | |
+교재 및 참고자료 | 5 | | | | | |
+교재 및 참고자료 | 6 | | | | | |
+교재 및 참고자료 | 7 | | | | | |
+교재 및 참고자료 | 8 | | | | | |
+교재 및 참고자료 | 9 | | | | | |
+교재 및 참고자료 | 10 | | | | | |
+추가문헌 및 자료 | 추가문헌 및 자료 | | | | | |
+평가방법
+평가항목 | 평가비율(%) | 추 가 설 명
+중간고사 | 30% | 추후 상황에 따라 중간고사 혹은 기말고사가 한번 진행될 계획입니다.
+기말고사 | 0% |
+과제보고서 | 10% |
+발표 | 50% |
+출석 | 10% |
+기타 | 0% |
+주별강의내용
+차시 | 날짜 | 강의주제 및 내용 | 비고(주차별 수업방법,과제 등)
+1주 | 3/2 ~ 3/8 | introduction to big data |
+2주 | 3/9 ~ 3/15 | data acquisition (python3 environment needed*) / 9:30 AM Friday / online tutorial |
+3주 | 3/16 ~ 3/22 | data acquisition advanced (python3 environment needed*) / 9:30 AM Friday / online tutorial |
+4주 | 3/23 ~ 3/29 | data storage S3 / 9:30 AM Friday / online tutorial |
+5주 | 3/30 ~ 4/5 | how to deal with co-working remotely like our current situation (github username needed*) / online tutorial진행 |
+6주 | 4/6 ~ 4/12 | data storage HDFS |
+7주 | 4/13 ~ 4/19 | data analysis, spark and python / online tutorial |
+8주 | 4/20 ~ 4/26 | individual project session and evaluation / online tutorial / 09:00 AM - 13:00 PM |
+9주 | 4/27 ~ 5/3 | spark processing / online tutorial |
+10주 | 5/4 ~ 5/10 | spark processing advanced / online tutorial |
+11주 | 5/11 ~ 5/17 | cluster setup / online tutorial |
+12주 | 5/18 ~ 5/24 | node visualization / online tutorial |
+13주 | 5/25 ~ 5/31 | ELK STACK / online tutorial |
+14주 | 6/1 ~ 6/7 | Group Project Presentation Session / B06 OFFLINE |
+15주 | 6/8 ~ 6/14 | FINAL TEST |
+16주 | 6/15 ~ 6/21 | |
+기타 | 강의자료는 아래 첨부파일 확인해주세요. 강의자료에 쓰여있는대로 전반적인 컨텐츠는 유지되지만, 추후에 강의 순서 및 소량의 컨텐츠는 다소 변경될 수 있습니다. | 강의자료는 아래 첨부파일 확인해주세요. 강의자료에 쓰여있는대로 전반적인 컨텐츠는 유지되지만, 추후에 강의 순서 및 소량의 컨텐츠는 다소 변경될 수 있습니다. | 강의자료는 아래 첨부파일 확인해주세요. 강의자료에 쓰여있는대로 전반적인 컨텐츠는 유지되지만, 추후에 강의 순서 및 소량의 컨텐츠는 다소 변경될 수 있습니다.
+과제 | | |
+수업안내사항 | | |
+첨부파일 | 2024 1학기 빅데이터 프로젝트 강의 계획서.pdf | 2024 1학기 빅데이터 프로젝트 강의 계획서.pdf | 2024 1학기 빅데이터 프로젝트 강의 계획서.pdf
+장애학생지원내용
+강의수강관련 | 시각장애: 디지털교재, 확대교재, 강의 녹취, 대필도우미 허용 지체장애: 대필도우미 및 수업보조 도우미 허용 청각장애: 대필 및 문자통역 도우미 활동 허용, 강의 녹취허용 건강장애: 질병 등으로 인한 결석에 대한 출석 인정, 대필 도우미 허용 학습장애: 대필도우미 허용 지적장애/자폐성장애: 대필도우미 및 수업멘토 허용
+과제 및 평가관련 | 과제 제출 및 응답 방식의 조정, 평가시간 연장, 평가 문항 제시 및 응답 방식의 조정, 별도 고사실 제공, 개별화 과제 제출 및 대체 평가 실시 과제 및 평가관련 :*장애유형, 정도에 따라 지원 내용이 다를 수 있음
+비고 | 본 과목을 수강하는 장애학생은 수업에 필요한 별도의 지원이 필요한 경우, 담당교강사 및 장애학생지원센터 (서울 02-961-2104~5, 국제 031-201-3460~1)로 필요한 사항을 요청하기 바랍니다.
+COPYRIGHT © KYUNG HEE UNIVERSITY. ALL RIGHT RESERVED.
