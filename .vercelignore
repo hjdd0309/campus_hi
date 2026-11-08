@@ -18,3 +18,6 @@ backend/lesson_games.py
 backend/test_lesson_games.py
 backend/requirements-pipeline.txt
 backend/.cache
+backend/course_activity.py
+backend/test_course_activity.py
+학과데이터
