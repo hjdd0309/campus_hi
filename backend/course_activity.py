@@ -35,6 +35,7 @@ import io
 import json
 import re
 import sys
+import unicodedata
 from collections import Counter
 from datetime import date
 from pathlib import Path
@@ -169,7 +170,9 @@ def squashed(text):
 
 
 def locate(quote, page):
-    """근거 문장이 페이지에 (띄어쓰기·구두점 차이를 빼고) 그대로 있으면 그 둘레 글을, 없으면 None."""
+    """근거 문장이 페이지에 (띄어쓰기·구두점 차이를 빼고) 그대로 있으면 그 둘레 글을, 없으면 None.
+    한글을 자모 조합형(NFD)으로 담은 페이지가 있어 둘 다 표준형(NFC)으로 바꿔 견준다."""
+    quote, page = unicodedata.normalize("NFC", quote or ""), unicodedata.normalize("NFC", page or "")
     needle, _ = squashed(quote)
     if len(needle) < MIN_QUOTE:
         return None
@@ -559,9 +562,9 @@ def fetch_page(url):
         raw, kind, content_type = pipeline.fetch(url)
     except Exception:  # 접속 거부·시간 초과·너무 큰 문서. 그 항목은 근거를 확인할 수 없어 버린다.
         return None
-    if kind == "pdf":
-        return pdf_text(raw)
-    return pipeline.html_to_text(decode_page(raw, content_type))
+    # 한글을 자모 조합형으로 담은 문서가 있어(경희대 강의계획서 일부) 표준형(NFC)으로 바꿔 둔다.
+    text = pdf_text(raw) if kind == "pdf" else pipeline.html_to_text(decode_page(raw, content_type))
+    return unicodedata.normalize("NFC", text)
 
 
 def decode_page(raw, content_type):

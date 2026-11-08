@@ -3,6 +3,7 @@ from collections import Counter
 import json
 import re
 import tempfile
+import unicodedata
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -156,6 +157,17 @@ class CourseActivityTests(unittest.TestCase):
         self.assertIsNotNone(ca.locate("binary search  tree, with insert", f"x {QUOTE_A} y"))
         self.assertIsNone(ca.locate("tree", QUOTE_A))
         self.assertIsNone(ca.locate("red black tree rotation", QUOTE_A))
+        # 자모 조합형(NFD)으로 적힌 페이지도 표준형 근거 문장과 맞는다(경희대 강의계획서 일부).
+        decomposed = unicodedata.normalize("NFD", "학기 프로젝트(개인 별 심화 프로젝트): 발표 후 최종 보고서 제출")
+        self.assertIsNotNone(ca.locate("개인 별 심화 프로젝트: 발표 후 최종 보고서", decomposed))
+
+    def test_fetch_page_returns_composed_hangul(self):
+        original = ca.pipeline.fetch
+        ca.pipeline.fetch = lambda url: (unicodedata.normalize("NFD", "<p>개인 별 과제</p>").encode("utf-8"), "html", "text/html; charset=utf-8")
+        try:
+            self.assertIn("개인 별 과제", ca.fetch_page("https://example.ac.kr/plan"))
+        finally:
+            ca.pipeline.fetch = original
 
     def test_parse_json_takes_last_result_object(self):
         text = '조사 계획 {"메모": 1}\n```json\n{"실제_활동": [], "과목명": "가"}\n```\n끝 {"실제_활동": [1], "과목명": "나"}'
