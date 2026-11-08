@@ -111,6 +111,7 @@ class CourseActivityTests(unittest.TestCase):
         self.assertEqual({ca.group_key(name) for name in ("자료구조", "자료구조론", "데이터구조", "자료 구조", "자료구조(Data Structures)")}, {"자료구조"})
         self.assertEqual(ca.group_key("운영체제 1"), ca.group_key("운영체제Ⅱ"))
         self.assertEqual(ca.group_key("컴퓨터비젼"), ca.group_key("컴퓨터비전"))
+        self.assertEqual(ca.group_key("자연언어처리"), ca.group_key("자연어처리"))
         self.assertNotEqual(ca.group_key("알고리즘"), ca.group_key("알고리즘분석"))
         # "이론"은 떼지 않고, 너무 짧은 이름의 "론"도 떼지 않는다.
         self.assertEqual(ca.group_key("그래프이론"), "그래프이론")
@@ -131,6 +132,25 @@ class CourseActivityTests(unittest.TestCase):
         groups = ca.select_courses(SCHOOL, COURSE)
         self.assertEqual(sum(len(group["names"]) for group in groups.values()), 77)
         self.assertEqual(groups[ca.group_key("최신기술콜로키움1")]["names"], ["최신기술콜로키움1", "최신기술콜로키움2"])
+
+    def test_course_list_file_replaces_catalog_subjects(self):
+        path = Path(self.folder.name) / "courses.txt"
+        path.write_text("# 학교 교육과정 표\n2\t자료구조\n\n3\t몰입심화학습(AI로봇)\n4\t몰입심화학습(딥엑스)\n캡스톤디자인\n2\t자료구조\n", encoding="utf-8")
+        names, years = ca.load_course_list(path)
+        self.assertEqual(names, ["자료구조", "몰입심화학습(AI로봇)", "몰입심화학습(딥엑스)", "캡스톤디자인"])
+        self.assertEqual(years, {"자료구조": 2, "몰입심화학습(AI로봇)": 3, "몰입심화학습(딥엑스)": 4})
+        state = ca.Run(SCHOOL, COURSE, self.out, courses=path)
+        self.assertEqual(state.order, ["자료구조", ca.group_key("몰입심화학습"), "캡스톤디자인"])
+        self.assertEqual(state.curriculum, names)
+        # 1차 분류 프롬프트의 학년·다른 교과목은 목록 파일에서 온다.
+        prompt = ca.stage1_prompt(SCHOOL, COURSE, state.groups[ca.group_key("몰입심화학습")], ["자료구조"], state.years, [])
+        self.assertIn("학교 편성표상 학년: 3학년, 4학년", prompt)
+        path.write_text("이학년\t자료구조\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "학년은 숫자"):
+            ca.load_course_list(path)
+        path.write_text("# 비어 있음\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "과목이 없"):
+            ca.load_course_list(path)
 
     def test_locate_ignores_spacing_and_rejects_short_or_missing_quotes(self):
         self.assertIsNotNone(ca.locate("binary search  tree, with insert", f"x {QUOTE_A} y"))

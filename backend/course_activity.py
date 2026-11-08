@@ -90,6 +90,7 @@ SYNONYMS = {
     "미적분학": "미분적분학",
     "이산수학": "이산구조",
     "머신러닝": "기계학습",
+    "자연언어처리": "자연어처리",
 }
 SUFFIXES = ("개론", "원론", "론")
 
@@ -131,10 +132,32 @@ def course_years(school, course):
     return dict(entry.get("subjects") or {})
 
 
-def select_courses(school, course):
-    """대상 학과의 교과목을 묶음으로: 키 → {"names": [...], "name": 대표 이름}. 원본 교과목 순서를 지킨다."""
+def load_course_list(path):
+    """`--courses` 파일: 한 줄에 `학년<TAB>과목명` 또는 과목명만. 빈 줄과 #으로 시작하는 줄은 건너뛴다.
+    (과목명 목록, 과목명 → 학년)을 돌려준다. 학교 교육과정 표처럼 공시 교과목과 다른 목록으로 돌릴 때 쓴다."""
+    names, years = [], {}
+    for number, line in enumerate(Path(path).read_text(encoding="utf-8-sig").splitlines(), start=1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        year, _, name = line.rpartition("	")
+        name = name.strip()
+        if year.strip():
+            if not year.strip().isdigit():
+                raise ValueError(f"{path} {number}번째 줄: 학년은 숫자여야 합니다: {year.strip()}")
+            years[name] = int(year)
+        if name and name not in names:
+            names.append(name)
+    if not names:
+        raise ValueError(f"{path}에 과목이 없습니다.")
+    return names, years
+
+
+def select_courses(school, course, names=None):
+    """대상 학과의 교과목을 묶음으로: 키 → {"names": [...], "name": 대표 이름}. 원본 교과목 순서를 지킨다.
+    names를 주면 공시 교과목 대신 그 목록을 쓴다."""
     groups = {}
-    for name in catalog().programs[(school, course)]["curriculum"]:
+    for name in names if names is not None else catalog().programs[(school, course)]["curriculum"]:
         groups.setdefault(group_key(name), []).append(name)
     return {key: {"names": names, "name": min(names, key=len)} for key, names in groups.items()}
 
@@ -1032,15 +1055,17 @@ FATAL = ("AuthenticationError", "PermissionDeniedError", "NotFoundError", "BadRe
 class Run:
     """한 학과의 파이프라인 상태. 출력 폴더의 jsonl을 읽어 이어서 한다."""
 
-    def __init__(self, school, course, out_dir=None):
+    def __init__(self, school, course, out_dir=None, courses=None):
         self.school, self.course = school, course
         name = folder_name(school, course)
         self.out = Path(out_dir) if out_dir else OUTPUT_ROOT / name
-        self.groups = select_courses(school, course)
+        names, years = load_course_list(courses) if courses else (None, None)
+        self.curriculum = names if names is not None else catalog().programs[(school, course)]["curriculum"]
+        self.groups = select_courses(school, course, names)
         for key, group in self.groups.items():
             group["key"] = key
         self.order = list(self.groups)
-        self.years = course_years(school, course)
+        self.years = years if courses else course_years(school, course)
         self.stage0 = load_jsonl(self.out / "stage0_syllabus.jsonl")
         self.stage1 = load_jsonl(self.out / "stage1_classification.jsonl")
         self.stage2 = load_jsonl(self.out / "stage2_search.jsonl")
@@ -1119,7 +1144,7 @@ class Run:
         if not self.stage1_ok(key):
             if not budget.allows("stage1"):
                 raise Stop()
-            others = [name for name in catalog().programs[(self.school, self.course)]["curriculum"] if name not in group["names"]]
+            others = [name for name in self.curriculum if name not in group["names"]]
             try:
                 result, usage = run_stage1(client, stage1_prompt(self.school, self.course, group, others, self.years, syllabi), syllabi)
                 budget.add("stage1", usage)
@@ -1214,9 +1239,9 @@ class Run:
         log(f"  실패 {group['name']}: {error}")
 
 
-def run(school, course, client=None, dry_run=False, max_courses=None, budget_usd=None, out_dir=None, fetcher=fetch_page, today=None, log=print):
+def run(school, course, client=None, dry_run=False, max_courses=None, budget_usd=None, out_dir=None, fetcher=fetch_page, today=None, log=print, courses=None):
     today = today or date.today().isoformat()
-    state = Run(school, course, out_dir)
+    state = Run(school, course, out_dir, courses)
     todo = state.plan()
     pending = [key for key in state.order if not state.done(key)]
     if max_courses is not None:
@@ -1422,6 +1447,7 @@ def main(argv=None):
         command = commands.add_parser(name, help=text)
         command.add_argument("--school", required=True)
         command.add_argument("--course", required=True, help="학과 이름(이름이 들어간 학과가 하나뿐이면 일부만 적어도 됨)")
+        command.add_argument("--courses", help="공시 교과목 대신 쓸 과목 목록 파일(한 줄에 `학년<TAB>과목명` 또는 과목명)")
         if name == "run":
             command.add_argument("--dry-run", action="store_true", help="호출 없이 대상 과목과 예상 호출 수만 출력")
             command.add_argument("--max-courses", type=int, help="이번에 처리할 묶음 수")
@@ -1433,8 +1459,17 @@ def main(argv=None):
     except ValueError as error:
         print(error)
         return 1
+    if args.courses:
+        if not Path(args.courses).is_file():
+            print(f"과목 목록 파일이 없습니다: {args.courses}")
+            return 1
+        try:
+            load_course_list(args.courses)
+        except ValueError as error:
+            print(error)
+            return 1
     if args.command == "report":
-        state = Run(school, course)
+        state = Run(school, course, courses=args.courses)
         write_reports(state)
         print(f"리포트: {state.out}")
         return 0
@@ -1446,7 +1481,7 @@ def main(argv=None):
         return 1
     try:
         client = FileClient(MANUAL_ROOT / folder_name(school, course)) if args.manual and not args.dry_run else None
-        run(school, course, client=client, dry_run=args.dry_run, max_courses=args.max_courses, budget_usd=args.budget_usd)
+        run(school, course, client=client, dry_run=args.dry_run, max_courses=args.max_courses, budget_usd=args.budget_usd, courses=args.courses)
     except Exception as error:
         if type(error).__name__ not in FATAL:
             raise
