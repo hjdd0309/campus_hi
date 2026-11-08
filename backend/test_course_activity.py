@@ -268,7 +268,7 @@ class CourseActivityTests(unittest.TestCase):
         self.assertNotIn("more text", raw)
         self.assertIn("https://github.com/a/ds", raw)
 
-        with (self.out / "review.csv").open(encoding="utf-8-sig", newline="") as file:
+        with (self.out / ca.ACTIVITY_FILE).open(encoding="utf-8-sig", newline="") as file:
             rows = list(csv.reader(file))
         self.assertEqual(rows[0], ca.REVIEW_COLUMNS)
         self.assertEqual(len(rows), 1 + 77)
@@ -297,7 +297,7 @@ class CourseActivityTests(unittest.TestCase):
         self.assertIsNone(entry["final"])
         # 활동 두 개와, 같은 github 근거를 댄 대표 과제가 불일치로 버려진다.
         self.assertEqual(Counter(drop["이유"] for drop in entry["dropped"])["주장과 근거 불일치"], 3)
-        with (self.out / "review.csv").open(encoding="utf-8-sig", newline="") as file:
+        with (self.out / ca.ACTIVITY_FILE).open(encoding="utf-8-sig", newline="") as file:
             row = list(csv.reader(file))[1]
         self.assertEqual((row[2], row[5]), ("(1차 추정) 코드 작성·디버깅", "낮음"))
         self.assertIn("검증을 통과한 근거 없음", (self.out / "summary.md").read_text(encoding="utf-8"))

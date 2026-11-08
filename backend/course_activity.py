@@ -20,7 +20,7 @@
    없으면 버린다. 남은 항목은 다른 모델이 근거 문장과 주장이 맞는지 대조한다. 서로 다른 학교 2곳 이상의 결과물
    (강의계획서 제외)이 같은 활동 유형을 보여줄 때만 신뢰도 "높음", 결과물이 하나라도 있으면 "중간",
    강의계획서뿐이면 "낮음"이다.
-7. 리포트: `outputs/학교_학과/`의 review.csv(팀원 검토용), summary.md.
+7. 리포트: `학과데이터/학교_학과/활동.csv`(팀원 검토용). 단계별 기록과 summary.md는 작업 폴더(`backend/.cache/course_activity/work/학교_학과/`).
 
 모든 단계 결과는 출력 폴더의 jsonl에 쌓이고, 다시 돌리면 이미 처리한 묶음은 건너뛴다(오류 난 묶음만 다시).
 로그인이 필요한 사이트와 영상 사이트는 검색·열람에서 막고, 학생 코드·글 원문은 저장하지 않는다(요약, URL,
@@ -44,8 +44,11 @@ from urllib.parse import urlparse, urlunparse
 from backend import pipeline
 from backend.main import catalog, compact, year_curricula
 
-ROOT = Path(__file__).parent.parent / "pipelines" / "course_activity"
-OUTPUT_ROOT = ROOT / "outputs"
+# 팀원이 보는 결과(강의계획서 원문·목록, 활동 표)는 저장소의 `학과데이터/학교_학과/`에,
+# 다시 돌릴 때 이어서 쓰는 단계별 기록(stage0~verify, 요약)은 저장소에 올리지 않는 작업 폴더에 둔다.
+DATA_ROOT = Path(__file__).parent.parent / "학과데이터"
+WORK_ROOT = Path(__file__).parent / ".cache" / "course_activity" / "work"
+ACTIVITY_FILE = "활동.csv"
 
 ACTIVITY_TYPES = ["코드 작성·디버깅", "계산·증명", "실험·측정·보고서", "설계·제도", "데이터 분석", "창작·제작", "사례 분석·토론·발표", "실기·임상"]
 SOURCE_KINDS = ["강의계획서", "과제명세", "학생결과물", "교수페이지", "시험", "기타"]
@@ -1061,7 +1064,8 @@ class Run:
     def __init__(self, school, course, out_dir=None, courses=None):
         self.school, self.course = school, course
         name = folder_name(school, course)
-        self.out = Path(out_dir) if out_dir else OUTPUT_ROOT / name
+        self.out = Path(out_dir) if out_dir else WORK_ROOT / name
+        self.data = Path(out_dir) if out_dir else DATA_ROOT / name
         names, years = load_course_list(courses) if courses else (None, None)
         self.curriculum = names if names is not None else catalog().programs[(school, course)]["curriculum"]
         self.groups = select_courses(school, course, names)
@@ -1269,7 +1273,7 @@ def run(school, course, client=None, dry_run=False, max_courses=None, budget_usd
             state.save()
     write_reports(state)
     log(f"이번 실행: 호출 {sum(budget.calls.values())}회({', '.join(f'{name} {count}' for name, count in sorted(budget.calls.items())) or '없음'}) · ${budget.spent:.2f}" + (" · 예산으로 중단" if stopped else ""))
-    log(f"결과: {state.out}")
+    log(f"결과: {state.data} (단계별 기록: {state.out})")
     return state
 
 
@@ -1336,7 +1340,8 @@ def write_reports(state):
     state.out.mkdir(parents=True, exist_ok=True)
     finals = [final for key in state.order for final in [state.final(key)] if final]
     state.path("final.jsonl").write_text("".join(json.dumps(final, ensure_ascii=False) + "\n" for final in finals), encoding="utf-8")
-    with state.path("review.csv").open("w", encoding="utf-8-sig", newline="") as file:
+    state.data.mkdir(parents=True, exist_ok=True)
+    with (state.data / ACTIVITY_FILE).open("w", encoding="utf-8-sig", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(REVIEW_COLUMNS)
         writer.writerows(review_rows(state))
@@ -1474,7 +1479,7 @@ def main(argv=None):
     if args.command == "report":
         state = Run(school, course, courses=args.courses)
         write_reports(state)
-        print(f"리포트: {state.out}")
+        print(f"리포트: {state.data} (단계별 기록: {state.out})")
         return 0
     if args.max_courses is not None and args.max_courses < 1:
         print("--max-courses는 1 이상이어야 합니다.")
